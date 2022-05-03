@@ -1,0 +1,3 @@
+kronos_validation.printf_buffer_size = 1024
+khronos_validation.printf_verbose = false
+khronos_validation.printf_to_stdout = false

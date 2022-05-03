@@ -1,0 +1,45 @@
+# suugu ignores
+
+#extensions
+*.pdb
+*.recipe
+*.obj
+*.idb
+*.o
+*.exe
+*.cppcheck
+*.4coder
+*.spv
+*.cap
+*.rdc
+*.rdbg
+*.tmp
+*.ctm
+*.diagsession
+*.svg
+*.code-workspace
+*.cache
+
+#folders
+.vs/
+.vscode/
+build/
+docs/doxygen/
+
+#data ignores
+data/cfg/*
+data/fonts/*
+data/logs/*
+data/models/*
+#data/shaders/*
+data/temp/*
+data/textures/*
+
+#specific files
+imgui.ini
+TODOs.txt
+misc/suugu.vcxproj.user
+
+#delle specifics
+misc/shell.bat
+
