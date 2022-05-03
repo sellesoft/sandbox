@@ -16,7 +16,7 @@
 #include "core/input.h"
 #include "core/logger.h"
 #include "core/memory.h"
-#include "core/renderer.h"
+#include "core/render.h"
 #include "core/storage.h"
 #include "core/threading.h"
 #include "core/time.h"
@@ -142,13 +142,13 @@ int main(){
     memory_init(Gigabytes(1), Gigabytes(1));
 	logger_init();
 	console_init();
-	DeshWindow->Init("suugu", 1280, 720);
-	Render::Init();
+	DeshWindow->Init("sandbox", 1280, 720);
+	render_init();
 	Storage::Init();
 	UI::Init();
 	cmd_init();
 	DeshWindow->ShowWindow();
-	Render::UseDefaultViewProjMatrix();
+    render_use_default_camera();
 	DeshThreadManager->init();
 
     array<TNode*> items;  
@@ -164,12 +164,15 @@ int main(){
         DeshWindow->Update();
 		console_update();
 		UI::Update();
-		Render::Update();
+		render_update();
 		logger_update();
 		memory_clear_temp();
-
-
-        DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
-    }
-
+		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
+	}
+	
+	//cleanup deshi
+    render_cleanup();
+	DeshWindow->Cleanup();
+	logger_cleanup();
+	memory_cleanup();
 }
