@@ -43,23 +43,13 @@ struct progwrite{
 	machine* mchn = 0;
 	u64* mem = 0;
 
-	void ADD(u64 DR, u64 SR1, u64 immcond, u64 S){
+    void NOP(){
 		u64 instr = 0b000000;
-		instr = (instr << 4) | (DR & nbits(4));
-		instr = (instr << 4) | (SR1 & nbits(4));
-		if(immcond){
-			instr = (instr << 1) | 1;
-			instr = (instr << 49) | (S & nbits(49));
-		}
-		else{
-			instr = (instr << 5) | (S & nbits(4));
-			instr <<= 45;
-		}
 		*mem = instr;
 		mem++;
 	}
 
-	void SUB(u64 DR, u64 SR1, u64 immcond, u64 S){
+	void ADD(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b000001;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -75,7 +65,7 @@ struct progwrite{
 		mem++;
 	}
 
-	void MUL(u64 DR, u64 SR1, u64 immcond, u64 S){
+	void SUB(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b000010;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -91,7 +81,7 @@ struct progwrite{
 		mem++;
 	}
 
-	void SMUL(u64 DR, u64 SR1, u64 immcond, s64 S){
+	void MUL(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b000011;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -107,8 +97,24 @@ struct progwrite{
 		mem++;
 	}
 
-	void DIV(u64 QR, u64 RR, u64 SR1, u64 immcond, u64 S){
+	void SMUL(u64 DR, u64 SR1, u64 immcond, s64 S){
 		u64 instr = 0b000100;
+		instr = (instr << 4) | (DR & nbits(4));
+		instr = (instr << 4) | (SR1 & nbits(4));
+		if(immcond){
+			instr = (instr << 1) | 1;
+			instr = (instr << 49) | (S & nbits(49));
+		}
+		else{
+			instr = (instr << 5) | (S & nbits(4));
+			instr <<= 45;
+		}
+		*mem = instr;
+		mem++;
+	}
+
+	void DIV(u64 QR, u64 RR, u64 SR1, u64 immcond, u64 S){
+		u64 instr = 0b000101;
 		instr = (instr << 4) | (QR & nbits(4));
 		instr = (instr << 4) | (RR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -126,7 +132,7 @@ struct progwrite{
 	}
 
 	void SDIV(u64 QR, u64 RR, u64 SR1, u64 immcond, s64 S){
-		u64 instr = 0b000101;
+		u64 instr = 0b000110;
 		u64 Su = ConversionlessCast(u64, S);
 		instr = (instr << 4) | (QR & nbits(4));
 		instr = (instr << 4) | (RR & nbits(4));
@@ -146,22 +152,6 @@ struct progwrite{
 	}
 
 	void AND(u64 DR, u64 SR1, u64 immcond, u64 S){
-		u64 instr = 0b000110;
-		instr = (instr << 4) | (DR & nbits(4));
-		instr = (instr << 4) | (SR1 & nbits(4));
-		if(immcond){
-			instr = (instr << 1) | 1;
-			instr = (instr << 49) | (S & nbits(49));
-		}
-		else{
-			instr = (instr << 5) | (S & nbits(4));
-			instr <<= 45;
-		}
-		*mem = instr;
-		mem++;
-	}
-
-	void OR(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b000111;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -177,7 +167,7 @@ struct progwrite{
 		mem++;
 	}
 
-	void XOR(u64 DR, u64 SR1, u64 immcond, u64 S){
+	void OR(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b001000;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -193,7 +183,7 @@ struct progwrite{
 		mem++;
 	}
 
-	void SHR(u64 DR, u64 SR1, u64 immcond, u64 S){
+	void XOR(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b001001;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -209,7 +199,7 @@ struct progwrite{
 		mem++;
 	}
 
-	void SHL(u64 DR, u64 SR1, u64 immcond, u64 S){
+	void SHR(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b001010;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -225,13 +215,45 @@ struct progwrite{
 		mem++;
 	}
 
-	void NOT(u64 DR, u64 SR1, u64 immcond, u64 S){
+	void SHL(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b001011;
 		instr = (instr << 4) | (DR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
+		if(immcond){
+			instr = (instr << 1) | 1;
+			instr = (instr << 49) | (S & nbits(49));
+		}
+		else{
+			instr = (instr << 5) | (S & nbits(4));
+			instr <<= 45;
+		}
 		*mem = instr;
 		mem++;
 	}
+
+	void NOT(u64 DR, u64 SR1){
+		u64 instr = 0b001100;
+		instr = (instr << 4) | (DR & nbits(4));
+		instr = (instr << 4) | (SR1 & nbits(4));
+		*mem = instr << 50;
+		mem++;
+	}
+
+    void JMP(u64 SR1){
+        u64 instr = 0b001101;
+        instr = (instr << 4) | (SR1 & nbits(4));
+        *mem = instr << 54;
+        mem++;
+    }
+
+    void MOV(u64 DR, u64 immcond, u64 S){
+        u64 instr = 0b001110;
+        instr = (instr << 4) | (DR & nbits(4));
+        if(immcond) instr = (((instr << 1) | 1) << 53) | (S & nbits(53));
+        else instr = ((instr << 5) | (S & nbits(4))) << 49;
+        *mem = instr;
+        mem++;
+    }
 };
 
 
@@ -253,16 +275,15 @@ int main(){
 	progwrite pw;
 	pw.mchn = &pc;
 	pw.mem = (u64*)pc.mem + pc.PC_START;
-	pw.ADD(R_R0,R_R0,1,10);     	// add  10  to  r0 -> r0    | r0: 10
-	pw.ADD(R_R1,R_R1,1,50);     	// add  50  to  r1 -> r1    | r0: 10, r1: 50
-	pw.SUB(R_R2,R_R0,0,R_R1);   	// sub  r1 from r0 -> r2    | r0: 10, r1: 50, r2: -40
-	pw.MUL(R_R3,R_R2,1,2);     		// mul  r2  by   2 -> r3    | r0: 10, r1: 50, r2: -40 r3: -80
-	pw.SMUL(R_R4,R_R3,1,-1);        // imul r3  by  -1 -> r4    | r0: 10, r1: 50, r2: -40 r3: -80 r4: 80
-	pw.DIV(R_R5,R_R6,R_R4,1,3);     // div  r4  by   3 -> r5,r6 | r0: 10, r1: 50, r2: -40 r3: -80 r4: 20 r5: 26, r6: 2
-	pw.SDIV(R_R7,R_R8,R_R6,1,-1);   // idiv r6  by  -1 -> r7,r8 | r0: 10, r1: 50, r2: -40 r3: -80 r4: 20 r5: 26, r6: 2 r7: -2 r8: 0
-	pw.OR(R_R0, R_R0, 1, 0xFF);
+    pw.MOV(R_R0, 1, 1);
+    pw.MOV(R_R1, 1, 1);
+    pw.MOV(R_R3, 1, 3);
+    pw.ADD(R_R2, R_R1, 0, R_R0);
+    pw.MOV(R_R0, 0, R_R1);
+    pw.MOV(R_R1, 0, R_R2);
+    pw.JMP(R_R3);
 
-	pc.turnon();
+    pc.turnon();
     
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
 		DeshWindow->Update();
@@ -272,20 +293,37 @@ int main(){
 			SetNextWindowSize(DeshWinSize);
 			Begin("MachineDebug");{
             #define regc "%"
-				if(Button("tick")) pc.tick();
-				if(Button("reset")) pc.ureg(R_PC) = pc.PC_START;
+				persist u32 running = false;
+                persist f32 throttle = 500; //time between ticks when running 
+                persist Stopwatch throttle_watch = start_stopwatch();
+                if(running && peek_stopwatch(throttle_watch) > throttle) reset_stopwatch(&throttle_watch), pc.tick();
+                if(!running && Button("tick")) pc.tick();
+                if(Button("reset")){ pc.ureg(R_PC) = pc.PC_START; memset(pc.reg, 0, sizeof(Reg)*R_COUNT); }
+                if(Button("run")) running = true;
+                if(Button("stop")) running = false; 
+                if(running) Slider("throttle", &throttle, 0, 1000);
 				
 				static u64 offset = 0;
 				if(key_pressed(Key_UP)) (offset ? offset-- : 0);
 				if(key_pressed(Key_DOWN)) offset++;
-				SetNextWindowSize(MAX_F32, MAX_F32);
+				SetNextWindowSize((GetMarginedRight()-GetMarginedLeft()) * 0.5, MAX_F32);
 				BeginChild("SourceMenu", vec2::ZERO);{
-					for(u64 instr = pc.PC_START; instr < 30+offset; instr++){
+					for(u64 instr = pc.PC_START+offset; instr < 30+offset; instr++){
 						//Selectable(getbits<64>(&pc.mem[instr]).str, instr==pc.ureg(R_PC));
+                        if(pc.ureg(R_PC) == instr){
+                            RectFilled(vec2(0, GetWinCursor().y), vec2(MAX_F32, GetStyle().fontHeight), color(100,50,40));
+                        }
 						BeginRow("instralign", 5, GetStyle().fontHeight, UIRowFlags_AutoSize); 
 						RowSetupColumnAlignments({{0,1},{1,1},{1,1},{0,1},{0,1}});
 						InstrRead read = ReadInstr(pc.mem[instr]);
 						switch(read.OP){
+                            case OP_NOP:{
+                                Text("nop ");
+                                Text(" ");
+                                Text(" ");
+                                Text(" ");
+                                Text(" ");
+                            }break;
 							case OP_ADD:{
 								Text("add "); 
                                 Text(toStr(regc, read.DR, " ")); 
@@ -321,10 +359,93 @@ int main(){
                                 Text(toStr(regc, read.SR1, " ")); 
                                 (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR2)));
 							}break;
+                            case OP_SDIV:{
+                                Text("sdiv "); 
+                                Text(toStr(regc, read.QR, " ")); 
+                                Text(toStr(regc, read.RR, " ")); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR2)));
+                            }break;
+                            case OP_AND:{
+								Text("and "); 
+                                Text(toStr(regc, read.DR, " ")); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR2))); 
+                                Text(" ");
+							}break;
+                            case OP_OR:{
+								Text("or "); 
+                                Text(toStr(regc, read.DR, " ")); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR2))); 
+                                Text(" ");
+							}break;
+                            case OP_XOR:{
+								Text("xor "); 
+                                Text(toStr(regc, read.DR, " ")); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR2))); 
+                                Text(" ");
+							}break;
+                            case OP_SHR:{
+								Text("shr "); 
+                                Text(toStr(regc, read.DR, " ")); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR2))); 
+                                Text(" ");
+							}break;
+                            case OP_SHL:{
+								Text("shl "); 
+                                Text(toStr(regc, read.DR, " ")); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR2))); 
+                                Text(" ");
+							}break;
+                            case OP_NOT:{
+								Text("not "); 
+                                Text(toStr(regc, read.DR, " ")); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                Text(" ");
+                                Text(" ");
+							}break;
+                            case OP_JMP:{
+								Text("jmp "); 
+                                Text(toStr(regc, read.SR1, " ")); 
+                                Text(" ");
+                                Text(" ");
+                                Text(" ");
+							}break;
+                            case OP_MOV:{
+                                Text("mov ");
+                                Text(toStr(regc, read.DR, " "));
+                                (read.immcond ? Text(toStr(read.immval)) : Text(toStr(regc, read.SR1)));
+                                Text(" ");
+                                Text(" ");
+                            }break;
 						}
 						EndRow();
 					}
 				}EndChild();
+                vec2 lpos = GetLastItem()->position;
+                vec2 lsiz = GetLastItem()->size;
+                SetNextWindowSize(MAX_F32, MAX_F32);
+                SetWinCursor({lpos.x+lsiz.x,lpos.y});
+                BeginChild("registers", vec2::ZERO);{
+                    BeginRow("regbuttonalign", 4, 0, UIRowFlags_AutoSize);
+                    RowSetupColumnAlignments({{0,0},{0,0},{0,0},{0,0}});
+                    static u64 state[R_COUNT]={0};//0 u64; 1 s64; 2 f64;
+                    forI(R_COUNT){
+                        switch(state[i]){
+                            case 0:{Text(toStr(regc, i, ": ", pc.ureg(i)));}break;
+                            case 1:{Text(toStr(regc, i, ": ", pc.sreg(i)));}break;
+                            case 2:{Text(toStr(regc, i, ": ", pc.freg(i)));}break;
+                        }
+                        if(Button((state[i] == 0 ? "o unsigned" : "unsigned"))) state[i] = 0;
+                        if(Button((state[i] == 1 ? "o signed" : "signed")))   state[i] = 1;
+                        if(Button((state[i] == 2 ? "o float" : "float")))    state[i] = 2;
+                    }
+                    EndRow();
+                }EndChild();
 			}End();
 		}
 		UI::ShowMetricsWindow();
