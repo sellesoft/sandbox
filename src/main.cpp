@@ -33,6 +33,10 @@
 #include "misc_testing.cpp"
 #endif
 
+//// tunnler inludes ////
+#include "external/zed_net.h"
+#include "networking.cpp"
+
 int main(){
 	//init deshi
 	memory_init(Gigabytes(1), Gigabytes(1));
