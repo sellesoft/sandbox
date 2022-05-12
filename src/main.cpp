@@ -35,11 +35,12 @@
 
 //// tunnler inludes ////
 #define ZED_NET_IMPLEMENTATION
-//// tunnler includes ////
+#define MINIAUDIO_IMPLEMENTATION
+#include "external/zed_net.h"
+#include "external/miniaudio.h"
 #include "types.h"
 #include "board.cpp"
-#include "external/zed_net.h"
-#include "types.h"
+#include "sound.cpp"
 #include "networking.cpp"
 
 int main(){
@@ -57,12 +58,14 @@ int main(){
     render_use_default_camera();
 	DeshThreadManager->init();
 	net_init_client(str8l("localhost"), 24465);
+	sound_init();
 	
 	init_board(20, 10);
 	
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
+		sound_update();
 		DeshWindow->Update();
 		platform_update();
 		console_update();
@@ -103,7 +106,7 @@ int main(){
 				}EndChild();
 				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
 				BeginChild(str8l("inwin"), vec2::ZERO);{
-					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
+					BeginRow(str8l("textalign2"), 2, 0, UIRowFlags_AutoSize);
 					string out = toStr(info_in.pos);
 					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
 					Text(str8l("move: ")); Text(MoveStrs[info_in.move]);
