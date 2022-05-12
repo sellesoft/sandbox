@@ -54,7 +54,7 @@ int main(){
 		console_update();
 		UI::Update();
 		render_update();
-		logger_update();
+		logger_update();//
 		memory_clear_temp();
 		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
 	}
