@@ -1,3 +1,5 @@
+//~////////////////////////////////////////////////////////////////////////////////////////////////
+//// @includes
 #ifdef TRACY_ENABLE
 #  include "Tracy.hpp"
 #endif
@@ -42,14 +44,18 @@
 #include "board.cpp"
 #include "sound.cpp"
 #include "networking.cpp"
+#include "game.cpp"
 
+
+//~////////////////////////////////////////////////////////////////////////////////////////////////
+//// @main
 int main(){
 	//init deshi
 	memory_init(Gigabytes(1), Gigabytes(1));
 	platform_init();
 	logger_init();
 	console_init();
-	DeshWindow->Init(str8l("sandbox"), 1280, 900);
+	DeshWindow->Init(str8l("sandbox"));
 	render_init();
 	Storage::Init();
 	UI::Init();
@@ -59,8 +65,7 @@ int main(){
 	DeshThreadManager->init();
 	net_init_client(str8l("localhost"), 24465);
 	sound_init();
-	
-	init_board(20, 10);
+	init_game();
 	
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
@@ -70,13 +75,12 @@ int main(){
 		platform_update();
 		console_update();
 		
-		draw_board();
-		
-		{
+		update_game();
+		{//debug
 			using namespace UI;
 			static NetInfo info_out;
 			static NetInfo info_in;
-
+			
 			Begin(str8l("nettest"));{
 				if(Button(str8l("send"))){
 					net_client_send(info_out);
@@ -87,9 +91,9 @@ int main(){
 						info_in = in;
 					}
 				}
-				if(BeginCombo(str8l("move"), MoveStrs[info_out.move])){
-					forI(Move_COUNT){
-						if(Selectable(MoveStrs[i], i==info_out.move)){
+				if(BeginCombo(str8l("move"), ActionStrs[info_out.move])){
+					forI(Action_COUNT){
+						if(Selectable(ActionStrs[i], i==info_out.move)){
 							info_out.move = i;
 						}
 					}
@@ -101,7 +105,7 @@ int main(){
 					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
 					string out = toStr(info_out.pos);
 					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
-					Text(str8l("move: ")); Text(MoveStrs[info_out.move]);
+					Text(str8l("move: ")); Text(ActionStrs[info_out.move]);
 					EndRow();
 				}EndChild();
 				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
@@ -109,13 +113,14 @@ int main(){
 					BeginRow(str8l("textalign2"), 2, 0, UIRowFlags_AutoSize);
 					string out = toStr(info_in.pos);
 					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
-					Text(str8l("move: ")); Text(MoveStrs[info_in.move]);
+					Text(str8l("move: ")); Text(ActionStrs[info_in.move]);
 					EndRow();
 				}EndChild();
 				PopVar();
 			}End();
+			//DemoWindow();
 		}
-		UI::DemoWindow();
+		
 		UI::Update();
 		render_update();
 		logger_update();
