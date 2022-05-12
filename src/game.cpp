@@ -87,7 +87,6 @@ void draw_board(){
 void init_game(){
 	init_board(20, 10);
 	turn_count = 0;
-	player_idx = 0;
 	
 	player0 = {0,             board_height-1, 3, TileFG_BritishPlayer, array<u32>(deshi_allocator)};
 	TileAt(player0.x,player0.y).bg = TileBG_Trench;
@@ -106,7 +105,7 @@ void update_game(){
 #define TileAtOtherPlayer() TileAt(player->x,player->y)
 #define TileNearOtherPlayer(_x,_y) TileAt(player->x+_x,player->y+_y)
 	
-	u32 action_performed = Action_None;
+	u32 action_performed = Message_None;
 	if(turn_count % 2 == player_idx){
 		player = &player0;
 		other_player = &player1;
@@ -114,31 +113,31 @@ void update_game(){
 		//// moving input ////
 		if      (   key_pressed(Key_UP    | InputMod_None)
 				 && player->y < board_height-1 && TileNearPlayer(0, 1).bg == TileBG_Trench){
-			action_performed = Action_MoveUp;
+			action_performed = Message_MoveUp;
 		}else if(   key_pressed(Key_DOWN  | InputMod_None)
 				 && player->y > 0              && TileNearPlayer(0,-1).bg == TileBG_Trench){
-			action_performed = Action_MoveDown;
+			action_performed = Message_MoveDown;
 		}else if(   key_pressed(Key_RIGHT | InputMod_None)
 				 && player->y < board_width-1  && TileNearPlayer( 1,0).bg == TileBG_Trench){
-			action_performed = Action_MoveRight;
+			action_performed = Message_MoveRight;
 		}else if(   key_pressed(Key_LEFT  | InputMod_None)
 				 && player->y > 0              && TileNearPlayer(-1,0).bg == TileBG_Trench){
-			action_performed = Action_MoveLeft;
+			action_performed = Message_MoveLeft;
 		}
 		
 		//// digging input ////
 		if      (   key_pressed(Key_UP    | InputMod_AnyShift)
 				 && player->y < board_height-1 && TileNearPlayer(0,1).bg == TileBG_Dirt){
-			action_performed = Action_DigUp;
+			action_performed = Message_DigUp;
 		}else if(   key_pressed(Key_DOWN  | InputMod_AnyShift)
 				 && player->y > 0 && TileNearPlayer(0,-1).bg == TileBG_Dirt){
-			action_performed = Action_DigDown;
+			action_performed = Message_DigDown;
 		}else if(   key_pressed(Key_RIGHT | InputMod_AnyShift)
 				 && player->y < board_width-1 && TileNearPlayer(1,0).bg == TileBG_Dirt){
-			action_performed = Action_DigRight;
+			action_performed = Message_DigRight;
 		}else if(   key_pressed(Key_LEFT  | InputMod_AnyShift)
 				 && player->y > 0 && TileNearPlayer(-1,0).bg == TileBG_Dirt){
-			action_performed = Action_DigLeft;
+			action_performed = Message_DigLeft;
 		}
 		
 		//// building input ////
@@ -147,12 +146,21 @@ void update_game(){
 		//// bombing input ////
 		if      (key_pressed(Key_B    | InputMod_None)){   //place bomb
 			if(player->bombs > 0){
-				action_performed = Action_PlaceBomb;
+				action_performed = Message_PlaceBomb;
 			}
 		}else if(key_pressed(Key_B  | InputMod_AnyShift)){ //detonate bomb
 			if(player->placed_bombs.count > 0){
-				action_performed = Action_DetonateBomb;
+				action_performed = Message_DetonateBomb;
 			}
+		}
+		
+		if(action_performed != Message_None){
+			turn_count += 1;
+			turn_info.uid = player_idx;
+			turn_info.x = player->x;
+			turn_info.y = player->y;
+			turn_info.message = action_performed;
+			net_client_send(turn_info);
 		}
 	}else{
 		player = &player1;
@@ -162,55 +170,55 @@ void update_game(){
 	//perform action for current player
 	switch(action_performed){
 		//// moving actions ////
-		case Action_MoveUp:{
+		case Message_MoveUp:{
 			RemoveFlag(TileAtPlayer().fg, player->flag);
 			player->y += 1;
 			AddFlag(TileAtPlayer().fg, player->flag);
 		}break;
-		case Action_MoveDown:{
+		case Message_MoveDown:{
 			RemoveFlag(TileAtPlayer().fg, player->flag);
 			player->y -= 1;
 			AddFlag(TileAtPlayer().fg, player->flag);
 		}break;
-		case Action_MoveRight:{
+		case Message_MoveRight:{
 			RemoveFlag(TileAtPlayer().fg, player->flag);
 			player->x += 1;
 			AddFlag(TileAtPlayer().fg, player->flag);
 		}break;
-		case Action_MoveLeft:{
+		case Message_MoveLeft:{
 			RemoveFlag(TileAtPlayer().fg, player->flag);
 			player->x -= 1;
 			AddFlag(TileAtPlayer().fg, player->flag);
 		}break;
 		
 		//// digging actions ////
-		case Action_DigUp:{
+		case Message_DigUp:{
 			TileNearPlayer(0, 1).bg = TileBG_Trench;
 		}break;
-		case Action_DigDown:{
+		case Message_DigDown:{
 			TileNearPlayer(0,-1).bg = TileBG_Trench;
 		}break;
-		case Action_DigRight:{
+		case Message_DigRight:{
 			TileNearPlayer( 1,0).bg = TileBG_Trench;
 		}break;
-		case Action_DigLeft:{
+		case Message_DigLeft:{
 			TileNearPlayer(-1,0).bg = TileBG_Trench;
 		}break;
 		
 		//// building actions ////
-		case Action_BuildLadder:{
+		case Message_BuildLadder:{
 			
 		}break;
-		case Action_BuildPillar:{
+		case Message_BuildPillar:{
 			
 		}break;
 		
 		//// bombing actions ////
-		case Action_PlaceBomb:{
+		case Message_PlaceBomb:{
 			player->placed_bombs.add(ToLinear(player->x,player->y));
 			player->bombs -= 1;
 		}break;
-		case Action_DetonateBomb:{
+		case Message_DetonateBomb:{
 			forI(player->placed_bombs.count){
 				//explode up
 				s32 up_tile = player->placed_bombs[i] - board_width;
@@ -261,10 +269,6 @@ void update_game(){
 				}
 			}
 		}break;
-	}
-	
-	if(action_performed != Action_None){
-		turn_count += 1;
 	}
 	
 	//debug

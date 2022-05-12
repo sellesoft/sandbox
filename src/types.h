@@ -3,39 +3,56 @@
 #define TUNLLER_TYPES_H
 #include "kigu/common.h"
 
-typedef u32 Action; enum{
-    Action_None,
-    Action_MoveUp,
-    Action_MoveDown,
-    Action_MoveRight,
-    Action_MoveLeft,
-	Action_DigUp,
-    Action_DigDown,
-    Action_DigRight,
-    Action_DigLeft,
-	Action_BuildLadder,
-	Action_BuildPillar,
-	Action_PlaceBomb,
-	Action_DetonateBomb,
-    Action_QuitGame,
-	Action_COUNT
+typedef u32 Message; enum{
+    Message_None,
+    
+    Message_HostGame, //message broadcast by client hosting game
+    Message_JoinGame, //message broadcast in response to HostGame
+    Message_QuitGame, //message broadcast by either client to end game
+    Message_AcknowledgeMessage, //message broadcast by either client to indiciate that the last message was recieved
+	
+    Message_MoveUp,
+    Message_MoveDown,
+    Message_MoveRight,
+    Message_MoveLeft,
+	
+	Message_DigUp,
+    Message_DigDown,
+    Message_DigRight,
+    Message_DigLeft,
+	
+	Message_BuildLadder,
+	Message_BuildPillar,
+	
+	Message_PlaceBomb,
+	Message_DetonateBomb,
+	
+	Message_COUNT
 };
 
-str8 ActionStrs[Action_COUNT] ={
+str8 MessageStringss[Message_COUNT] ={
     str8l("None"),
+	
+	str8l("HostGame"),
+	str8l("JoinGame"),
+	str8l("QuitGame"),
+	str8l("AcknowledgeMessage"),
+	
 	str8l("MoveUp"),
 	str8l("MoveDown"),
 	str8l("MoveRight"),
 	str8l("MoveLeft"),
+	
 	str8l("DigUp"),
 	str8l("DigDown"),
 	str8l("DigRight"),
 	str8l("DigLeft"),
+	
 	str8l("BuildLadder"),
 	str8l("BuildPillar"),
+	
 	str8l("PlaceBomb"),
 	str8l("DetonateBomb"),
-	str8l("QuitGame"),
 };
 
 typedef u32 TileBG; enum{
@@ -75,7 +92,7 @@ struct Player{
 
 struct NetInfo{
     u8 magic[4] = {'T','U','N','L'};
-	Action move;
+	Message message;
     s32 x, y;
     u32 uid;
 };
@@ -91,6 +108,8 @@ var.magic[3] == 'L'     \
 
 //~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @vars
+b32 game_active = 0;
+
 Tile* board;
 s32 board_width;
 s32 board_height;
@@ -103,6 +122,7 @@ s32 board_area;
 #define TileAtLinear(pos) board[pos]
 
 u32 turn_count;
+NetInfo turn_info;
 
 Player player0;
 Player player1;

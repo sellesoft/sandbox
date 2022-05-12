@@ -66,16 +66,56 @@ NetInfo net_client_recieve(){
     return info;
 }
 
-struct{
-    u32 turn;
-}game_info;
+u32 host_phase = 0;
 
-void net_begin_game(){
-	
+b32 net_host_game(){
+	switch(host_phase){
+        case 0:{//set index and broadcast host message
+            player_idx = 0;
+            NetInfo info;
+            info.uid = 0;
+            info.message = Message_HostGame;
+            net_client_send(info);
+        }break;
+        case 1:{//wait for response from another client
+            NetInfo info = net_client_recieve();
+            if(info.message == Message_JoinGame){
+                NetInfo info; //acknowledge join game
+                info.uid = 0;
+                info.message = Message_AcknowledgeMessage;
+                net_client_send(info);
+                return false;
+            }else{ //rebroadcast message TODO(sushi) check if this is necessary
+                info = NetInfo();
+                info.uid = 0;
+                info.message = Message_HostGame;
+                net_client_send(info);
+            }
+        }break;
+    }
+    return true;
 }
 
-void net_join_game(){
-	
+u32 join_phase = 0;
+
+b32 net_join_game(){
+    switch(join_phase){
+        case 0:{ //searching for HostGame message, respond if found
+            player_idx = 1;
+            NetInfo info = net_client_recieve();
+            if(info.message == Message_HostGame){
+                info.uid = 1;
+                info.message = Message_JoinGame;
+                net_client_send(info);
+                join_phase = 1;
+            }
+        }break;            
+        case 1:{ // we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
+            NetInfo info = net_client_recieve();
+            if(info.message == Message_AcknowledgeMessage) return join_phase = 0, false;
+        }break;
+    }
+    return true;
 }
 
 #if 0
