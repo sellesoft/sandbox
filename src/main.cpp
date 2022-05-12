@@ -157,7 +157,6 @@ int main(){
 						} else game_active = true;
 					}break;
 				}
-				
 			}End();
 		}
 		

@@ -8,6 +8,10 @@ void init_board(s32 width, s32 height){
 	board_area   = width*height;
 }
 
+void deinit_board(){
+	memzfree(board);
+}
+
 void draw_board(){
 	f32 tile_width  = (f32)DeshWindow->width / (f32)board_width;
 	f32 tile_height = tile_width;
@@ -165,6 +169,10 @@ void update_game(){
 	}else{
 		player = &player1;
 		other_player = &player0;
+		NetInfo info = net_client_recieve();
+		action_performed = info.message;
+		if(action_performed <= Message_MOVES_END && action_performed >= Message_MOVES_START) turn_count++;
+		
 	}
 	
 	//perform action for current player
@@ -268,6 +276,10 @@ void update_game(){
 					}
 				}
 			}
+		}break;
+		case Message_QuitGame:{
+			deinit_board();
+			game_active = 0;
 		}break;
 	}
 	

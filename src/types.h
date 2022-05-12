@@ -27,7 +27,10 @@ typedef u32 Message; enum{
 	Message_PlaceBomb,
 	Message_DetonateBomb,
 	
-	Message_COUNT
+	Message_COUNT,
+
+    Message_MOVES_START = Message_MoveUp,
+    Message_MOVES_END = Message_DetonateBomb,
 };
 
 str8 MessageStrings[Message_COUNT] ={
