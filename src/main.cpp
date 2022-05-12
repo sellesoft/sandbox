@@ -33,8 +33,11 @@
 #include "misc_testing.cpp"
 #endif
 
+//// tunnler includes ////
 #include "types.h"
 #include "board.cpp"
+#include "external/zed_net.h"
+#include "networking.cpp"
 
 int main(){
 	//init deshi

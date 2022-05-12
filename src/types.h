@@ -1,3 +1,4 @@
+#pragma once
 #ifndef TUNLLER_TYPES_H
 #define TUNLLER_TYPES_H
 #include "kigu/common.h"
