@@ -34,7 +34,9 @@
 #endif
 
 //// tunnler inludes ////
+#define ZED_NET_IMPLEMENTATION
 #include "external/zed_net.h"
+#include "types.h"
 #include "networking.cpp"
 
 int main(){
@@ -51,15 +53,19 @@ int main(){
 	DeshWindow->ShowWindow();
     render_use_default_camera();
 	DeshThreadManager->init();
-
+	net_init_client(str8l("localhost"), 4480);
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
 		DeshWindow->Update();
+		NetInfo info;
+		info.move = Move_Down;
+		net_client_send(info);
 		platform_update();
 		console_update();
 		UI::Update();
 		render_update();
+		NetInfo response = net_client_recieve();
 		logger_update();
 		memory_clear_temp();
 		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
