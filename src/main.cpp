@@ -48,7 +48,6 @@ int main(){
     render_use_default_camera();
 	DeshThreadManager->init();
 
-
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
