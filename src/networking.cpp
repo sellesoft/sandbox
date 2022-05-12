@@ -8,11 +8,6 @@ zaddress caddress;
 b32 is_server = 0;
 b32 is_client = 0;
 
-//threaded worker function to constantly receieve messages
-void net_worker(void* data){
-
-}
-
 //opens the socket on specified port
 //this is internal, but maybe have more uses later
 b32 net_open_socket(u64 port){
@@ -46,7 +41,7 @@ void net_deinit(){
     zed_net_socket_close(&csocket);
     is_client = is_server = 0;
     zed_net_shutdown();
-}
+} 
 
 //sends data to the client's connected server
 b32 net_client_send(NetInfo info){
@@ -69,6 +64,19 @@ NetInfo net_client_recieve(){
     if(!bytes_read) info.magic[0] = 0; 
     return info;
 }
+
+struct{
+    u32 turn;
+}game_info;
+
+void net_begin_game(){
+
+}
+
+void net_join_game(){
+
+}
+
 #if 0
 //recieves a message from some client and then rebroadcasts it to all other clients
 NetInfo net_server_recieve(){

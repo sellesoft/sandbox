@@ -62,7 +62,7 @@ int main(){
 	DeshWindow->ShowWindow();
     render_use_default_camera();
 	DeshThreadManager->init();
-	net_init_client(str8l("localhost"), 24465);
+	net_init_client(str8l("192.168.0.255"), 24465);
 	sound_init();
 	init_game();
 	
