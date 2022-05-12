@@ -62,7 +62,7 @@ int main(){
 	DeshWindow->ShowWindow();
     render_use_default_camera();
 	DeshThreadManager->init();
-	net_init_client(str8l("localhost"), 24465);
+	net_init_client(str8l("192.168.0.255"), 24465);
 	sound_init();
 	init_game();
 	
@@ -102,7 +102,7 @@ int main(){
 				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y / 2);
 				BeginChild(str8l("outwin"), vec2::ZERO);{
 					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
-					string out = toStr(info_out.pos);
+					string out = toStr("(",info_out.x,",",info_out.y,")");
 					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
 					Text(str8l("move: ")); Text(ActionStrs[info_out.move]);
 					EndRow();
@@ -110,7 +110,7 @@ int main(){
 				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
 				BeginChild(str8l("inwin"), vec2::ZERO);{
 					BeginRow(str8l("textalign2"), 2, 0, UIRowFlags_AutoSize);
-					string out = toStr(info_in.pos);
+					string out = toStr("(",info_out.x,",",info_out.y,")");
 					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
 					Text(str8l("move: ")); Text(ActionStrs[info_in.move]);
 					EndRow();

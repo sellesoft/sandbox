@@ -1,8 +1,6 @@
 //~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @board
-
-
-void init_board(u32 width, u32 height){
+void init_board(s32 width, s32 height){
 	board        = (Tile*)memory_alloc((width*height)*sizeof(Tile));
 	board_width  = width;
 	board_height = height;
@@ -37,28 +35,41 @@ void draw_board(){
 				   "\n(l)  Place Ladder"));
 	
 	//draw board
-	forX(row, board_height){
-		forX(col, board_width){
-			vec2 tile_pos = vec2(col*tile_width, DeshWindow->cheight - (row+1)*tile_height);
+	forX(y, board_height){
+		forX(x, board_width){
+			vec2 tile_pos = vec2(x*tile_width, DeshWindow->cheight - (y+1)*tile_height);
 			
 			//draw tile background
-			switch(TileAt(row,col).bg){
-				case TextureBG_Dirt:    UI::Text(str8l("Dirt"),    tile_pos, UITextFlags_NoWrap); break;
-				case TextureBG_Surface: UI::Text(str8l("Surface"), tile_pos, UITextFlags_NoWrap); break;
-				case TextureBG_Sky:     UI::Text(str8l("Sky"),     tile_pos, UITextFlags_NoWrap); break;
-				case TextureBG_Trench:  UI::Text(str8l("Trench"),  tile_pos, UITextFlags_NoWrap); break;
-				case TextureBG_Fort:    UI::Text(str8l("Fort"),    tile_pos, UITextFlags_NoWrap); break;
-				case TextureBG_Tunnel:  UI::Text(str8l("Tunnel"),  tile_pos, UITextFlags_NoWrap); break;
+			switch(TileAt(x,y).bg){
+				case TileBG_Dirt:    UI::Text(str8l("Dirt"),    tile_pos, UITextFlags_NoWrap); break;
+				case TileBG_Surface: UI::Text(str8l("Surface"), tile_pos, UITextFlags_NoWrap); break;
+				case TileBG_Sky:     UI::Text(str8l("Sky"),     tile_pos, UITextFlags_NoWrap); break;
+				case TileBG_Trench:  UI::Text(str8l("Trench"),  tile_pos, UITextFlags_NoWrap); break;
+				case TileBG_Fort:    UI::Text(str8l("Fort"),    tile_pos, UITextFlags_NoWrap); break;
+				case TileBG_Tunnel:  UI::Text(str8l("Tunnel"),  tile_pos, UITextFlags_NoWrap); break;
 			}
 			
-			//draw tile foreground
-			switch(TileAt(row,col).fg){
-				case TextureFG_BritishPlayer: UI::Text(str8l("British"),   tile_pos + vec2{0,style.fontHeight}, UITextFlags_NoWrap); break;
-				case TextureFG_GermanPlayer:  UI::Text(str8l("German"),    tile_pos + vec2{0,style.fontHeight}, UITextFlags_NoWrap); break;
-				case TextureFG_Pillar:        UI::Text(str8l("Pillar"),    tile_pos + vec2{0,style.fontHeight}, UITextFlags_NoWrap); break;
-				case TextureFG_Explosive:     UI::Text(str8l("Explosive"), tile_pos + vec2{0,style.fontHeight}, UITextFlags_NoWrap); break;
-				case TextureFG_Sandbags:      UI::Text(str8l("Sandbag"),   tile_pos + vec2{0,style.fontHeight}, UITextFlags_NoWrap); break;
-				case TextureFG_Ladder:      UI::Text(str8l("Ladder"),    tile_pos + vec2{0,style.fontHeight}, UITextFlags_NoWrap); break;
+			//draw foreground structures
+			if      (HasFlag(TileAt(x,y).fg, TileFG_Ladder)){
+				UI::Text(str8l("Ladder"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+			}else if(HasFlag(TileAt(x,y).fg, TileFG_Pillar)){
+				UI::Text(str8l("Pillar"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+			}
+			
+			//draw foreground bombs
+			if      (HasFlag(TileAt(x,y).fg, TileFG_BritishBomb)){
+				UI::Text(str8l("Bomb (B)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+			}else if(HasFlag(TileAt(x,y).fg, TileFG_GermanBomb)){
+				UI::Text(str8l("Bomb (G)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+			}else if(HasFlag(TileAt(x,y).fg, TileFG_BombWire)){
+				UI::Text(str8l("Wire"),     UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+			}
+			
+			//draw foreground players
+			if      (HasFlag(TileAt(x,y).fg, TileFG_BritishPlayer)){
+				UI::Text(str8l("Player (B)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+			}else if(HasFlag(TileAt(x,y).fg, TileFG_GermanPlayer)){
+				UI::Text(str8l("Player (G)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
 			}
 			
 			//draw tile border
@@ -76,13 +87,13 @@ void draw_board(){
 void init_game(){
 	init_board(20, 10);
 	player_idx = 0;
-	turn_count = 1;
-	player0.pos    = vec2{0,(f32)(board_height-1)};
-	player0.health = 100;
-	player0.bombs  = 3;
-	player1.pos    = vec2{(f32)(board_width-1),(f32)(board_height-1)};
-	player1.health = 100;
-	player1.bombs  = 3;
+	turn_count = 0;
+	player0 = {0,             board_height-1, 3};
+	TileAt(player0.x,player0.y).bg = TileBG_Trench;
+	TileAt(player0.x,player0.y).fg = TileFG_BritishPlayer;
+	player1 = {board_width-1, board_height-1, 3};
+	TileAt(player1.x,player1.y).bg = TileBG_Trench;
+	TileAt(player1.x,player1.y).fg = TileFG_GermanPlayer;
 }
 
 void update_game(){
@@ -92,13 +103,33 @@ void update_game(){
 	//player input
 	if(our_turn){
 		if      (key_pressed(Key_UP    | InputMod_None)){ //move up
-			action_performed = Action_MoveUp;
+			if(player0.y < board_height-1){
+				action_performed = Action_MoveUp;
+				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+				player0.y += 1;
+				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+			}
 		}else if(key_pressed(Key_DOWN  | InputMod_None)){ //move down
-			action_performed = Action_MoveDown;
+			if(player0.y > 0){
+				action_performed = Action_MoveDown;
+				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+				player0.y -= 1;
+				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+			}
 		}else if(key_pressed(Key_RIGHT | InputMod_None)){ //move right
-			action_performed = Action_MoveRight;
+			if(player0.y < board_width-1){
+				action_performed = Action_MoveRight;
+				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+				player0.x += 1;
+				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+			}
 		}else if(key_pressed(Key_LEFT  | InputMod_None)){ //move left
-			action_performed = Action_MoveLeft;
+			if(player0.y > 0){
+				action_performed = Action_MoveLeft;
+				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+				player0.x -= 1;
+				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+			}
 		}
 	}
 	

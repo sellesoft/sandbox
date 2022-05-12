@@ -36,41 +36,43 @@ str8 ActionStrs[Action_COUNT] ={
 	str8l("QuitGame"),
 };
 
-typedef u32 TextureBG; enum{
-	TextureBG_Dirt,
-	TextureBG_Surface,
-	TextureBG_Sky,
-	TextureBG_Trench,
-	TextureBG_Fort,
-	TextureBG_Tunnel,
+typedef u32 TileBG; enum{
+	TileBG_Dirt,
+	TileBG_Surface,
+	TileBG_Sky,
+	TileBG_Trench,
+	TileBG_Fort,
+	TileBG_Tunnel,
 };
 
-typedef u32 TextureFG; enum{
-	TextureFG_None,
-	TextureFG_BritishPlayer,
-	TextureFG_GermanPlayer,
-	TextureFG_Pillar,
-	TextureFG_Explosive,
-	TextureFG_Sandbags,
-	TextureFG_Ladder,
+typedef u32 TileFG; enum{
+	TileFG_None          = 0,
+	
+	TileFG_Ladder        = (1 << 0),
+	TileFG_Pillar        = (1 << 1),
+	
+	TileFG_BritishBomb   = (1 << 2),
+	TileFG_GermanBomb    = (1 << 3),
+	TileFG_BombWire      = (1 << 4),
+	
+	TileFG_BritishPlayer = (1 << 5),
+	TileFG_GermanPlayer  = (1 << 6),
 };
 
 struct Tile{
-	TextureBG fg;
-	TextureFG bg;
-    b32 bomb;
+	TileBG bg;
+	TileFG fg;
 };
 
 struct Player{
-    vec2 pos;
-    u32 health;
+    s32 x, y;
     u32 bombs;
 };
 
 struct NetInfo{
     u8 magic[4] = {'T','U','N','L'};
 	Action move;
-    vec2 pos;
+    s32 x, y;
     u32 uid;
 };
 
@@ -86,14 +88,14 @@ var.magic[3] == 'L'     \
 //~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @vars
 Tile* board;
-u32 board_width;
-u32 board_height;
-u32 board_area;
+s32 board_width;
+s32 board_height;
+s32 board_area;
 
 #define LinearRow(pos) ((pos)/board_width)
 #define LinearCol(pos) ((pos)%board_width)
-#define ToLinear(row,col) ((board_width*(row))+(col))
-#define TileAt(row,col) board[ToLinear(row,col)]
+#define ToLinear(x,y) ((board_width*(y))+(x))
+#define TileAt(x,y) board[ToLinear(x,y)]
 #define TileAtLinear(pos) board[pos]
 
 u32 turn_count;

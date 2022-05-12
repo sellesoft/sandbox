@@ -10,7 +10,7 @@ b32 is_client = 0;
 
 //threaded worker function to constantly receieve messages
 void net_worker(void* data){
-
+	
 }
 
 //opens the socket on specified port
@@ -62,6 +62,7 @@ NetInfo net_client_recieve(){
     zaddress sender;
     NetInfo info;
     s32 bytes_read = zed_net_udp_socket_receive(&csocket, &sender, &info, sizeof(NetInfo));
+	Logf("net","Received %d bytes from %s:%d", bytes_read, zed_net_host_to_str(sender.host), sender.port);
     if(bytes_read == -1){
         LogE("net", "Client failed to read bytes with error:\n", zed_net_get_error());
         return {0};
