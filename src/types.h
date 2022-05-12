@@ -90,6 +90,12 @@ u32 board_width;
 u32 board_height;
 u32 board_area;
 
+#define LinearRow(pos) ((pos)/board_width)
+#define LinearCol(pos) ((pos)%board_width)
+#define ToLinear(row,col) ((board_width*(row))+(col))
+#define TileAt(row,col) board[ToLinear(row,col)]
+#define TileAtLinear(pos) board[pos]
+
 u32 turn_count;
 u32 player_idx;
 

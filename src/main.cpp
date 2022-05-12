@@ -41,7 +41,6 @@
 #include "external/zed_net.h"
 #include "external/miniaudio.h"
 #include "types.h"
-#include "board.cpp"
 #include "sound.cpp"
 #include "networking.cpp"
 #include "game.cpp"
