@@ -35,6 +35,9 @@
 
 //// tunnler inludes ////
 #define ZED_NET_IMPLEMENTATION
+//// tunnler includes ////
+#include "types.h"
+#include "board.cpp"
 #include "external/zed_net.h"
 #include "types.h"
 #include "networking.cpp"
@@ -45,7 +48,7 @@ int main(){
 	platform_init();
 	logger_init();
 	console_init();
-	DeshWindow->Init(str8l("sandbox"), 1280, 720);
+	DeshWindow->Init(str8l("sandbox"));
 	render_init();
 	Storage::Init();
 	UI::Init();
@@ -54,6 +57,9 @@ int main(){
     render_use_default_camera();
 	DeshThreadManager->init();
 	net_init_client(str8l("localhost"), 4480);
+	
+	init_board(20, 10);
+	
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
@@ -63,6 +69,9 @@ int main(){
 		net_client_send(info);
 		platform_update();
 		console_update();
+		
+		draw_board();
+		
 		UI::Update();
 		render_update();
 		NetInfo response = net_client_recieve();

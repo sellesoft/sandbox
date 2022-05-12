@@ -28,12 +28,12 @@ docs/doxygen/
 
 #data ignores
 data/cfg/*
-data/fonts/*
+#data/fonts/*
 data/logs/*
 data/models/*
 #data/shaders/*
 data/temp/*
-data/textures/*
+#data/textures/*
 
 #specific files
 imgui.ini
