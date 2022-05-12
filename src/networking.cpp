@@ -70,20 +70,22 @@ u32 host_phase = 0;
 
 b32 net_host_game(){
 	switch(host_phase){
-        case 0:{//set index and broadcast host message
+        case 0:{ /////////////////////////////////////// set index and broadcast host message
             player_idx = 0;
             NetInfo info;
             info.uid = 0;
             info.message = Message_HostGame;
             net_client_send(info);
+            host_phase = 1;
         }break;
-        case 1:{//wait for response from another client
+        case 1:{ /////////////////////////////////////// wait for response from another client
             NetInfo info = net_client_recieve();
             if(info.message == Message_JoinGame){
                 NetInfo info; //acknowledge join game
                 info.uid = 0;
                 info.message = Message_AcknowledgeMessage;
                 net_client_send(info);
+                host_phase = 0;
                 return false;
             }else{ //rebroadcast message TODO(sushi) check if this is necessary
                 info = NetInfo();
@@ -100,7 +102,7 @@ u32 join_phase = 0;
 
 b32 net_join_game(){
     switch(join_phase){
-        case 0:{ //searching for HostGame message, respond if found
+        case 0:{ /////////////////////////////////////// searching for HostGame message, respond if found
             player_idx = 1;
             NetInfo info = net_client_recieve();
             if(info.message == Message_HostGame){
@@ -110,9 +112,9 @@ b32 net_join_game(){
                 join_phase = 1;
             }
         }break;            
-        case 1:{ // we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
+        case 1:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
             NetInfo info = net_client_recieve();
-            if(info.message == Message_AcknowledgeMessage) return join_phase = 0, false;
+            if(info.message == Message_AcknowledgeMessage){ join_phase = 0; return false;}
         }break;
     }
     return true;
