@@ -36,9 +36,9 @@
 int main(){
 	//init deshi
 	memory_init(Gigabytes(1), Gigabytes(1));
+	platform_init();
 	logger_init();
 	console_init();
-	platform_init();
 	DeshWindow->Init(str8l("sandbox"), 1280, 720);
 	render_init();
 	Storage::Init();
@@ -58,7 +58,6 @@ int main(){
 		UI::Update();
 		render_update();
 		logger_update();
-
 		memory_clear_temp();
 		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
 	}
