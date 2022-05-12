@@ -19,6 +19,7 @@
 #include "core/input.h"
 #include "core/logger.h"
 #include "core/memory.h"
+#include "core/platform.h"
 #include "core/render.h"
 #include "core/storage.h"
 #include "core/threading.h"
@@ -37,7 +38,8 @@ int main(){
 	memory_init(Gigabytes(1), Gigabytes(1));
 	logger_init();
 	console_init();
-	DeshWindow->Init("sandbox", 1280, 720);
+	platform_init();
+	DeshWindow->Init(str8l("sandbox"), 1280, 720);
 	render_init();
 	Storage::Init();
 	UI::Init();
@@ -51,10 +53,12 @@ int main(){
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
 		DeshWindow->Update();
+		platform_update();
 		console_update();
 		UI::Update();
 		render_update();
 		logger_update();
+
 		memory_clear_temp();
 		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
 	}
