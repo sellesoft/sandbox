@@ -8,10 +8,15 @@ zaddress caddress;
 b32 is_server = 0;
 b32 is_client = 0;
 
+//threaded worker function to constantly receieve messages
+void net_worker(void* data){
+
+}
+
 //opens the socket on specified port
 //this is internal, but maybe have more uses later
 b32 net_open_socket(u64 port){
-    if(zed_net_udp_socket_open(&csocket, port, 0)){
+    if(zed_net_udp_socket_open(&csocket, port, 1)){
         LogE("Net", "Socket failed to open on port ", port,  " with error ", zed_net_get_error());
         return 0;
     }
@@ -61,6 +66,7 @@ NetInfo net_client_recieve(){
         LogE("net", "Client failed to read bytes with error:\n", zed_net_get_error());
         return {0};
     }
+    if(!bytes_read) info.magic[0] = 0; 
     return info;
 }
 #if 0

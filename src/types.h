@@ -10,7 +10,17 @@ enum MoveType_{
     Move_Right,   
     Move_Left,   
     Move_QuitGame,
+    Move_COUNT
 };typedef u32 MoveType;
+
+static str8 MoveStrs[] ={
+    str8l("None"),       
+    str8l("Up"),     
+    str8l("Down"),       
+    str8l("Right"),          
+    str8l("Left"),           
+    str8l("QuitGame"),       
+};
 
 typedef u32 TextureBG; enum{
 	TextureBG_Dirt,
@@ -47,6 +57,14 @@ struct NetInfo{
     vec2 pos;
     u32 uid;
 };
+
+#define CheckMagic(var)\
+(                      \
+var.magic[0] == 'T' &&  \
+var.magic[1] == 'U' &&  \
+var.magic[2] == 'N' &&  \
+var.magic[3] == 'L'     \
+)
 
 Tile* board;
 u32 board_width;

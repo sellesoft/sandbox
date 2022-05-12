@@ -48,7 +48,7 @@ int main(){
 	platform_init();
 	logger_init();
 	console_init();
-	DeshWindow->Init(str8l("sandbox"));
+	DeshWindow->Init(str8l("sandbox"), 1280, 900);
 	render_init();
 	Storage::Init();
 	UI::Init();
@@ -56,7 +56,7 @@ int main(){
 	DeshWindow->ShowWindow();
     render_use_default_camera();
 	DeshThreadManager->init();
-	net_init_client(str8l("localhost"), 4480);
+	net_init_client(str8l("localhost"), 24465);
 	
 	init_board(20, 10);
 	
@@ -64,17 +64,57 @@ int main(){
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
 		DeshWindow->Update();
-		NetInfo info;
-		info.move = Move_Down;
-		net_client_send(info);
 		platform_update();
 		console_update();
 		
 		draw_board();
 		
+		{
+			using namespace UI;
+			static NetInfo info_out;
+			static NetInfo info_in;
+
+			Begin(str8l("nettest"));{
+				if(Button(str8l("send"))){
+					net_client_send(info_out);
+				}
+				if(Button(str8l("receieve"))){
+					NetInfo in = net_client_recieve();
+					if(CheckMagic(in)){
+						info_in = in;
+					}
+				}
+				if(BeginCombo(str8l("move"), MoveStrs[info_out.move])){
+					forI(Move_COUNT){
+						if(Selectable(MoveStrs[i], i==info_out.move)){
+							info_out.move = i;
+						}
+					}
+					EndCombo();
+				}
+				PushVar(UIStyleVar_ItemSpacing, vec2::ZERO);
+				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y / 2);
+				BeginChild(str8l("outwin"), vec2::ZERO);{
+					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
+					string out = toStr(info_out.pos);
+					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
+					Text(str8l("move: ")); Text(MoveStrs[info_out.move]);
+					EndRow();
+				}EndChild();
+				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
+				BeginChild(str8l("inwin"), vec2::ZERO);{
+					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
+					string out = toStr(info_in.pos);
+					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
+					Text(str8l("move: ")); Text(MoveStrs[info_in.move]);
+					EndRow();
+				}EndChild();
+				PopVar();
+			}End();
+		}
+		UI::DemoWindow();
 		UI::Update();
 		render_update();
-		NetInfo response = net_client_recieve();
 		logger_update();
 		memory_clear_temp();
 		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
