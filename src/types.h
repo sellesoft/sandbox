@@ -30,7 +30,7 @@ typedef u32 Message; enum{
 	Message_COUNT
 };
 
-str8 MessageStringss[Message_COUNT] ={
+str8 MessageStrings[Message_COUNT] ={
     str8l("None"),
 	
 	str8l("HostGame"),

@@ -57,7 +57,7 @@ NetInfo net_client_recieve(){
     zaddress sender;
     NetInfo info;
     s32 bytes_read = zed_net_udp_socket_receive(&csocket, &sender, &info, sizeof(NetInfo));
-	Logf("net","Received %d bytes from %s:%d", bytes_read, zed_net_host_to_str(sender.host), sender.port);
+	if(bytes_read) Logf("net","Received %d bytes from %s:%d; Message: %s", bytes_read, zed_net_host_to_str(sender.host), sender.port, (char*)MessageStrings[info.message].str);
     if(bytes_read == -1){
         LogE("net", "Client failed to read bytes with error:\n", zed_net_get_error());
         return {0};

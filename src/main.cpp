@@ -59,9 +59,9 @@ void update_debug(){
 				info_in = in;
 			}
 		}
-		if(BeginCombo(str8l("move"), MessageStringss[info_out.message])){
+		if(BeginCombo(str8l("move"), MessageStrings[info_out.message])){
 			forI(Message_COUNT){
-				if(Selectable(MessageStringss[i], i==info_out.message)){
+				if(Selectable(MessageStrings[i], i==info_out.message)){
 					info_out.message = i;
 				}
 			}
@@ -73,7 +73,7 @@ void update_debug(){
 			BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
 			string out = toStr("(",info_out.x,",",info_out.y,")");
 			Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
-			Text(str8l("move: ")); Text(MessageStringss[info_out.message]);
+			Text(str8l("move: ")); Text(MessageStrings[info_out.message]);
 			EndRow();
 		}EndChild();
 		SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
@@ -81,7 +81,7 @@ void update_debug(){
 			BeginRow(str8l("textalign2"), 2, 0, UIRowFlags_AutoSize);
 			string out = toStr("(",info_out.x,",",info_out.y,")");
 			Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
-			Text(str8l("move: ")); Text(MessageStringss[info_in.message]);
+			Text(str8l("move: ")); Text(MessageStrings[info_in.message]);
 			EndRow();
 		}EndChild();
 		PopVar();
