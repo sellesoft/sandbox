@@ -44,7 +44,51 @@
 #include "sound.cpp"
 #include "networking.cpp"
 #include "game.cpp"
-
+void update_debug(){
+	using namespace UI;
+	static NetInfo info_out;
+	static NetInfo info_in;
+	
+	Begin(str8l("nettest"));{
+		if(Button(str8l("send"))){
+			net_client_send(info_out);
+		}
+		if(Button(str8l("receieve"))){
+			NetInfo in = net_client_recieve();
+			if(CheckMagic(in)){
+				info_in = in;
+			}
+		}
+		if(BeginCombo(str8l("move"), ActionStrs[info_out.message])){
+			forI(Message_COUNT){
+				if(Selectable(ActionStrs[i], i==info_out.message)){
+					info_out.message = i;
+				}
+			}
+			EndCombo();
+		}
+		PushVar(UIStyleVar_ItemSpacing, vec2::ZERO);
+		SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y / 2);
+		BeginChild(str8l("outwin"), vec2::ZERO);{
+			BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
+			string out = toStr("(",info_out.x,",",info_out.y,")");
+			Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
+			Text(str8l("move: ")); Text(ActionStrs[info_out.message]);
+			EndRow();
+		}EndChild();
+		SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
+		BeginChild(str8l("inwin"), vec2::ZERO);{
+			BeginRow(str8l("textalign2"), 2, 0, UIRowFlags_AutoSize);
+			string out = toStr("(",info_out.x,",",info_out.y,")");
+			Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
+			Text(str8l("move: ")); Text(ActionStrs[info_in.message]);
+			EndRow();
+		}EndChild();
+		PopVar();
+	}End();
+		//DemoWindow();
+	
+}
 
 //~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @main
@@ -73,51 +117,48 @@ int main(){
 		DeshWindow->Update();
 		platform_update();
 		console_update();
-		
-		update_game();
-		{//debug
+		if(game_active) update_game();
+		else{
+			persist u32 menu_state = 0;
 			using namespace UI;
-			static NetInfo info_out;
-			static NetInfo info_in;
-			
-			Begin(str8l("nettest"));{
-				if(Button(str8l("send"))){
-					net_client_send(info_out);
-				}
-				if(Button(str8l("receieve"))){
-					NetInfo in = net_client_recieve();
-					if(CheckMagic(in)){
-						info_in = in;
-					}
-				}
-				if(BeginCombo(str8l("move"), ActionStrs[info_out.move])){
-					forI(Action_COUNT){
-						if(Selectable(ActionStrs[i], i==info_out.move)){
-							info_out.move = i;
-						}
-					}
-					EndCombo();
-				}
-				PushVar(UIStyleVar_ItemSpacing, vec2::ZERO);
-				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y / 2);
-				BeginChild(str8l("outwin"), vec2::ZERO);{
-					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
-					string out = toStr("(",info_out.x,",",info_out.y,")");
-					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
-					Text(str8l("move: ")); Text(ActionStrs[info_out.move]);
-					EndRow();
-				}EndChild();
-				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
-				BeginChild(str8l("inwin"), vec2::ZERO);{
-					BeginRow(str8l("textalign2"), 2, 0, UIRowFlags_AutoSize);
-					string out = toStr("(",info_out.x,",",info_out.y,")");
-					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
-					Text(str8l("move: ")); Text(ActionStrs[info_in.move]);
-					EndRow();
-				}EndChild();
+			SetNextWindowPos(vec2::ZERO);
+			SetNextWindowSize(DeshWinSize);
+			Begin(str8l("menu"), UIWindowFlags_NoInteract);{
+				PushVar(UIStyleVar_FontHeight, 50);
+				Text(str8l("TUNNLER"));
 				PopVar();
+				switch(menu_state){
+					case 0:{ //host/join buttons
+						//TODO(sushi) nicer button styling PushColor(UIStyleCol_ButtonBg,)
+						if(Button(str8l("Join Game"))) menu_state = 1;
+						if(Button(str8l("Host Game"))) menu_state = 2;
+
+					}break;
+					case 1:{ //joining game
+						if(net_join_game()){
+							f64 t = DeshTotalTime/1000*2;
+							CircleFilled(vec2(DeshWinSize.x / 2-15, DeshWinSize.y/2 - 20 - 10*(sin(t+0 - cos(t+0))+1)/2), 2);
+							CircleFilled(vec2(DeshWinSize.x / 2+00, DeshWinSize.y/2 - 20 - 10*(sin(t+1 - cos(t+1))+1)/2), 2);
+							CircleFilled(vec2(DeshWinSize.x / 2+15, DeshWinSize.y/2 - 20 - 10*(sin(t+2 - cos(t+2))+1)/2), 2);
+							str8 text = str8l("searching for game..");
+							vec2 size = CalcTextSize(text);
+							Text(text, (DeshWinSize - size)/2);
+						} else game_active = true;
+					}break;
+					case 2:{ //hosting game
+						if(net_host_game()){
+							f64 t = DeshTotalTime/1000*2;
+							CircleFilled(vec2(DeshWinSize.x / 2-15, DeshWinSize.y/2 - 20 - 10*(sin(t+0 - cos(t+0))+1)/2), 2);
+							CircleFilled(vec2(DeshWinSize.x / 2+00, DeshWinSize.y/2 - 20 - 10*(sin(t+1 - cos(t+1))+1)/2), 2);
+							CircleFilled(vec2(DeshWinSize.x / 2+15, DeshWinSize.y/2 - 20 - 10*(sin(t+2 - cos(t+2))+1)/2), 2);
+							str8 text = str8l("searching for player..");
+							vec2 size = CalcTextSize(text);
+							Text(text, (DeshWinSize - size)/2);
+						} else game_active = true;
+					}break;
+				}
+
 			}End();
-			//DemoWindow();
 		}
 		
 		UI::Update();

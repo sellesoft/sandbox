@@ -3,24 +3,29 @@
 #define TUNLLER_TYPES_H
 #include "kigu/common.h"
 
-typedef u32 Action; enum{
-    Action_None,
-    Action_MoveUp,
-    Action_MoveDown,
-    Action_MoveRight,
-    Action_MoveLeft,
-	Action_DigUp,
-    Action_DigDown,
-    Action_DigRight,
-    Action_DigLeft,
-	Action_PlaceBomb,
-	Action_DetonateBomb,
-	Action_PlaceLadder,
-    Action_QuitGame,
-	Action_COUNT
+typedef u32 Message; enum{
+    Message_None,
+    
+    Message_HostGame, //message broadcast by client hosting game
+    Message_JoinGame, //message broadcast in response to HostGame
+    Message_QuitGame, //message broadcast by either client to end game
+    Message_AcknowledgeMessage, //message broadcast by either client to indiciate that the last message was recieved
+
+    Message_MoveUp,
+    Message_MoveDown,
+    Message_MoveRight,
+    Message_MoveLeft,
+	Message_DigUp,
+    Message_DigDown,
+    Message_DigRight,
+    Message_DigLeft,
+	Message_PlaceBomb,
+	Message_DetonateBomb,
+	Message_PlaceLadder,
+	Message_COUNT
 };
 
-str8 ActionStrs[Action_COUNT] ={
+str8 ActionStrs[Message_COUNT] ={
     str8l("None"),
 	str8l("MoveUp"),
 	str8l("MoveDown"),
@@ -71,7 +76,7 @@ struct Player{
 
 struct NetInfo{
     u8 magic[4] = {'T','U','N','L'};
-	Action move;
+	Message message;
     s32 x, y;
     u32 uid;
 };
@@ -87,6 +92,8 @@ var.magic[3] == 'L'     \
 
 //~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @vars
+b32 game_active = 0;
+
 Tile* board;
 s32 board_width;
 s32 board_height;
@@ -103,5 +110,7 @@ u32 player_idx;
 
 Player player0;
 Player player1;
+
+NetInfo turn_info;
 
 #endif //TUNLLER_TYPES_H

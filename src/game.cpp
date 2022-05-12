@@ -86,7 +86,6 @@ void draw_board(){
 //// @game
 void init_game(){
 	init_board(20, 10);
-	player_idx = 0;
 	turn_count = 0;
 	player0 = {0,             board_height-1, 3};
 	TileAt(player0.x,player0.y).bg = TileBG_Trench;
@@ -98,34 +97,34 @@ void init_game(){
 
 void update_game(){
 	b32 our_turn = (turn_count % 2 == player_idx);
-	u32 action_performed = Action_None;
+	u32 action_performed = Message_None;
 	
 	//player input
 	if(our_turn){
 		if      (key_pressed(Key_UP    | InputMod_None)){ //move up
 			if(player0.y < board_height-1){
-				action_performed = Action_MoveUp;
+				action_performed = Message_MoveUp;
 				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
 				player0.y += 1;
 				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
 			}
 		}else if(key_pressed(Key_DOWN  | InputMod_None)){ //move down
 			if(player0.y > 0){
-				action_performed = Action_MoveDown;
+				action_performed = Message_MoveDown;
 				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
 				player0.y -= 1;
 				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
 			}
 		}else if(key_pressed(Key_RIGHT | InputMod_None)){ //move right
 			if(player0.y < board_width-1){
-				action_performed = Action_MoveRight;
+				action_performed = Message_MoveRight;
 				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
 				player0.x += 1;
 				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
 			}
 		}else if(key_pressed(Key_LEFT  | InputMod_None)){ //move left
 			if(player0.y > 0){
-				action_performed = Action_MoveLeft;
+				action_performed = Message_MoveLeft;
 				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
 				player0.x -= 1;
 				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
@@ -133,8 +132,13 @@ void update_game(){
 		}
 	}
 	
-	if(action_performed != Action_None){
+	if(action_performed != Message_None){
 		turn_count += 1;
+		turn_info.uid = player_idx;
+		turn_info.x = player0.x;
+		turn_info.y = player0.y;
+		turn_info.message = action_performed;
+		net_client_send(turn_info);
 	}
 	
 	//debug
