@@ -1,3 +1,5 @@
+//~////////////////////////////////////////////////////////////////////////////////////////////////
+//// @includes
 #ifdef TRACY_ENABLE
 #  include "Tracy.hpp"
 #endif
@@ -33,13 +35,16 @@
 #include "misc_testing.cpp"
 #endif
 
-//// tunnler includes ////
+//// tunller includes ////
 #include "types.h"
 #define ZED_NET_IMPLEMENTATION
 #include "external/zed_net.h"
 #include "networking.cpp"
 #include "game.cpp"
 
+
+//~////////////////////////////////////////////////////////////////////////////////////////////////
+//// @main
 int main(){
 	//init deshi
 	memory_init(Gigabytes(1), Gigabytes(1));
@@ -55,6 +60,7 @@ int main(){
     render_use_default_camera();
 	DeshThreadManager->init();
 	
+	net_init_client(str8l("localhost"), 24465);
 	init_game();
 	
 	//start main loop
@@ -65,10 +71,53 @@ int main(){
 		console_update();
 		
 		update_game();
+		{//debug
+			using namespace UI;
+			static NetInfo info_out;
+			static NetInfo info_in;
+			
+			Begin(str8l("nettest"));{
+				if(Button(str8l("send"))){
+					net_client_send(info_out);
+				}
+				if(Button(str8l("receieve"))){
+					NetInfo in = net_client_recieve();
+					if(CheckMagic(in)){
+						info_in = in;
+					}
+				}
+				if(BeginCombo(str8l("move"), ActionStrs[info_out.move])){
+					forI(Action_COUNT){
+						if(Selectable(ActionStrs[i], i==info_out.move)){
+							info_out.move = i;
+						}
+					}
+					EndCombo();
+				}
+				PushVar(UIStyleVar_ItemSpacing, vec2::ZERO);
+				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y / 2);
+				BeginChild(str8l("outwin"), vec2::ZERO);{
+					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
+					string out = toStr(info_out.pos);
+					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
+					Text(str8l("move: ")); Text(ActionStrs[info_out.move]);
+					EndRow();
+				}EndChild();
+				SetNextWindowSize(MAX_F32, GetWindowRemainingSpace().y);
+				BeginChild(str8l("inwin"), vec2::ZERO);{
+					BeginRow(str8l("textalign1"), 2, 0, UIRowFlags_AutoSize);
+					string out = toStr(info_in.pos);
+					Text(str8l("pos: ")); Text({(u8*)out.str, out.count});
+					Text(str8l("move: ")); Text(ActionStrs[info_in.move]);
+					EndRow();
+				}EndChild();
+				PopVar();
+			}End();
+			//DemoWindow();
+		}
 		
 		UI::Update();
 		render_update();
-		NetInfo response = net_client_recieve();
 		logger_update();
 		memory_clear_temp();
 		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);

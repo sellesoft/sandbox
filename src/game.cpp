@@ -1,17 +1,4 @@
 //~////////////////////////////////////////////////////////////////////////////////////////////////
-//// @vars
-Tile* board;
-u32 board_width;
-u32 board_height;
-u32 board_area;
-
-u32 turn_count;
-u32 player_idx;
-
-Player player0;
-Player player1;
-
-//~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @board
 #define LinearRow(pos) ((pos)/board_width)
 #define LinearCol(pos) ((pos)%board_width)
@@ -31,7 +18,9 @@ void draw_board(){
 	f32 tile_width  = (f32)DeshWindow->width / (f32)board_width;
 	f32 tile_height = tile_width;
 	vec2 tile_dims(tile_width, tile_height);
+	UI::PushLayer(3);
 	UI::PushColor(UIStyleCol_WindowBg, Color_LightBlue);
+	UI::SetNextWindowSize(DeshWindow->dimensions);
 	UI::Begin(str8l("tunller_board"), vec2::ZERO, DeshWindow->dimensions, UIWindowFlags_NoInteract);
 	UIStyle style = UI::GetStyle();
 	
@@ -81,14 +70,14 @@ void draw_board(){
 		}
 	}
 	UI::End();
-	UI::PopColor();
+	UI::PopColor(1);
+	UI::PopLayer(1);
 }
 
 
 //~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @game
 void init_game(){
-	net_init_client(str8l("localhost"), 4480);
 	init_board(20, 10);
 	player_idx = 0;
 	turn_count = 1;
@@ -117,18 +106,15 @@ void update_game(){
 		}
 	}
 	
-	//debug
-	if(key_pressed(Key_ENTER)){
+	if(action_performed != Action_None){
 		turn_count += 1;
 	}
 	
-	if(action_performed){
+	//debug
+	if(key_pressed(Key_ENTER)){
 		turn_count += 1;
 	}
 	
 	//draw things
 	draw_board();
 }
-
-
-
