@@ -13,9 +13,10 @@ typedef u32 Action; enum{
     Action_DigDown,
     Action_DigRight,
     Action_DigLeft,
+	Action_BuildLadder,
+	Action_BuildPillar,
 	Action_PlaceBomb,
 	Action_DetonateBomb,
-	Action_PlaceLadder,
     Action_QuitGame,
 	Action_COUNT
 };
@@ -30,9 +31,10 @@ str8 ActionStrs[Action_COUNT] ={
 	str8l("DigDown"),
 	str8l("DigRight"),
 	str8l("DigLeft"),
+	str8l("BuildLadder"),
+	str8l("BuildPillar"),
 	str8l("PlaceBomb"),
 	str8l("DetonateBomb"),
-	str8l("PlaceLadder"),
 	str8l("QuitGame"),
 };
 
@@ -67,6 +69,8 @@ struct Tile{
 struct Player{
     s32 x, y;
     u32 bombs;
+	u32 flag;
+	array<u32> placed_bombs;
 };
 
 struct NetInfo{
@@ -99,9 +103,9 @@ s32 board_area;
 #define TileAtLinear(pos) board[pos]
 
 u32 turn_count;
-u32 player_idx;
 
 Player player0;
 Player player1;
+u32 player_idx;
 
 #endif //TUNLLER_TYPES_H

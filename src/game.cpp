@@ -86,51 +86,181 @@ void draw_board(){
 //// @game
 void init_game(){
 	init_board(20, 10);
-	player_idx = 0;
 	turn_count = 0;
-	player0 = {0,             board_height-1, 3};
+	player_idx = 0;
+	
+	player0 = {0,             board_height-1, 3, TileFG_BritishPlayer, array<u32>(deshi_allocator)};
 	TileAt(player0.x,player0.y).bg = TileBG_Trench;
 	TileAt(player0.x,player0.y).fg = TileFG_BritishPlayer;
-	player1 = {board_width-1, board_height-1, 3};
+	
+	player1 = {board_width-1, board_height-1, 3, TileFG_GermanPlayer, array<u32>(deshi_allocator)};
 	TileAt(player1.x,player1.y).bg = TileBG_Trench;
 	TileAt(player1.x,player1.y).fg = TileFG_GermanPlayer;
 }
 
 void update_game(){
-	b32 our_turn = (turn_count % 2 == player_idx);
-	u32 action_performed = Action_None;
+	Player* player;
+	Player* other_player;
+#define TileAtPlayer() TileAt(player->x,player->y)
+#define TileNearPlayer(_x,_y) TileAt(player->x+_x,player->y+_y)
+#define TileAtOtherPlayer() TileAt(player->x,player->y)
+#define TileNearOtherPlayer(_x,_y) TileAt(player->x+_x,player->y+_y)
 	
-	//player input
-	if(our_turn){
-		if      (key_pressed(Key_UP    | InputMod_None)){ //move up
-			if(player0.y < board_height-1){
-				action_performed = Action_MoveUp;
-				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
-				player0.y += 1;
-				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+	u32 action_performed = Action_None;
+	if(turn_count % 2 == player_idx){
+		player = &player0;
+		other_player = &player1;
+		
+		//// moving input ////
+		if      (   key_pressed(Key_UP    | InputMod_None)
+				 && player->y < board_height-1 && TileNearPlayer(0, 1).bg == TileBG_Trench){
+			action_performed = Action_MoveUp;
+		}else if(   key_pressed(Key_DOWN  | InputMod_None)
+				 && player->y > 0              && TileNearPlayer(0,-1).bg == TileBG_Trench){
+			action_performed = Action_MoveDown;
+		}else if(   key_pressed(Key_RIGHT | InputMod_None)
+				 && player->y < board_width-1  && TileNearPlayer( 1,0).bg == TileBG_Trench){
+			action_performed = Action_MoveRight;
+		}else if(   key_pressed(Key_LEFT  | InputMod_None)
+				 && player->y > 0              && TileNearPlayer(-1,0).bg == TileBG_Trench){
+			action_performed = Action_MoveLeft;
+		}
+		
+		//// digging input ////
+		if      (   key_pressed(Key_UP    | InputMod_AnyShift)
+				 && player->y < board_height-1 && TileNearPlayer(0,1).bg == TileBG_Dirt){
+			action_performed = Action_DigUp;
+		}else if(   key_pressed(Key_DOWN  | InputMod_AnyShift)
+				 && player->y > 0 && TileNearPlayer(0,-1).bg == TileBG_Dirt){
+			action_performed = Action_DigDown;
+		}else if(   key_pressed(Key_RIGHT | InputMod_AnyShift)
+				 && player->y < board_width-1 && TileNearPlayer(1,0).bg == TileBG_Dirt){
+			action_performed = Action_DigRight;
+		}else if(   key_pressed(Key_LEFT  | InputMod_AnyShift)
+				 && player->y > 0 && TileNearPlayer(-1,0).bg == TileBG_Dirt){
+			action_performed = Action_DigLeft;
+		}
+		
+		//// building input ////
+		//TODO building
+		
+		//// bombing input ////
+		if      (key_pressed(Key_B    | InputMod_None)){   //place bomb
+			if(player->bombs > 0){
+				action_performed = Action_PlaceBomb;
 			}
-		}else if(key_pressed(Key_DOWN  | InputMod_None)){ //move down
-			if(player0.y > 0){
-				action_performed = Action_MoveDown;
-				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
-				player0.y -= 1;
-				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
-			}
-		}else if(key_pressed(Key_RIGHT | InputMod_None)){ //move right
-			if(player0.y < board_width-1){
-				action_performed = Action_MoveRight;
-				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
-				player0.x += 1;
-				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
-			}
-		}else if(key_pressed(Key_LEFT  | InputMod_None)){ //move left
-			if(player0.y > 0){
-				action_performed = Action_MoveLeft;
-				RemoveFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
-				player0.x -= 1;
-				AddFlag(TileAt(player0.x,player0.y).fg, TileFG_BritishPlayer);
+		}else if(key_pressed(Key_B  | InputMod_AnyShift)){ //detonate bomb
+			if(player->placed_bombs.count > 0){
+				action_performed = Action_DetonateBomb;
 			}
 		}
+	}else{
+		player = &player1;
+		other_player = &player0;
+	}
+	
+	//perform action for current player
+	switch(action_performed){
+		//// moving actions ////
+		case Action_MoveUp:{
+			RemoveFlag(TileAtPlayer().fg, player->flag);
+			player->y += 1;
+			AddFlag(TileAtPlayer().fg, player->flag);
+		}break;
+		case Action_MoveDown:{
+			RemoveFlag(TileAtPlayer().fg, player->flag);
+			player->y -= 1;
+			AddFlag(TileAtPlayer().fg, player->flag);
+		}break;
+		case Action_MoveRight:{
+			RemoveFlag(TileAtPlayer().fg, player->flag);
+			player->x += 1;
+			AddFlag(TileAtPlayer().fg, player->flag);
+		}break;
+		case Action_MoveLeft:{
+			RemoveFlag(TileAtPlayer().fg, player->flag);
+			player->x -= 1;
+			AddFlag(TileAtPlayer().fg, player->flag);
+		}break;
+		
+		//// digging actions ////
+		case Action_DigUp:{
+			TileNearPlayer(0, 1).bg = TileBG_Trench;
+		}break;
+		case Action_DigDown:{
+			TileNearPlayer(0,-1).bg = TileBG_Trench;
+		}break;
+		case Action_DigRight:{
+			TileNearPlayer( 1,0).bg = TileBG_Trench;
+		}break;
+		case Action_DigLeft:{
+			TileNearPlayer(-1,0).bg = TileBG_Trench;
+		}break;
+		
+		//// building actions ////
+		case Action_BuildLadder:{
+			
+		}break;
+		case Action_BuildPillar:{
+			
+		}break;
+		
+		//// bombing actions ////
+		case Action_PlaceBomb:{
+			player->placed_bombs.add(ToLinear(player->x,player->y));
+			player->bombs -= 1;
+		}break;
+		case Action_DetonateBomb:{
+			forI(player->placed_bombs.count){
+				//explode up
+				s32 up_tile = player->placed_bombs[i] - board_width;
+				if(up_tile >= 0 && up_tile < board_height){
+					TileAtLinear(up_tile).bg = TileBG_Trench;
+					if(ToLinear(player->x,player->y) == up_tile){
+						//TODO player dies
+					}
+					if(ToLinear(other_player->x,other_player->y) == up_tile){
+						//TODO other player dies
+					}
+				}
+				
+				//explode down
+				s32 down_tile = player->placed_bombs[i] + board_width;
+				if(down_tile >= 0 && down_tile < board_height){
+					TileAtLinear(down_tile).bg = TileBG_Trench;
+					if(ToLinear(player->x,player->y) == down_tile){
+						//TODO player dies
+					}
+					if(ToLinear(other_player->x,other_player->y) == down_tile){
+						//TODO other player dies
+					}
+				}
+				
+				//explode right
+				s32 right_tile = player->placed_bombs[i] + 1;
+				if(right_tile >= 0 && right_tile < board_height){
+					TileAtLinear(right_tile).bg = TileBG_Trench;
+					if(ToLinear(player->x,player->y) == right_tile){
+						//TODO player dies
+					}
+					if(ToLinear(other_player->x,other_player->y) == right_tile){
+						//TODO other player dies
+					}
+				}
+				
+				//explode left
+				s32 left_tile = player->placed_bombs[i] - 1;
+				if(left_tile >= 0 && left_tile < board_height){
+					TileAtLinear(left_tile).bg = TileBG_Trench;
+					if(ToLinear(player->x,player->y) == left_tile){
+						//TODO player dies
+					}
+					if(ToLinear(other_player->x,other_player->y) == left_tile){
+						//TODO other player dies
+					}
+				}
+			}
+		}break;
 	}
 	
 	if(action_performed != Action_None){
