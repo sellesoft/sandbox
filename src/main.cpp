@@ -33,13 +33,16 @@
 #include "misc_testing.cpp"
 #endif
 
+#include "types.h"
+#include "board.cpp"
+
 int main(){
 	//init deshi
 	memory_init(Gigabytes(1), Gigabytes(1));
 	platform_init();
 	logger_init();
 	console_init();
-	DeshWindow->Init(str8l("sandbox"), 1280, 720);
+	DeshWindow->Init(str8l("sandbox"));
 	render_init();
 	Storage::Init();
 	UI::Init();
@@ -47,13 +50,18 @@ int main(){
 	DeshWindow->ShowWindow();
     render_use_default_camera();
 	DeshThreadManager->init();
-
+	
+	init_board(20, 10);
+	
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
 		DeshWindow->Update();
 		platform_update();
 		console_update();
+		
+		draw_board();
+		
 		UI::Update();
 		render_update();
 		logger_update();

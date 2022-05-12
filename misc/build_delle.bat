@@ -1,8 +1,5 @@
 @echo off
-REM i run this from suugu\
-
 ctime -begin misc\sandbox.ctm
-
 pushd src
 
 REM _____________________________________________________________________________________________________
