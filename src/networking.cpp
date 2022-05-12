@@ -46,10 +46,12 @@ void net_deinit(){
 //sends data to the client's connected server
 b32 net_client_send(NetInfo info){
     Assert(is_client, "Can't send info as client unless network is initialized as a client");
+
     if(zed_net_udp_socket_send(&csocket, caddress, &info, sizeof(NetInfo))){
         LogE("net", "Failed to send data with error:\n", zed_net_get_error());
         return 0;
     }
+    Log("net", "Sending NetInfo to ", zed_net_host_to_str(caddress.host), ":", caddress.port, "; ", "Message: ", MessageStrings[info.message]);
     return 1;
 }
 
@@ -81,7 +83,7 @@ b32 net_host_game(){
         case 1:{ /////////////////////////////////////// wait for response from another client
             NetInfo info = net_client_recieve();
             if(info.message == Message_JoinGame){
-                NetInfo info; //acknowledge join game
+                info = NetInfo(); //acknowledge join game
                 info.uid = 0;
                 info.message = Message_AcknowledgeMessage;
                 net_client_send(info);
