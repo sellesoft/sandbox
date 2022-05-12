@@ -33,14 +33,12 @@
 #include "misc_testing.cpp"
 #endif
 
-//// tunnler inludes ////
-#define ZED_NET_IMPLEMENTATION
 //// tunnler includes ////
 #include "types.h"
-#include "board.cpp"
+#define ZED_NET_IMPLEMENTATION
 #include "external/zed_net.h"
-#include "types.h"
 #include "networking.cpp"
+#include "game.cpp"
 
 int main(){
 	//init deshi
@@ -56,21 +54,17 @@ int main(){
 	DeshWindow->ShowWindow();
     render_use_default_camera();
 	DeshThreadManager->init();
-	net_init_client(str8l("localhost"), 4480);
 	
-	init_board(20, 10);
+	init_game();
 	
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
 		DeshWindow->Update();
-		NetInfo info;
-		info.move = Move_Down;
-		net_client_send(info);
 		platform_update();
 		console_update();
 		
-		draw_board();
+		update_game();
 		
 		UI::Update();
 		render_update();

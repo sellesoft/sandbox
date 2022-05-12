@@ -3,14 +3,21 @@
 #define TUNLLER_TYPES_H
 #include "kigu/common.h"
 
-enum MoveType_{
-    Move_None,
-    Move_Up,
-    Move_Down,
-    Move_Right,   
-    Move_Left,   
-    Move_QuitGame,
-};typedef u32 MoveType;
+typedef u32 Action; enum{
+    Action_None,
+    Action_MoveUp,
+    Action_MoveDown,
+    Action_MoveRight,
+    Action_MoveLeft,
+	Action_DigUp,
+    Action_DigDown,
+    Action_DigRight,
+    Action_DigLeft,
+	Action_PlaceBomb,
+	Action_DetonateBomb,
+	Action_PlaceLadder,
+    Action_QuitGame,
+};
 
 typedef u32 TextureBG; enum{
 	TextureBG_Dirt,
@@ -22,11 +29,13 @@ typedef u32 TextureBG; enum{
 };
 
 typedef u32 TextureFG; enum{
+	TextureFG_None,
 	TextureFG_BritishPlayer,
 	TextureFG_GermanPlayer,
 	TextureFG_Pillar,
 	TextureFG_Explosive,
 	TextureFG_Sandbags,
+	TextureFG_Ladder,
 };
 
 struct Tile{
@@ -43,15 +52,9 @@ struct Player{
 
 struct NetInfo{
     u8 magic[4] = {'T','U','N','L'};
-    MoveType move;
+	Action move;
     vec2 pos;
     u32 uid;
 };
-
-Tile* board;
-u32 board_width;
-u32 board_height;
-
-u32 turn_count;
 
 #endif //TUNLLER_TYPES_H
