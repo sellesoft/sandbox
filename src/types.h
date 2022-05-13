@@ -60,11 +60,11 @@ str8 MessageStrings[Message_COUNT] ={
 
 typedef u32 TileBG; enum{
 	TileBG_Dirt,
-	TileBG_Surface,
-	TileBG_Sky,
-	TileBG_Trench,
-	TileBG_Fort,
 	TileBG_Tunnel,
+	//TileBG_Trench,
+	TileBG_BritishBase,
+	TileBG_GermanBase,
+	TileBG_Sky,
 };
 
 typedef u32 TileFG; enum{
@@ -89,7 +89,8 @@ struct Tile{
 struct Player{
     s32 x, y;
     u32 bombs;
-	u32 flag;
+	u32 player_flag;
+	u32 bomb_flag;
 	array<u32> placed_bombs;
 };
 
