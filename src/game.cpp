@@ -132,10 +132,10 @@ void update_game(){
 				 && player->y > 0              && TileNearPlayer(0,-1).bg == TileBG_Trench){
 			action_performed = Message_MoveDown;
 		}else if(   key_pressed(Key_RIGHT | InputMod_None)
-				 && player->y < board_width-1  && TileNearPlayer( 1,0).bg == TileBG_Trench){
+				 && player->x < board_width-1  && TileNearPlayer( 1,0).bg == TileBG_Trench){
 			action_performed = Message_MoveRight;
 		}else if(   key_pressed(Key_LEFT  | InputMod_None)
-				 && player->y > 0              && TileNearPlayer(-1,0).bg == TileBG_Trench){
+				 && player->x > 0              && TileNearPlayer(-1,0).bg == TileBG_Trench){
 			action_performed = Message_MoveLeft;
 		}
 		
@@ -147,10 +147,10 @@ void update_game(){
 				 && player->y > 0 && TileNearPlayer(0,-1).bg == TileBG_Dirt){
 			action_performed = Message_DigDown;
 		}else if(   key_pressed(Key_RIGHT | InputMod_AnyShift)
-				 && player->y < board_width-1 && TileNearPlayer(1,0).bg == TileBG_Dirt){
+				 && player->x < board_width-1 && TileNearPlayer(1,0).bg == TileBG_Dirt){
 			action_performed = Message_DigRight;
 		}else if(   key_pressed(Key_LEFT  | InputMod_AnyShift)
-				 && player->y > 0 && TileNearPlayer(-1,0).bg == TileBG_Dirt){
+				 && player->x > 0 && TileNearPlayer(-1,0).bg == TileBG_Dirt){
 			action_performed = Message_DigLeft;
 		}
 		
@@ -185,7 +185,6 @@ void update_game(){
 		other_player = (player_idx) ? &player1 : &player0;
 		
 		NetInfo info = listener_latch;
-
 		if(info.magic[0] && info.uid != player_idx){
 			action_performed = info.message;
 			if(info.message <= Message_MOVES_END && info.message >= Message_MOVES_START){
@@ -196,7 +195,7 @@ void update_game(){
 				turn_count += 1;
 			}
 			DeshThreadManager->add_job({&net_worker, 0});
-            DeshThreadManager->wake_threads();
+			DeshThreadManager->wake_threads();
 		}
 	}
 	
