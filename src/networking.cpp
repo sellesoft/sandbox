@@ -70,11 +70,12 @@ NetInfo net_client_recieve(){
 }
 
 NetInfo listener_latch;
+b32 close_listener = false;
 
 //listens until it finds one of our messages
 void net_worker(void* data){
     listener_latch.magic[0] = 0;
-    while(1){
+    while(!close_listener){
         platform_sleep(100);
         NetInfo info = net_client_recieve();
         //look for valid messages from a client that is not us
@@ -86,6 +87,7 @@ void net_worker(void* data){
             net_client_send(info);
         }
     }
+    close_listener = false;
 }
 
 u32 host_phase = 0;
@@ -123,22 +125,25 @@ b32 net_host_game(){
 u32 join_phase = 0;
 
 b32 net_join_game(){
-    DeshThreadManager->add_job({&net_worker, 0});
-    DeshThreadManager->wake_threads();
     switch(join_phase){
-        case 0:{ /////////////////////////////////////// searching for HostGame message, respond if found
+        case 0:{ //start listener thread; set player idx
             player_idx = 1;
+            DeshThreadManager->add_job({&net_worker, 0});
+            DeshThreadManager->wake_threads();
+            join_phase = 1;
+        }break;
+        case 1:{ /////////////////////////////////////// searching for HostGame message, respond if found
             NetInfo info = listener_latch;
             if(info.magic[0] && info.message == Message_HostGame){
                 info.uid = 1;
                 info.message = Message_JoinGame;
                 net_client_send(info);
-                join_phase = 1;
+                join_phase = 2;
                 DeshThreadManager->add_job({&net_worker, 0});
                 DeshThreadManager->wake_threads();
             }
         }break;            
-        case 1:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
+        case 2:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
             NetInfo info = listener_latch;
             if(info.magic[0] && info.message == Message_AcknowledgeMessage){ 
                 join_phase = 0; 

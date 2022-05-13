@@ -150,7 +150,10 @@ int main(){
 							str8 text = str8l("searching for game..");
 							vec2 size = CalcTextSize(text);
 							Text(text, (DeshWinSize - size)/2);
-							if(Button(str8l("Cancel"))) menu_state = 0;
+							if(Button(str8l("Cancel"))) {
+								menu_state = 0;
+								close_listener = true;
+							}
 						} else game_active = true;
 					}break;
 					case 2:{ //hosting game
@@ -162,7 +165,11 @@ int main(){
 							str8 text = str8l("searching for player..");
 							vec2 size = CalcTextSize(text);
 							Text(text, (DeshWinSize - size)/2);
-							if(Button(str8l("Cancel"))) menu_state = 0;
+							if(Button(str8l("Cancel"))) {
+								menu_state = 0;
+								close_listener = true;
+								
+							}
 						} else game_active = true;
 					}break;
 				}
