@@ -79,17 +79,19 @@ void net_worker(void* data){
         platform_sleep(500);
         NetInfo info = net_client_recieve();
         //look for valid messages from a client that is not us
+        while(1){
+            NetInfo next = net_client_recieve();
+            if(listener_latch.message == next.message) continue;
+            else{
+                net_client_send(next);
+            }       
+        }
         if(CheckMagic(info) && info.uid != player_idx){
             listener_latch = info;
-            while(1){
-                NetInfo next = net_client_recieve();
-                if(listener_latch.message == next.message) continue;
-                else{
-                    net_client_send(next);
-                }
-            }
+           
             break;
         }
+        
         //else{
         //    net_client_send(info);
         //}
