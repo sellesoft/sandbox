@@ -8,6 +8,8 @@ zaddress caddress;
 b32 is_server = 0;
 b32 is_client = 0;
 
+
+
 //opens the socket on specified port
 //this is internal, but maybe have more uses later
 b32 net_open_socket(u64 port){
@@ -51,8 +53,6 @@ b32 net_client_send(NetInfo info){
         return 0;
     }
     Log("net", "Sending NetInfo to ", zed_net_host_to_str(caddress.host), ":", caddress.port, "; ", "Message: ", MessageStrings[info.message]);
-    platform_sleep(50);
-
     return 1;
 }
 
@@ -69,6 +69,21 @@ NetInfo net_client_recieve(){
     return info;
 }
 
+NetInfo listener_latch;
+
+//listens until it finds one of our messages
+void net_worker(void* data){
+    listener_latch.magic[0] = 0;
+    while(1){
+        NetInfo info = net_client_recieve();
+        //look for valid messages from a client that is not us
+        if(CheckMagic(info) && info.uid != player_idx){
+            listener_latch = info;
+            break;
+        }
+    }
+}
+
 u32 host_phase = 0;
 
 b32 net_host_game(){
@@ -80,21 +95,18 @@ b32 net_host_game(){
             info.message = Message_HostGame;
             net_client_send(info);
             host_phase = 1;
+            DeshThreadManager->add_job({&net_worker, 0});
         }break;
         case 1:{ /////////////////////////////////////// wait for response from another client
-            NetInfo info = net_client_recieve();
-            if(info.message == Message_JoinGame){
+            NetInfo info = listener_latch;
+            if(info.magic[0] && info.message == Message_JoinGame){
                 info = NetInfo(); //acknowledge join game
                 info.uid = 0;
                 info.message = Message_AcknowledgeMessage;
                 net_client_send(info);
                 host_phase = 0;
+                DeshThreadManager->add_job({&net_worker, 0});
                 return false;
-            }else{ //rebroadcast message TODO(sushi) check if this is necessary
-                info = NetInfo();
-                info.uid = 0;
-                info.message = Message_HostGame;
-                net_client_send(info);
             }
         }break;
     }
@@ -107,8 +119,8 @@ b32 net_join_game(){
     switch(join_phase){
         case 0:{ /////////////////////////////////////// searching for HostGame message, respond if found
             player_idx = 1;
-            NetInfo info = net_client_recieve();
-            if(info.message == Message_HostGame){
+            NetInfo info = listener_latch;
+            if(info.magic[0] && info.message == Message_HostGame){
                 info.uid = 1;
                 info.message = Message_JoinGame;
                 net_client_send(info);
@@ -116,12 +128,14 @@ b32 net_join_game(){
             }
         }break;            
         case 1:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
-            NetInfo info = net_client_recieve();
-            if(info.message == Message_AcknowledgeMessage){ join_phase = 0; return false;}
+            NetInfo info = listener_latch;
+            if(info.magic[0] && info.message == Message_AcknowledgeMessage){ join_phase = 0; return false;}
         }break;
     }
     return true;
 }
+
+
 
 #if 0
 //recieves a message from some client and then rebroadcasts it to all other clients

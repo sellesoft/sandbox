@@ -171,7 +171,8 @@ void update_game(){
 		other_player = &player0;
 		NetInfo info = net_client_recieve();
 		action_performed = info.message;
-		if(action_performed <= Message_MOVES_END && action_performed >= Message_MOVES_START) turn_count++;
+		if(action_performed <= Message_MOVES_END && action_performed >= Message_MOVES_START) 
+			turn_count++;
 		
 	}
 	
