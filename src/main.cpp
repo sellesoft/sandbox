@@ -112,10 +112,13 @@ int main(){
 	DeshWindow->ShowWindow();
     render_use_default_camera();
 	DeshThreadManager->init();
-	net_init_client(str8l("192.168.0.255"), 24465);
+	
 	sound_init();
 	init_game();
 	DeshThreadManager->spawn_thread();
+	u8* buff = (u8*)memalloc(5);
+	buff[0] = '2'; buff[1] = '4'; buff[2] = '4'; buff[3] = '6'; buff[4] = '5';
+	
 	
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
@@ -138,10 +141,25 @@ int main(){
 				PopVar();
 				switch(menu_state){
 					case 0:{ //host/join buttons
-						//TODO(sushi) nicer button styling PushColor(UIStyleCol_ButtonBg,)
-						if(Button(str8l("Join Game"))) menu_state = 1;
-						if(Button(str8l("Host Game"))) menu_state = 2;
-						
+						if(InputText(str8l("portinput"), buff, 6, str8(), UIInputTextFlags_EnterReturnsTrue)){
+							net_port = stoi((char*)buff);
+						} SameLine(); Text(str8l("  Port"));
+						if(net_port > 65535){
+							PushColor(UIStyleCol_Text, Color_Red);
+							Text(str8l("Port must be in between 0 and 65535"));
+							PopColor();
+						}
+						else{
+							//TODO(sushi) nicer button styling PushColor(UIStyleCol_ButtonBg,)
+							if(Button(str8l("Join Game"))){
+								net_init_client(str8l("192.168.0.255"), net_port);
+								menu_state = 1;
+							}
+							if(Button(str8l("Host Game"))){ 
+								net_init_client(str8l("192.168.0.255"), net_port);
+								menu_state = 2;
+							}
+						}
 					}break;
 					case 1:{ //joining game
 						if(net_join_game()){
@@ -156,6 +174,7 @@ int main(){
 								menu_state = 0;
 								close_listener = true;
 								join_phase = 0;
+								net_deinit();
 							}
 						} else game_active = true;
 					}break;
@@ -172,7 +191,7 @@ int main(){
 								menu_state = 0;
 								close_listener = true;
 								host_phase = 0;
-								
+								net_deinit();
 							}
 						} else game_active = true;
 					}break;

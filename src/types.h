@@ -135,4 +135,6 @@ Message last_action;
 u32 last_action_x;
 u32 last_action_y;
 
+u64 net_port = 24465;
+
 #endif //TUNLLER_TYPES_H
