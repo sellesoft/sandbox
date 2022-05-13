@@ -140,7 +140,6 @@ int main(){
 						//TODO(sushi) nicer button styling PushColor(UIStyleCol_ButtonBg,)
 						if(Button(str8l("Join Game"))) menu_state = 1;
 						if(Button(str8l("Host Game"))) menu_state = 2;
-						
 					}break;
 					case 1:{ //joining game
 						if(net_join_game()){

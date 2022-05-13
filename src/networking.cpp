@@ -75,11 +75,15 @@ NetInfo listener_latch;
 void net_worker(void* data){
     listener_latch.magic[0] = 0;
     while(1){
+        platform_sleep(100);
         NetInfo info = net_client_recieve();
         //look for valid messages from a client that is not us
         if(CheckMagic(info) && info.uid != player_idx){
             listener_latch = info;
             break;
+        }
+        else{
+            net_client_send(info);
         }
     }
 }
@@ -119,6 +123,8 @@ b32 net_host_game(){
 u32 join_phase = 0;
 
 b32 net_join_game(){
+    DeshThreadManager->add_job({&net_worker, 0});
+    DeshThreadManager->wake_threads();
     switch(join_phase){
         case 0:{ /////////////////////////////////////// searching for HostGame message, respond if found
             player_idx = 1;
@@ -130,7 +136,6 @@ b32 net_join_game(){
                 join_phase = 1;
                 DeshThreadManager->add_job({&net_worker, 0});
                 DeshThreadManager->wake_threads();
-                
             }
         }break;            
         case 1:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
