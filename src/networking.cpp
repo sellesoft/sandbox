@@ -90,7 +90,7 @@ void net_worker(void* data){
         if(CheckMagic(info) && info.uid != player_idx){
             listener_latch = info;
            
-            break;
+            //break;
         }
         
         //else{

@@ -132,6 +132,7 @@ int main(){
 			SetNextWindowPos(vec2::ZERO);
 			SetNextWindowSize(DeshWinSize);
 			Begin(str8l("menu"), UIWindowFlags_NoInteract);{
+				PushVar(UIStyleVar_ItemSpacing, vec2(0, 10));
 				PushVar(UIStyleVar_FontHeight, 50);
 				Text(str8l("TUNNLER"));
 				PopVar();
@@ -140,6 +141,7 @@ int main(){
 						//TODO(sushi) nicer button styling PushColor(UIStyleCol_ButtonBg,)
 						if(Button(str8l("Join Game"))) menu_state = 1;
 						if(Button(str8l("Host Game"))) menu_state = 2;
+						
 					}break;
 					case 1:{ //joining game
 						if(net_join_game()){
@@ -175,7 +177,7 @@ int main(){
 						} else game_active = true;
 					}break;
 				}
-				
+				PopVar();
 			}End();
 		}
 		
