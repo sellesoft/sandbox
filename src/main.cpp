@@ -99,7 +99,7 @@ int main(){
 	platform_init();
 	logger_init();
 	console_init();
-	DeshWindow->Init(str8l("sandbox"));
+	DeshWindow->Init(str8l("TUNNLER"));
 	render_init();
 	Storage::Init();
 	UI::Init();
