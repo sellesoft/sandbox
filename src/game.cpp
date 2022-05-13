@@ -403,6 +403,7 @@ void update_game(){
 		case Message_QuitGame:{
 			deinit_board();
 			game_active = 0;
+			menu_state = 0;
 		}break;
 	}
 	

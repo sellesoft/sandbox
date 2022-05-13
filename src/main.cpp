@@ -131,7 +131,6 @@ int main(){
 		update_debug();
 		if(game_active) update_game();
 		else{
-			persist u32 menu_state = 0;
 			using namespace UI;
 			SetNextWindowPos(vec2::ZERO);
 			SetNextWindowSize(DeshWinSize);

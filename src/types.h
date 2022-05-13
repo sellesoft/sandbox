@@ -3,13 +3,14 @@
 #define TUNLLER_TYPES_H
 #include "kigu/common.h"
 
+//NOTE(delle) the order of these matter!
 typedef u32 Message; enum{
     Message_None,
     
     Message_HostGame, //message broadcast by client hosting game
     Message_JoinGame, //message broadcast in response to HostGame
-    Message_QuitGame, //message broadcast by either client to end game
     Message_AcknowledgeMessage, //message broadcast by either client to indiciate that the last message was recieved
+    Message_QuitGame, //message broadcast by either client to end game
 	
 	Message_SkipTurn,
 	
@@ -30,7 +31,7 @@ typedef u32 Message; enum{
 	Message_DetonateBomb,
 	
 	Message_COUNT,
-    Message_ACTIONS_START = Message_SkipTurn,
+    Message_ACTIONS_START = Message_QuitGame,
     Message_ACTIONS_END   = Message_DetonateBomb,
 };
 
@@ -39,8 +40,10 @@ str8 MessageStrings[Message_COUNT] ={
 	
 	str8l("HostGame"),
 	str8l("JoinGame"),
-	str8l("QuitGame"),
 	str8l("AcknowledgeMessage"),
+	str8l("QuitGame"),
+	
+	str8l("SkipTurn"),
 	
 	str8l("MoveUp"),
 	str8l("MoveDown"),
@@ -127,7 +130,7 @@ NetInfo turn_info;
 //1 - other player has acknoledged our move, so we listen for their next move
 u32 other_turn_phase = 0; 
 Stopwatch acknowledge_timeout;
-
+u32 menu_state = 0;
 
 Player player0;
 Player player1;
