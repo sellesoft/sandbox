@@ -96,6 +96,7 @@ b32 net_host_game(){
             net_client_send(info);
             host_phase = 1;
             DeshThreadManager->add_job({&net_worker, 0});
+            DeshThreadManager->wake_threads();
         }break;
         case 1:{ /////////////////////////////////////// wait for response from another client
             NetInfo info = listener_latch;
@@ -106,6 +107,8 @@ b32 net_host_game(){
                 net_client_send(info);
                 host_phase = 0;
                 DeshThreadManager->add_job({&net_worker, 0});
+                DeshThreadManager->wake_threads();
+
                 return false;
             }
         }break;
@@ -125,11 +128,18 @@ b32 net_join_game(){
                 info.message = Message_JoinGame;
                 net_client_send(info);
                 join_phase = 1;
+                DeshThreadManager->add_job({&net_worker, 0});
+                DeshThreadManager->wake_threads();
+                
             }
         }break;            
         case 1:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
             NetInfo info = listener_latch;
-            if(info.magic[0] && info.message == Message_AcknowledgeMessage){ join_phase = 0; return false;}
+            if(info.magic[0] && info.message == Message_AcknowledgeMessage){ 
+                join_phase = 0; 
+                DeshThreadManager->add_job({&net_worker, 0}); 
+                DeshThreadManager->wake_threads();
+                return false;}
         }break;
     }
     return true;
