@@ -230,6 +230,7 @@ void update_game(){
 			turn_info.y       = player->y;
 			turn_info.message = action_performed;
 			net_client_send(turn_info);
+			acknowledge_timeout = start_stopwatch();
 		}
 	}else{
 		player = (player_idx) ? &player0 : &player1;
@@ -237,19 +238,35 @@ void update_game(){
 		
 		NetInfo info = listener_latch;
 		if(info.magic && info.uid != player_idx){
-			action_performed = info.message;
-			if(info.message <= Message_MOVES_END && info.message >= Message_MOVES_START){
-				last_action = action_performed;
-				last_action_x = player->x;
-				last_action_y = player->y;
-				
-				turn_count += 1;
+			if(!other_turn_phase){//wait for acknowledgement from other player before expecting their turn, rebroadcast after timeout
+				if(info.message == Message_AcknowledgeMessage){
+					other_turn_phase = 1;
+				}else if(peek_stopwatch(acknowledge_timeout) > 1000) {
+					net_client_send(turn_info);
+					reset_stopwatch(&acknowledge_timeout);
+				}
 			}
-			DeshThreadManager->add_job({&net_worker, 0});
-			DeshThreadManager->wake_threads();
+			else{ //other player has acknowledged our turn, so now we check for them to make their's
+				action_performed = info.message;
+				if(info.message <= Message_MOVES_END && info.message >= Message_MOVES_START){
+					last_action = action_performed;
+					last_action_x = player->x;
+					last_action_y = player->y;
+
+					turn_count += 1;
+
+					NetInfo info;
+					info.message = Message_AcknowledgeMessage;
+					info.uid = player_idx;
+					net_client_send(info);
+				}
+				DeshThreadManager->add_job({&net_worker, 0});
+				DeshThreadManager->wake_threads();
+			}
 		}
 		listener_latch = {0};
 	}
+	
 	
 	//perform action for current player
 	switch(action_performed){

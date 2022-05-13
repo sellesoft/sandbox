@@ -121,6 +121,12 @@ s32 board_area;
 
 u32 turn_count;
 NetInfo turn_info;
+//phase of the other player's turn
+//0 - waiting for acknowledgement from other player, rebroadcast message if we timeout
+//1 - other player has acknoledged our move, so we listen for their next move
+u32 other_turn_phase = 0; 
+Stopwatch acknowledge_timeout;
+
 
 Player player0;
 Player player1;
