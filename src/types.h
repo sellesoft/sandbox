@@ -11,6 +11,8 @@ typedef u32 Message; enum{
     Message_QuitGame, //message broadcast by either client to end game
     Message_AcknowledgeMessage, //message broadcast by either client to indiciate that the last message was recieved
 	
+	Message_SkipTurn,
+	
     Message_MoveUp,
     Message_MoveDown,
     Message_MoveRight,
@@ -28,9 +30,8 @@ typedef u32 Message; enum{
 	Message_DetonateBomb,
 	
 	Message_COUNT,
-	
-    Message_MOVES_START = Message_MoveUp,
-    Message_MOVES_END = Message_DetonateBomb,
+    Message_ACTIONS_START = Message_SkipTurn,
+    Message_ACTIONS_END   = Message_DetonateBomb,
 };
 
 str8 MessageStrings[Message_COUNT] ={

@@ -92,6 +92,7 @@ void update_debug(){
 	//DemoWindow();
 	
 	if(key_pressed(Key_ENTER | InputMod_AnyCtrl)){
+		net_init_client(str8l("localhost"), 12345);
 		game_active = true;
 	}
 }

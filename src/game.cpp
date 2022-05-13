@@ -24,7 +24,7 @@ void draw_board(){
 	
 	//draw controls
 	UI::SetWinCursor(vec2{2.f,2.f});
-	UI::Text(str8l(  "(Escape) Open Menu"
+	UI::Text(str8l(  "(Escape) Exit Game"
 				   "\n(Enter)  Skip Turn"));
 	UI::SetWinCursor(UI::GetLastItemPos() + vec2{UI::GetLastItemSize().x + 2.f,0});
 	UI::Text(str8l(  "(Up)     Move Up"
@@ -219,12 +219,19 @@ void update_game(){
 			action_performed = Message_DetonateBomb;
 		}
 		
-		if(action_performed <= Message_MOVES_END && action_performed >= Message_MOVES_START){
+		//// game state input ////
+		if      (key_pressed(Key_ENTER | InputMod_None)){
+			action_performed = Message_SkipTurn;
+		}else if(key_pressed(Key_ESCAPE | InputMod_None)){
+			action_performed = Message_QuitGame;
+		}
+		
+		if(action_performed <= Message_ACTIONS_END && action_performed >= Message_ACTIONS_START){
 			last_action = action_performed;
 			last_action_x = player->x;
 			last_action_y = player->y;
-			
 			turn_count += 1;
+			
 			turn_info.uid     = player_idx;
 			turn_info.x       = player->x;
 			turn_info.y       = player->y;
@@ -248,13 +255,12 @@ void update_game(){
 			}
 			else{ //other player has acknowledged our turn, so now we check for them to make their's
 				action_performed = info.message;
-				if(info.message <= Message_MOVES_END && info.message >= Message_MOVES_START){
+				if(info.message <= Message_ACTIONS_END && info.message >= Message_ACTIONS_START){
 					last_action = action_performed;
 					last_action_x = player->x;
 					last_action_y = player->y;
-
 					turn_count += 1;
-
+					
 					NetInfo info;
 					info.message = Message_AcknowledgeMessage;
 					info.uid = player_idx;
@@ -390,7 +396,10 @@ void update_game(){
 			}
 		}break;
 		
-		//// mode ////
+		//// game state ////
+		case Message_SkipTurn:{
+			//do nothing
+		}break;
 		case Message_QuitGame:{
 			deinit_board();
 			game_active = 0;
