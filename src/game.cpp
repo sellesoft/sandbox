@@ -158,7 +158,7 @@ void update_game(){
 	
 	//debug
 	if(key_pressed(Key_ENTER | InputMod_AnyShift)){
-		turn_count += 1;
+		player_idx = (player_idx) ? 0 : 1;
 	}
 	
 	u32 action_performed = Message_None;
