@@ -81,7 +81,13 @@ void net_worker(void* data){
         //look for valid messages from a client that is not us
         if(CheckMagic(info) && info.uid != player_idx){
             listener_latch = info;
-            while(listener_latch.message == net_client_recieve().message);
+            while(1){
+                NetInfo next = net_client_recieve();
+                if(listener_latch.message == next.message) continue;
+                else{
+                    net_client_send(next);
+                }
+            }
             break;
         }
         //else{
@@ -119,13 +125,13 @@ b32 net_host_game(){
 
                 return false;
             }
-            //else if(peek_stopwatch(host_watch) > 100){
-            //    reset_stopwatch(&host_watch);
-            //    NetInfo info;
-            //    info.uid = 0;
-            //    info.message = Message_HostGame;
-            //    net_client_send(info);
-            //}
+            else if(peek_stopwatch(host_watch) > 100){
+                reset_stopwatch(&host_watch);
+                NetInfo info;
+                info.uid = 0;
+                info.message = Message_HostGame;
+                net_client_send(info);
+            }
         }break;
     }
     return true;
