@@ -53,17 +53,37 @@ b32 net_client_send(NetInfo info){
     return 1;
 }
 
+b32 tail_avaliable = 0;
+NetInfo tail_message;
 NetInfo net_client_recieve(){
-    zaddress sender;
-    NetInfo info;
-    s32 bytes_read = zed_net_udp_socket_receive(&csocket, &sender, &info, sizeof(NetInfo));
-	if(bytes_read) Logf("net","Received %d bytes from %s:%d; Message: %s", bytes_read, zed_net_host_to_str(sender.host), sender.port, (char*)MessageStrings[info.message].str);
-    if(bytes_read == -1){
-        LogE("net", "Client failed to read bytes with error:\n", zed_net_get_error());
-        return {0};
+    if(tail_avaliable){
+        tail_avaliable = 0;
+        return tail_message;
     }
-    if(!bytes_read) info.magic = 0; 
-    return info;
+    else{
+        zaddress sender;
+        NetInfo info;
+        s32 bytes_read = zed_net_udp_socket_receive(&csocket, &sender, &info, sizeof(NetInfo));
+        if(bytes_read){ 
+            Logf("net","Received %d bytes from %s:%d; Message: %s", bytes_read, zed_net_host_to_str(sender.host), sender.port, (char*)MessageStrings[info.message].str);
+            NetInfo eat;
+            while(zed_net_udp_socket_receive(&csocket, &sender, &eat, sizeof(NetInfo))){
+                if(memcmp(&info, &eat, sizeof(NetInfo))){
+                    if(CheckMagic(eat)){
+                        tail_avaliable = 1;
+                        tail_message = eat;
+                    }
+                    break;
+                }
+            }
+        }
+        if(bytes_read == -1){
+            LogE("net", "Client failed to read bytes with error:\n", zed_net_get_error());
+            return {0};
+        }
+        if(!bytes_read) info.magic = 0;
+        return info;
+    }
 }
 
 NetInfo listener_latch;
@@ -108,8 +128,14 @@ b32 net_host_game(){
                 host_phase = 0;
                 DeshThreadManager->add_job({&net_worker, 0});
                 DeshThreadManager->wake_threads();
-
                 return false;
+            }
+            else if(peek_stopwatch(host_watch) > 1000){//rebroadcast host message every second
+                reset_stopwatch(&host_watch);
+                NetInfo info;
+                info.uid = 0;
+                info.message = Message_HostGame;
+                net_client_send(info);
             }
             listener_latch = {0};
         }break;
