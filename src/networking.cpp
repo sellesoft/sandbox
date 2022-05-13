@@ -76,11 +76,12 @@ b32 close_listener = false;
 void net_worker(void* data){
     listener_latch.magic[0] = 0;
     while(!close_listener){
-        platform_sleep(100);
+        platform_sleep(500);
         NetInfo info = net_client_recieve();
         //look for valid messages from a client that is not us
         if(CheckMagic(info) && info.uid != player_idx){
             listener_latch = info;
+            while(listener_latch.message == net_client_recieve().message);
             break;
         }
         //else{
@@ -93,6 +94,7 @@ void net_worker(void* data){
 u32 host_phase = 0;
 
 b32 net_host_game(){
+    persist Stopwatch host_watch = start_stopwatch();
 	switch(host_phase){
         case 0:{ /////////////////////////////////////// set index and broadcast host message
             player_idx = 0;
@@ -117,6 +119,13 @@ b32 net_host_game(){
 
                 return false;
             }
+            //else if(peek_stopwatch(host_watch) > 100){
+            //    reset_stopwatch(&host_watch);
+            //    NetInfo info;
+            //    info.uid = 0;
+            //    info.message = Message_HostGame;
+            //    net_client_send(info);
+            //}
         }break;
     }
     return true;
@@ -147,7 +156,8 @@ b32 net_join_game(){
             NetInfo info = listener_latch;
             if(info.magic[0] && info.message == Message_AcknowledgeMessage){ 
                 join_phase = 0; 
-                return false;}
+                return false;
+            }
         }break;
     }
     return true;
