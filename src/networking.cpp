@@ -125,6 +125,7 @@ b32 net_host_game(){
 
                 return false;
             }
+            listener_latch = {0};
             //else if(peek_stopwatch(host_watch) > 100){
             //    reset_stopwatch(&host_watch);
             //    NetInfo info;
@@ -157,6 +158,7 @@ b32 net_join_game(){
                 DeshThreadManager->add_job({&net_worker, 0});
                 DeshThreadManager->wake_threads();
             }
+            listener_latch = {0};
         }break;            
         case 2:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
             NetInfo info = listener_latch;
@@ -166,6 +168,7 @@ b32 net_join_game(){
                 DeshThreadManager->wake_threads();
                 return false;
             }
+            listener_latch = {0};
         }break;
     }
     return true;

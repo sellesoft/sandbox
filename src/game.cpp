@@ -248,6 +248,7 @@ void update_game(){
 			DeshThreadManager->add_job({&net_worker, 0});
 			DeshThreadManager->wake_threads();
 		}
+		listener_latch = {0};
 	}
 	
 	//perform action for current player
