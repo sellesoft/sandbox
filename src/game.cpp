@@ -236,7 +236,7 @@ void update_game(){
 		other_player = (player_idx) ? &player1 : &player0;
 		
 		NetInfo info = listener_latch;
-		if(info.magic[0] && info.uid != player_idx){
+		if(info.magic && info.uid != player_idx){
 			action_performed = info.message;
 			if(info.message <= Message_MOVES_END && info.message >= Message_MOVES_START){
 				last_action = action_performed;

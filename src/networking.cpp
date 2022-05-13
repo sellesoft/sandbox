@@ -62,7 +62,7 @@ NetInfo net_client_recieve(){
         LogE("net", "Client failed to read bytes with error:\n", zed_net_get_error());
         return {0};
     }
-    if(!bytes_read) info.magic[0] = 0; 
+    if(!bytes_read) info.magic = 0; 
     return info;
 }
 
@@ -71,28 +71,14 @@ b32 close_listener = false;
 
 //listens until it finds one of our messages
 void net_worker(void* data){
-    listener_latch.magic[0] = 0;
+    listener_latch.magic = 0;
     while(!close_listener){
         platform_sleep(500);
         NetInfo info = net_client_recieve();
-        //look for valid messages from a client that is not us
-        //while(1){
-        //    NetInfo next = net_client_recieve();
-        //    if(listener_latch.message == next.message) continue;
-        //    else{
-        //        net_client_send(next);
-        //        break;
-        //    }       
-        //}
         if(CheckMagic(info) && info.uid != player_idx){
             listener_latch = info;
-           
             //break;
         }
-        
-        //else{
-        //    net_client_send(info);
-        //}
     }
     close_listener = false;
 }
@@ -114,7 +100,7 @@ b32 net_host_game(){
         }break;
         case 1:{ /////////////////////////////////////// wait for response from another client
             NetInfo info = listener_latch;
-            if(info.magic[0] && info.message == Message_JoinGame){
+            if(info.magic && info.message == Message_JoinGame){
                 info = NetInfo(); //acknowledge join game
                 info.uid = 0;
                 info.message = Message_AcknowledgeMessage;
@@ -126,13 +112,6 @@ b32 net_host_game(){
                 return false;
             }
             listener_latch = {0};
-            //else if(peek_stopwatch(host_watch) > 100){
-            //    reset_stopwatch(&host_watch);
-            //    NetInfo info;
-            //    info.uid = 0;
-            //    info.message = Message_HostGame;
-            //    net_client_send(info);
-            //}
         }break;
     }
     return true;
@@ -150,7 +129,7 @@ b32 net_join_game(){
         }break;
         case 1:{ /////////////////////////////////////// searching for HostGame message, respond if found
             NetInfo info = listener_latch;
-            if(info.magic[0] && info.message == Message_HostGame){
+            if(info.magic && info.message == Message_HostGame){
                 info.uid = 1;
                 info.message = Message_JoinGame;
                 net_client_send(info);
@@ -162,7 +141,7 @@ b32 net_join_game(){
         }break;            
         case 2:{ ///////////////////////////////////////// we have found HostGame message and responded, now we wait for the server to acknowledge us joining 
             NetInfo info = listener_latch;
-            if(info.magic[0] && info.message == Message_AcknowledgeMessage){ 
+            if(info.magic && info.message == Message_AcknowledgeMessage){ 
                 join_phase = 0; 
                 DeshThreadManager->add_job({&net_worker, 0});
                 DeshThreadManager->wake_threads();

@@ -95,19 +95,13 @@ struct Player{
 };
 
 struct NetInfo{
-    u8 magic[4] = {'T','U','N','L'};
+    u32 magic = PackU32('T', 'U', 'N', 'L');
 	Message message;
     s32 x, y;
     u32 uid;
 };
 
-#define CheckMagic(var)     \
-(                         \
-var.magic[0] == 'T' &&  \
-var.magic[1] == 'U' &&  \
-var.magic[2] == 'N' &&  \
-var.magic[3] == 'L'     \
-)
+#define CheckMagic(var) (var.magic == PackU32('T','U','N','L'))
 
 
 //~////////////////////////////////////////////////////////////////////////////////////////////////
