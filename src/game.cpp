@@ -184,8 +184,9 @@ void update_game(){
 		player = (player_idx) ? &player0 : &player1;
 		other_player = (player_idx) ? &player1 : &player0;
 		
-		NetInfo info = net_client_recieve();
-		if(info.uid != player_idx){
+		NetInfo info = listener_latch;
+
+		if(info.magic[0] && info.uid != player_idx){
 			action_performed = info.message;
 			if(info.message <= Message_MOVES_END && info.message >= Message_MOVES_START){
 				last_action = action_performed;
@@ -194,6 +195,8 @@ void update_game(){
 				
 				turn_count += 1;
 			}
+			DeshThreadManager->add_job({&net_worker, 0});
+            DeshThreadManager->wake_threads();
 		}
 	}
 	

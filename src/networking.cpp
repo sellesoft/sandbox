@@ -79,13 +79,14 @@ void net_worker(void* data){
         platform_sleep(500);
         NetInfo info = net_client_recieve();
         //look for valid messages from a client that is not us
-        while(1){
-            NetInfo next = net_client_recieve();
-            if(listener_latch.message == next.message) continue;
-            else{
-                net_client_send(next);
-            }       
-        }
+        //while(1){
+        //    NetInfo next = net_client_recieve();
+        //    if(listener_latch.message == next.message) continue;
+        //    else{
+        //        net_client_send(next);
+        //        break;
+        //    }       
+        //}
         if(CheckMagic(info) && info.uid != player_idx){
             listener_latch = info;
            
@@ -127,13 +128,13 @@ b32 net_host_game(){
 
                 return false;
             }
-            else if(peek_stopwatch(host_watch) > 100){
-                reset_stopwatch(&host_watch);
-                NetInfo info;
-                info.uid = 0;
-                info.message = Message_HostGame;
-                net_client_send(info);
-            }
+            //else if(peek_stopwatch(host_watch) > 100){
+            //    reset_stopwatch(&host_watch);
+            //    NetInfo info;
+            //    info.uid = 0;
+            //    info.message = Message_HostGame;
+            //    net_client_send(info);
+            //}
         }break;
     }
     return true;
@@ -164,6 +165,8 @@ b32 net_join_game(){
             NetInfo info = listener_latch;
             if(info.magic[0] && info.message == Message_AcknowledgeMessage){ 
                 join_phase = 0; 
+                DeshThreadManager->add_job({&net_worker, 0});
+                DeshThreadManager->wake_threads();
                 return false;
             }
         }break;
