@@ -46,6 +46,7 @@
 #include "game.cpp"
 void update_debug(){
 	using namespace UI;
+	/*
 	static NetInfo info_out;
 	static NetInfo info_in;
 	
@@ -86,8 +87,12 @@ void update_debug(){
 		}EndChild();
 		PopVar();
 	}End();
+	*/
 	//DemoWindow();
 	
+	if(key_pressed(Key_ENTER | InputMod_AnyCtrl)){
+		game_active = true;
+	}
 }
 
 //~////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,6 +122,8 @@ int main(){
 		DeshWindow->Update();
 		platform_update();
 		console_update();
+		
+		update_debug();
 		if(game_active) update_game();
 		else{
 			persist u32 menu_state = 0;
@@ -157,6 +164,7 @@ int main(){
 						} else game_active = true;
 					}break;
 				}
+				
 			}End();
 		}
 		
