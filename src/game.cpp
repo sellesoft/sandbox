@@ -51,12 +51,12 @@ void draw_board(){
 			
 			//draw tile background
 			switch(TileAt(x,y).bg){
-				case TileBG_Dirt:    UI::Text(str8l("Dirt"),    tile_pos, UITextFlags_NoWrap); break;
-				case TileBG_Surface: UI::Text(str8l("Surface"), tile_pos, UITextFlags_NoWrap); break;
-				case TileBG_Sky:     UI::Text(str8l("Sky"),     tile_pos, UITextFlags_NoWrap); break;
-				case TileBG_Trench:  UI::Text(str8l("Trench"),  tile_pos, UITextFlags_NoWrap); break;
-				case TileBG_Fort:    UI::Text(str8l("Fort"),    tile_pos, UITextFlags_NoWrap); break;
-				case TileBG_Tunnel:  UI::Text(str8l("Tunnel"),  tile_pos, UITextFlags_NoWrap); break;
+				case TileBG_Dirt:   { UI::RectFilled(tile_pos, tile_dims, color(70,37,33)); UI::Text(str8l("Dirt"),    tile_pos, UITextFlags_NoWrap); }break;
+				case TileBG_Surface:{ UI::Text(str8l("Surface"), tile_pos, UITextFlags_NoWrap); }break;
+				case TileBG_Sky:    { UI::Text(str8l("Sky"),     tile_pos, UITextFlags_NoWrap); }break;
+				case TileBG_Trench: { UI::RectFilled(tile_pos, tile_dims, color(150,112,91)); UI::Text(str8l("Trench"),  tile_pos, UITextFlags_NoWrap); }break;
+				case TileBG_Fort:   { UI::Text(str8l("Fort"),    tile_pos, UITextFlags_NoWrap); }break;
+				case TileBG_Tunnel: { UI::Text(str8l("Tunnel"),  tile_pos, UITextFlags_NoWrap); }break;
 			}
 			
 			//draw foreground structures
