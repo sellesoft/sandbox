@@ -24,6 +24,9 @@ void draw_board(){
 	
 	//draw controls
 	UI::SetWinCursor(vec2{2.f,2.f});
+	UI::Text(str8l(  "(Escape) Open Menu"
+				   "\n(Enter)  Skip Turn"));
+	UI::SetWinCursor(UI::GetLastItemPos() + vec2{UI::GetLastItemSize().x + 2.f,0});
 	UI::Text(str8l(  "(Up)     Move Up"
 				   "\n(Down)   Move Down"
 				   "\n(Right)  Move Right"
@@ -34,9 +37,12 @@ void draw_board(){
 				   "\n(Shift Right)  Dig Right"
 				   "\n(Shift Left)   Dig Left"));
 	UI::SetWinCursor(UI::GetLastItemPos() + vec2{UI::GetLastItemSize().x + 2.f,0});
-	UI::Text(str8l(  "(b)  Place Bomb"
-				   "\n(B)  Detonate Bomb"
-				   "\n(l)  Place Ladder"));
+	UI::Text(str8l(  "(b) Place Bomb"
+				   "\n(B) Detonate Bomb"
+				   "\n(l) Build Ladder"
+				   "\n(p) Build Pillar"));
+	UI::SetWinCursor(UI::GetLastItemPos() + vec2{UI::GetLastItemSize().x + 2.f,0});
+	UI::TextF(str8_lit("Turn Count: %d\nPlayer Turn: %s\nLast Action: %s at (%d,%d)"), turn_count, (turn_count % 2 == 0) ? "British" : "German", (char*)MessageStrings[last_action].str, last_action_x, last_action_y);
 	
 	//draw board
 	forX(y, board_height){
@@ -99,6 +105,10 @@ void init_game(){
 	player1 = {board_width-1, board_height-1, 3, TileFG_GermanPlayer, array<u32>(deshi_allocator)};
 	TileAt(player1.x,player1.y).bg = TileBG_Trench;
 	TileAt(player1.x,player1.y).fg = TileFG_GermanPlayer;
+	
+	last_action = Message_None;
+	last_action_x = 0;
+	last_action_y = 0;
 }
 
 void update_game(){
@@ -111,8 +121,8 @@ void update_game(){
 	
 	u32 action_performed = Message_None;
 	if(turn_count % 2 == player_idx){
-		player = &player0;
-		other_player = &player1;
+		player = (player_idx) ? &player1 : &player0;
+		other_player = (player_idx) ? &player0 : &player1;
 		
 		//// moving input ////
 		if      (   key_pressed(Key_UP    | InputMod_None)
@@ -158,7 +168,11 @@ void update_game(){
 			}
 		}
 		
-		if(action_performed != Message_None){
+		if(action_performed <= Message_MOVES_END && action_performed >= Message_MOVES_START){
+			last_action = action_performed;
+			last_action_x = player->x;
+			last_action_y = player->y;
+			
 			turn_count += 1;
 			turn_info.uid = player_idx;
 			turn_info.x = player->x;
@@ -167,13 +181,20 @@ void update_game(){
 			net_client_send(turn_info);
 		}
 	}else{
-		player = &player1;
-		other_player = &player0;
-		NetInfo info = net_client_recieve();
-		action_performed = info.message;
-		if(action_performed <= Message_MOVES_END && action_performed >= Message_MOVES_START) 
-			turn_count++;
+		player = (player_idx) ? &player0 : &player1;
+		other_player = (player_idx) ? &player1 : &player0;
 		
+		NetInfo info = net_client_recieve();
+		if(info.uid != player_idx){
+			action_performed = info.message;
+			if(info.message <= Message_MOVES_END && info.message >= Message_MOVES_START){
+				last_action = action_performed;
+				last_action_x = player->x;
+				last_action_y = player->y;
+				
+				turn_count += 1;
+			}
+		}
 	}
 	
 	//perform action for current player
@@ -278,6 +299,8 @@ void update_game(){
 				}
 			}
 		}break;
+		
+		//// mode ////
 		case Message_QuitGame:{
 			deinit_board();
 			game_active = 0;
@@ -285,7 +308,7 @@ void update_game(){
 	}
 	
 	//debug
-	if(key_pressed(Key_ENTER)){
+	if(key_pressed(Key_ENTER | InputMod_AnyShift)){
 		turn_count += 1;
 	}
 	

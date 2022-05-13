@@ -28,7 +28,7 @@ typedef u32 Message; enum{
 	Message_DetonateBomb,
 	
 	Message_COUNT,
-
+	
     Message_MOVES_START = Message_MoveUp,
     Message_MOVES_END = Message_DetonateBomb,
 };
@@ -130,5 +130,9 @@ NetInfo turn_info;
 Player player0;
 Player player1;
 u32 player_idx;
+
+Message last_action;
+u32 last_action_x;
+u32 last_action_y;
 
 #endif //TUNLLER_TYPES_H
