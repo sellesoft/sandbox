@@ -153,6 +153,7 @@ int main(){
 							if(Button(str8l("Cancel"))) {
 								menu_state = 0;
 								close_listener = true;
+								join_phase = 0;
 							}
 						} else game_active = true;
 					}break;
@@ -168,6 +169,7 @@ int main(){
 							if(Button(str8l("Cancel"))) {
 								menu_state = 0;
 								close_listener = true;
+								host_phase = 0;
 								
 							}
 						} else game_active = true;

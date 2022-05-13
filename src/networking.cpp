@@ -83,9 +83,9 @@ void net_worker(void* data){
             listener_latch = info;
             break;
         }
-        else{
-            net_client_send(info);
-        }
+        //else{
+        //    net_client_send(info);
+        //}
     }
     close_listener = false;
 }
@@ -147,8 +147,6 @@ b32 net_join_game(){
             NetInfo info = listener_latch;
             if(info.magic[0] && info.message == Message_AcknowledgeMessage){ 
                 join_phase = 0; 
-                DeshThreadManager->add_job({&net_worker, 0}); 
-                DeshThreadManager->wake_threads();
                 return false;}
         }break;
     }
