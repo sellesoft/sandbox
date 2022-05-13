@@ -44,6 +44,7 @@
 #include "sound.cpp"
 #include "networking.cpp"
 #include "game.cpp"
+
 void update_debug(){
 	using namespace UI;
 	/*
@@ -114,6 +115,7 @@ int main(){
 	net_init_client(str8l("192.168.0.255"), 24465);
 	sound_init();
 	init_game();
+	DeshThreadManager->spawn_thread();
 	
 	//start main loop
 	Stopwatch frame_stopwatch = start_stopwatch();
@@ -122,7 +124,6 @@ int main(){
 		DeshWindow->Update();
 		platform_update();
 		console_update();
-		
 		update_debug();
 		if(game_active) update_game();
 		else{
@@ -150,6 +151,7 @@ int main(){
 							str8 text = str8l("searching for game..");
 							vec2 size = CalcTextSize(text);
 							Text(text, (DeshWinSize - size)/2);
+							if(Button(str8l("Cancel"))) menu_state = 0;
 						} else game_active = true;
 					}break;
 					case 2:{ //hosting game
@@ -161,6 +163,7 @@ int main(){
 							str8 text = str8l("searching for player..");
 							vec2 size = CalcTextSize(text);
 							Text(text, (DeshWinSize - size)/2);
+							if(Button(str8l("Cancel"))) menu_state = 0;
 						} else game_active = true;
 					}break;
 				}
