@@ -158,6 +158,7 @@ int main(){
 							str8 text = str8l("searching for player..");
 							vec2 size = CalcTextSize(text);
 							Text(text, (DeshWinSize - size)/2);
+							if(Button(str8l("Cancel"))) menu_state = 0;
 						} else game_active = true;
 					}break;
 				}
