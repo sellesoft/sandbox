@@ -132,8 +132,7 @@ u32 other_turn_phase = 0;
 Stopwatch acknowledge_timeout;
 u32 menu_state = 0;
 
-Player player0;
-Player player1;
+Player players[2];
 u32 player_idx;
 
 Message last_action;

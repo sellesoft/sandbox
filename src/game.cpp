@@ -1,5 +1,6 @@
 //~////////////////////////////////////////////////////////////////////////////////////////////////
 //// @board
+//NOTE(delle) the board's origin is at the bottom left
 void init_board(s32 width, s32 height){
 	board        = (Tile*)memory_alloc((width*height)*sizeof(Tile));
 	board_width  = width;
@@ -10,6 +11,40 @@ void init_board(s32 width, s32 height){
 
 void deinit_board(){
 	memzfree(board);
+}
+
+//Returns true if the tile is in line of sight of the target
+b32 line_of_sight(u32 tile_x, u32 tile_y, u32 target_x, u32 target_y){
+	u32 x = tile_x, y = tile_y;
+	while(x != target_x || y != target_y){
+		vec2 tile_towards_target = (vec2(target_x,target_y) - vec2(x,y)).normalized();
+		
+		//not in line of sight if nearest tile along line is opaque 
+		if(abs(tile_towards_target.x) > abs(tile_towards_target.y)){
+			if(tile_towards_target.x > 0){
+				Assert(x+1 < board_width);
+				if(TileAt(x+1,y).bg == TileBG_Dirt) return false;
+				x += 1;
+			}else{
+				Assert(x-1 >= 0);
+				if(TileAt(x-1,y).bg == TileBG_Dirt) return false;
+				x -= 1;
+			}
+		}else{
+			if(tile_towards_target.y > 0){
+				Assert(y+1 < board_height);
+				if(TileAt(x,y+1).bg == TileBG_Dirt) return false;
+				y += 1;
+			}else{
+				Assert(y-1 >= 0);
+				if(TileAt(x,y-1).bg == TileBG_Dirt) return false;
+				y -= 1;
+			}
+		}
+		
+		if(x == target_x && y == target_y) break;
+	}
+	return true;
 }
 
 void draw_board(){
@@ -42,62 +77,75 @@ void draw_board(){
 				   "\n(l) Build Ladder"
 				   "\n(p) Build Pillar"));
 	UI::SetWinCursor(UI::GetLastItemPos() + vec2{UI::GetLastItemSize().x + 2.f,0});
-	UI::TextF(str8_lit("Turn Count: %d\nPlayer Turn: %s\nLast Action: %s at (%d,%d)"), turn_count, (turn_count % 2 == 0) ? "British" : "German", (char*)MessageStrings[last_action].str, last_action_x, last_action_y);
+	UI::TextF(str8_lit(  "FPS: %d"
+					   "\nTurn Count: %d"
+					   "\nPlayer Turn: %s"
+					   "\nLast Action: %s at (%d,%d)"),
+			  (int)(1000.f / DeshTime->deltaTime), turn_count,
+			  (turn_count % 2 == 0) ? "British" : "German",
+			  (char*)MessageStrings[last_action].str, last_action_x, last_action_y);
 	
 	//draw board
 	forX(y, board_height){
 		forX(x, board_width){
 			vec2 tile_pos = vec2(x*tile_width, DeshWindow->cheight - (y+1)*tile_height);
 			
-			//draw tile background
-			switch(TileAt(x,y).bg){
-				case TileBG_Dirt:{
-					UI::RectFilled(tile_pos, tile_dims, color(70,37,33));
-					UI::Text(str8l("Dirt"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
-				}break;
-				case TileBG_Tunnel:{
-					UI::RectFilled(tile_pos, tile_dims, color(150,112,91));
-					UI::Text(str8l("Tunnel"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
-				}break;
-				/*case TileBG_Trench:{
-					UI::Text(str8l("Trench"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
-				}break;*/
-				case TileBG_BritishBase:{
-					UI::RectFilled(tile_pos, tile_dims, Color_Grey);
-					UI::RectFilled(tile_pos, tile_dims - tile_dims.yComp()*.75f, Color_DarkBlue);
-					UI::Text(str8l("Base (B)"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
-				}break;
-				case TileBG_GermanBase:{
-					UI::RectFilled(tile_pos, tile_dims, Color_Grey);
-					UI::RectFilled(tile_pos, tile_dims - tile_dims.yComp()*.75f, Color_DarkRed);
-					UI::Text(str8l("Base (G)"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
-				}break;
-				case TileBG_Sky:{
-					UI::Text(str8l("Sky"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
-				}break;
-			}
-			
-			//draw foreground structures
-			if      (HasFlag(TileAt(x,y).fg, TileFG_Ladder)){
-				UI::Text(str8l("Ladder"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
-			}else if(HasFlag(TileAt(x,y).fg, TileFG_Pillar)){
-				UI::Text(str8l("Pillar"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
-			}
-			
-			//draw foreground bombs
-			if      (HasFlag(TileAt(x,y).fg, TileFG_BritishBomb)){
-				UI::Text(str8l("Bomb (B)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
-			}else if(HasFlag(TileAt(x,y).fg, TileFG_GermanBomb)){
-				UI::Text(str8l("Bomb (G)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
-			}else if(HasFlag(TileAt(x,y).fg, TileFG_BombWire)){
-				UI::Text(str8l("Wire"),     UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
-			}
-			
-			//draw foreground players
-			if      (HasFlag(TileAt(x,y).fg, TileFG_BritishPlayer)){
-				UI::Text(str8l("Player (B)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
-			}else if(HasFlag(TileAt(x,y).fg, TileFG_GermanPlayer)){
-				UI::Text(str8l("Player (G)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+			//if in line of sight of player or base, show true tile, else show dirt
+			if(   line_of_sight(x, y, players[player_idx].x,              players[player_idx].y)
+			   || line_of_sight(x, y, ((player_idx) ? board_width-1 : 0), board_height-1)){
+				//draw tile background
+				switch(TileAt(x,y).bg){
+					case TileBG_Dirt:{
+						UI::RectFilled(tile_pos, tile_dims, color(70,37,33));
+						UI::Text(str8l("Dirt"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
+					}break;
+					case TileBG_Tunnel:{
+						UI::RectFilled(tile_pos, tile_dims, color(150,112,91));
+						UI::Text(str8l("Tunnel"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
+					}break;
+					/*case TileBG_Trench:{
+						UI::Text(str8l("Trench"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
+					}break;*/
+					case TileBG_BritishBase:{
+						UI::RectFilled(tile_pos, tile_dims, Color_Grey);
+						UI::RectFilled(tile_pos, tile_dims - tile_dims.yComp()*.75f, Color_DarkBlue);
+						UI::Text(str8l("Base (B)"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
+					}break;
+					case TileBG_GermanBase:{
+						UI::RectFilled(tile_pos, tile_dims, Color_Grey);
+						UI::RectFilled(tile_pos, tile_dims - tile_dims.yComp()*.75f, Color_DarkRed);
+						UI::Text(str8l("Base (G)"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
+					}break;
+					case TileBG_Sky:{
+						UI::Text(str8l("Sky"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
+					}break;
+				}
+				
+				//draw foreground structures
+				if      (HasFlag(TileAt(x,y).fg, TileFG_Ladder)){
+					UI::Text(str8l("Ladder"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+				}else if(HasFlag(TileAt(x,y).fg, TileFG_Pillar)){
+					UI::Text(str8l("Pillar"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+				}
+				
+				//draw foreground bombs
+				if      (HasFlag(TileAt(x,y).fg, TileFG_BritishBomb)){
+					UI::Text(str8l("Bomb (B)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+				}else if(HasFlag(TileAt(x,y).fg, TileFG_GermanBomb)){
+					UI::Text(str8l("Bomb (G)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+				}else if(HasFlag(TileAt(x,y).fg, TileFG_BombWire)){
+					UI::Text(str8l("Wire"),     UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+				}
+				
+				//draw foreground players
+				if      (HasFlag(TileAt(x,y).fg, TileFG_BritishPlayer)){
+					UI::Text(str8l("Player (B)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+				}else if(HasFlag(TileAt(x,y).fg, TileFG_GermanPlayer)){
+					UI::Text(str8l("Player (G)"), UI::GetLastItemPos()+UI::GetLastItemSize().yComp(), UITextFlags_NoWrap);
+				}
+			}else{
+				UI::RectFilled(tile_pos, tile_dims, color(70,37,33));
+				UI::Text(str8l("Dirt"), tile_pos+vec2::ONE, UITextFlags_NoWrap);
 			}
 			
 			//draw tile border
@@ -116,7 +164,7 @@ void init_game(){
 	init_board(20, 10);
 	turn_count = 0;
 	
-	player0 = {1,             board_height-5, 3, TileFG_BritishPlayer, TileFG_BritishBomb,  array<u32>(deshi_allocator)};
+	players[0] = {1,             board_height-5, 3, TileFG_BritishPlayer, TileFG_BritishBomb,  array<u32>(deshi_allocator)};
 	TileAt(0,board_height-1).bg = TileBG_BritishBase;
 	for(int i = 1; i < board_width-1; ++i) TileAt(i,board_height-1).bg = TileBG_Sky;
 	TileAt(0,board_height-2).bg = TileBG_Tunnel;
@@ -127,10 +175,10 @@ void init_game(){
 	TileAt(0,board_height-4).fg = TileFG_Ladder;
 	TileAt(0,board_height-5).bg = TileBG_Tunnel;
 	TileAt(0,board_height-5).fg = TileFG_Ladder;
-	TileAt(player0.x,player0.y).bg = TileBG_Tunnel;
-	TileAt(player0.x,player0.y).fg = TileFG_BritishPlayer;
+	TileAt(players[0].x,players[0].y).bg = TileBG_Tunnel;
+	TileAt(players[0].x,players[0].y).fg = TileFG_BritishPlayer;
 	
-	player1 = {board_width-2, board_height-5, 3, TileFG_GermanPlayer,  TileFG_GermanBomb, array<u32>(deshi_allocator)};
+	players[1] = {board_width-2, board_height-5, 3, TileFG_GermanPlayer,  TileFG_GermanBomb, array<u32>(deshi_allocator)};
 	TileAt(board_width-1,board_height-1).bg = TileBG_GermanBase;
 	TileAt(board_width-1,board_height-2).bg = TileBG_Tunnel;
 	TileAt(board_width-1,board_height-2).fg = TileFG_Ladder;
@@ -140,8 +188,8 @@ void init_game(){
 	TileAt(board_width-1,board_height-4).fg = TileFG_Ladder;
 	TileAt(board_width-1,board_height-5).bg = TileBG_Tunnel;
 	TileAt(board_width-1,board_height-5).fg = TileFG_Ladder;
-	TileAt(player1.x,player1.y).bg = TileBG_Tunnel;
-	TileAt(player1.x,player1.y).fg = TileFG_GermanPlayer;
+	TileAt(players[1].x,players[1].y).bg = TileBG_Tunnel;
+	TileAt(players[1].x,players[1].y).fg = TileFG_GermanPlayer;
 	
 	last_action = Message_None;
 	last_action_x = 0;
@@ -163,8 +211,8 @@ void update_game(){
 	
 	u32 action_performed = Message_None;
 	if(turn_count % 2 == player_idx){
-		player = (player_idx) ? &player1 : &player0;
-		other_player = (player_idx) ? &player0 : &player1;
+		player = &players[player_idx];
+		other_player = &players[(player_idx) ? 1 : 0];
 		
 		//// moving input ////
 		if      (   key_pressed(Key_UP    | InputMod_None)
@@ -240,8 +288,8 @@ void update_game(){
 			acknowledge_timeout = start_stopwatch();
 		}
 	}else{
-		player = (player_idx) ? &player0 : &player1;
-		other_player = (player_idx) ? &player1 : &player0;
+		player = &players[(player_idx) ? 0 : 1];
+		other_player = &players[player_idx];
 		
 		NetInfo info = listener_latch;
 		if(info.magic && info.uid != player_idx){
