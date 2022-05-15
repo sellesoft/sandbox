@@ -85,6 +85,13 @@ typedef u32 TileFG; enum{
 	TileFG_GermanPlayer  = (1 << 6),
 };
 
+typedef u32 GameWinner; enum{
+	GameWinner_None,
+	GameWinner_Player, //this player won
+	GameWinner_Other, //other player won
+	GameWinner_Tie,
+};
+
 struct Tile{
 	TileBG bg;
 	TileFG fg;
@@ -142,6 +149,6 @@ Message last_action;
 u32 last_action_x;
 u32 last_action_y;
 
-u32 game_winner; //0 = no winner, 1 = player won, 2 = other won, 3 = tie
+GameWinner game_winner;
 
 #endif //TUNLLER_TYPES_H

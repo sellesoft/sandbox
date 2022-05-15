@@ -92,8 +92,9 @@ void update_debug(){
 	//DemoWindow();
 	
 	if(key_pressed(Key_ENTER | InputMod_AnyCtrl)){
-		net_init_client(str8l("localhost"), 12345);
+		if(!is_client) net_init_client(str8l("localhost"), 12345);
 		game_active = true;
+		if(game_winner) init_game();
 	}
 }
 
@@ -159,6 +160,13 @@ int main(){
 								net_init_client(str8l("192.168.0.255"), net_port);
 								menu_state = 2;
 							}
+						}
+						
+						//last game winner
+						switch(game_winner){
+							case GameWinner_Player: UI::Text(str8l("You Won."), UITextFlags_NoWrap); break;
+							case GameWinner_Other:  UI::Text(str8l("You Lost."), UITextFlags_NoWrap); break;
+							case GameWinner_Tie:    UI::Text(str8l("You Tied."), UITextFlags_NoWrap); break;
 						}
 					}break;
 					case 1:{ //joining game

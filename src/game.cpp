@@ -7,6 +7,33 @@ void init_board(s32 width, s32 height){
 	board_height = height;
 	turn_count   = 0;
 	board_area   = width*height;
+	
+	players[0] = {1,             board_height-5, 3, TileFG_BritishPlayer, TileFG_BritishBomb,  array<u32>(deshi_allocator)};
+	TileAt(0,board_height-1).bg = TileBG_BritishBase;
+	for(int i = 1; i < board_width-1; ++i) TileAt(i,board_height-1).bg = TileBG_Sky;
+	TileAt(0,board_height-2).bg = TileBG_Tunnel;
+	TileAt(0,board_height-2).fg = TileFG_Ladder;
+	TileAt(0,board_height-3).bg = TileBG_Tunnel;
+	TileAt(0,board_height-3).fg = TileFG_Ladder;
+	TileAt(0,board_height-4).bg = TileBG_Tunnel;
+	TileAt(0,board_height-4).fg = TileFG_Ladder;
+	TileAt(0,board_height-5).bg = TileBG_Tunnel;
+	TileAt(0,board_height-5).fg = TileFG_Ladder;
+	TileAt(players[0].x,players[0].y).bg = TileBG_Tunnel;
+	TileAt(players[0].x,players[0].y).fg = TileFG_BritishPlayer;
+	
+	players[1] = {board_width-2, board_height-5, 3, TileFG_GermanPlayer,  TileFG_GermanBomb, array<u32>(deshi_allocator)};
+	TileAt(board_width-1,board_height-1).bg = TileBG_GermanBase;
+	TileAt(board_width-1,board_height-2).bg = TileBG_Tunnel;
+	TileAt(board_width-1,board_height-2).fg = TileFG_Ladder;
+	TileAt(board_width-1,board_height-3).bg = TileBG_Tunnel;
+	TileAt(board_width-1,board_height-3).fg = TileFG_Ladder;
+	TileAt(board_width-1,board_height-4).bg = TileBG_Tunnel;
+	TileAt(board_width-1,board_height-4).fg = TileFG_Ladder;
+	TileAt(board_width-1,board_height-5).bg = TileBG_Tunnel;
+	TileAt(board_width-1,board_height-5).fg = TileFG_Ladder;
+	TileAt(players[1].x,players[1].y).bg = TileBG_Tunnel;
+	TileAt(players[1].x,players[1].y).fg = TileFG_GermanPlayer;
 }
 
 void deinit_board(){
@@ -58,8 +85,8 @@ void draw_board(){
 	UIStyle style = UI::GetStyle();
 	
 	//draw controls
-	UI::PushColor(UIStyleCol_WindowBg, Color_Blue);
-	UI::Begin("tunnler_controls", UIWindowFlags_NoInteract|UIWindowFlags_FitAllElements);
+	UI::PushColor(UIStyleCol_WindowBg, Color_DarkBlue);
+	UI::Begin(str8l("tunnler_controls"), vec2::ZERO, vec2::ZERO, UIWindowFlags_NoResize|UIWindowFlags_FitAllElements|UIWindowFlags_SnapToOtherWindows);
 	UI::SetWinCursor(vec2{2.f,2.f});
 	UI::Text(str8l(  "(Escape) Exit Game"
 				   "\n(Enter)  Skip Turn"));
@@ -79,7 +106,7 @@ void draw_board(){
 				   "\n(l) Build Ladder"
 				   "\n(p) Build Pillar"));
 	UI::SetWinCursor(UI::GetLastItemPos() + vec2{UI::GetLastItemSize().x + 2.f,0});
-	UI::TextF(str8_lit(  "FPS: %d"
+	UI::TextF(str8l(  "FPS: %d"
 					   "\nTurn Count: %d"
 					   "\nPlayer Turn: %s"
 					   "\nLast Action: %s at (%d,%d)"),
@@ -168,33 +195,6 @@ void init_game(){
 	init_board(20, 10);
 	turn_count = 0;
 	
-	players[0] = {1,             board_height-5, 3, TileFG_BritishPlayer, TileFG_BritishBomb,  array<u32>(deshi_allocator)};
-	TileAt(0,board_height-1).bg = TileBG_BritishBase;
-	for(int i = 1; i < board_width-1; ++i) TileAt(i,board_height-1).bg = TileBG_Sky;
-	TileAt(0,board_height-2).bg = TileBG_Tunnel;
-	TileAt(0,board_height-2).fg = TileFG_Ladder;
-	TileAt(0,board_height-3).bg = TileBG_Tunnel;
-	TileAt(0,board_height-3).fg = TileFG_Ladder;
-	TileAt(0,board_height-4).bg = TileBG_Tunnel;
-	TileAt(0,board_height-4).fg = TileFG_Ladder;
-	TileAt(0,board_height-5).bg = TileBG_Tunnel;
-	TileAt(0,board_height-5).fg = TileFG_Ladder;
-	TileAt(players[0].x,players[0].y).bg = TileBG_Tunnel;
-	TileAt(players[0].x,players[0].y).fg = TileFG_BritishPlayer;
-	
-	players[1] = {board_width-2, board_height-5, 3, TileFG_GermanPlayer,  TileFG_GermanBomb, array<u32>(deshi_allocator)};
-	TileAt(board_width-1,board_height-1).bg = TileBG_GermanBase;
-	TileAt(board_width-1,board_height-2).bg = TileBG_Tunnel;
-	TileAt(board_width-1,board_height-2).fg = TileFG_Ladder;
-	TileAt(board_width-1,board_height-3).bg = TileBG_Tunnel;
-	TileAt(board_width-1,board_height-3).fg = TileFG_Ladder;
-	TileAt(board_width-1,board_height-4).bg = TileBG_Tunnel;
-	TileAt(board_width-1,board_height-4).fg = TileFG_Ladder;
-	TileAt(board_width-1,board_height-5).bg = TileBG_Tunnel;
-	TileAt(board_width-1,board_height-5).fg = TileFG_Ladder;
-	TileAt(players[1].x,players[1].y).bg = TileBG_Tunnel;
-	TileAt(players[1].x,players[1].y).fg = TileFG_GermanPlayer;
-	
 	last_action = Message_None;
 	last_action_x = 0;
 	last_action_y = 0;
@@ -216,7 +216,7 @@ void update_game(){
 	u32 action_performed = Message_None;
 	if(turn_count % 2 == player_idx){
 		player = &players[player_idx];
-		other_player = &players[(player_idx) ? 1 : 0];
+		other_player = &players[(player_idx) ? 0 : 1];
 		
 		//// moving input ////
 		if      (   key_pressed(Key_UP    | InputMod_None)
@@ -394,10 +394,10 @@ void update_game(){
 		}break;
 		case Message_DetonateBomb:{
 			b32 player_died = false, other_died = false;
-			forI(player->placed_bombs.count){
+			while(player->placed_bombs.count){
 				//explode up
-				s32 up_tile = player->placed_bombs[i] - board_width;
-				if(up_tile >= 0 && up_tile < board_height){
+				if(LinearRow(player->placed_bombs[0]) < board_height-1){
+				s32 up_tile = player->placed_bombs[0] - board_width;
 					TileAtLinear(up_tile).bg = TileBG_Tunnel;
 					TileAtLinear(up_tile).fg = TileFG_None;
 					if(ToLinear(player->x,      player->y      ) == up_tile) player_died = true;
@@ -405,8 +405,8 @@ void update_game(){
 				}
 				
 				//explode down
-				s32 down_tile = player->placed_bombs[i] + board_width;
-				if(down_tile >= 0 && down_tile < board_height){
+				if(LinearRow(player->placed_bombs[0]) >= 0){
+				s32 down_tile = player->placed_bombs[0] + board_width;
 					TileAtLinear(down_tile).bg = TileBG_Tunnel;
 					TileAtLinear(down_tile).fg = TileFG_None;
 					if(ToLinear(player->x,      player->y      ) == down_tile) player_died = true;
@@ -414,8 +414,8 @@ void update_game(){
 				}
 				
 				//explode right
-				s32 right_tile = player->placed_bombs[i] + 1;
-				if(right_tile >= 0 && right_tile < board_height){
+				if(LinearCol(player->placed_bombs[0]) < board_width-1){
+				s32 right_tile = player->placed_bombs[0] + 1;
 					TileAtLinear(right_tile).bg = TileBG_Tunnel;
 					TileAtLinear(right_tile).fg = TileFG_None;
 					if(ToLinear(player->x,      player->y      ) == right_tile) player_died = true;
@@ -423,31 +423,36 @@ void update_game(){
 				}
 				
 				//explode left
-				s32 left_tile = player->placed_bombs[i] - 1;
-				if(left_tile >= 0 && left_tile < board_height){
+				if(LinearCol(player->placed_bombs[0]) >= 0){
+				s32 left_tile = player->placed_bombs[0] - 1;
 					TileAtLinear(left_tile).bg = TileBG_Tunnel;
 					TileAtLinear(left_tile).fg = TileFG_None;
 					if(ToLinear(player->x,      player->y      ) == left_tile) player_died = true;
 					if(ToLinear(other_player->x,other_player->y) == left_tile) other_died  = true;
 				}
+				
+				if(ToLinear(player->x,      player->y      ) == player->placed_bombs[0]) player_died = true;
+				if(ToLinear(other_player->x,other_player->y) == player->placed_bombs[0]) other_died  = true;
+				TileAtLinear(player->placed_bombs[0]).fg = TileFG_None;
+				player->placed_bombs.remove_unordered(0);
 			}
 			
 			//check if the game should end
 			if(player_died){
 				if(other_died){
-					game_winner = 3;
+					game_winner = GameWinner_Tie;
 					game_active = 0;
 					menu_state  = 0;
 					deinit_board();
 				}else{
-					game_winner = 2;
+					game_winner = GameWinner_Other;
 					game_active = 0;
 					menu_state  = 0;
 					deinit_board();
 				}
 			}else{
 				if(other_died){
-					game_winner = 1;
+					game_winner = GameWinner_Player;
 					game_active = 0;
 					menu_state  = 0;
 					deinit_board();
@@ -460,7 +465,7 @@ void update_game(){
 			//do nothing
 		}break;
 		case Message_QuitGame:{
-			game_winner = (player == &players[player_idx]) ? 2 : 1;
+			game_winner = (player == &players[player_idx]) ? GameWinner_Other : GameWinner_Player;
 			game_active = 0;
 			menu_state  = 0;
 			deinit_board();
