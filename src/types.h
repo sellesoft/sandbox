@@ -124,12 +124,15 @@ s32 board_area;
 #define TileAtLinear(pos) board[pos]
 
 u32 turn_count;
+
 NetInfo turn_info;
 //phase of the other player's turn
 //0 - waiting for acknowledgement from other player, rebroadcast message if we timeout
 //1 - other player has acknoledged our move, so we listen for their next move
 u32 other_turn_phase = 0; 
 Stopwatch acknowledge_timeout;
+u64 net_port = 24465;
+
 u32 menu_state = 0;
 
 Player players[2];
@@ -139,6 +142,6 @@ Message last_action;
 u32 last_action_x;
 u32 last_action_y;
 
-u64 net_port = 24465;
+u32 game_winner; //0 = no winner, 1 = player won, 2 = other won, 3 = tie
 
 #endif //TUNLLER_TYPES_H

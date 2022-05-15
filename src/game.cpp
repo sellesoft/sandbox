@@ -58,6 +58,8 @@ void draw_board(){
 	UIStyle style = UI::GetStyle();
 	
 	//draw controls
+	UI::PushColor(UIStyleCol_WindowBg, Color_Blue);
+	UI::Begin("tunnler_controls", UIWindowFlags_NoInteract|UIWindowFlags_FitAllElements);
 	UI::SetWinCursor(vec2{2.f,2.f});
 	UI::Text(str8l(  "(Escape) Exit Game"
 				   "\n(Enter)  Skip Turn"));
@@ -84,6 +86,8 @@ void draw_board(){
 			  (int)(1000.f / DeshTime->deltaTime), turn_count,
 			  (turn_count % 2 == 0) ? "British" : "German",
 			  (char*)MessageStrings[last_action].str, last_action_x, last_action_y);
+	UI::End();
+	UI::PopColor();
 	
 	//draw board
 	forX(y, board_height){
@@ -389,18 +393,15 @@ void update_game(){
 			AddFlag(TileAtPlayer().fg, player->bomb_flag);
 		}break;
 		case Message_DetonateBomb:{
+			b32 player_died = false, other_died = false;
 			forI(player->placed_bombs.count){
 				//explode up
 				s32 up_tile = player->placed_bombs[i] - board_width;
 				if(up_tile >= 0 && up_tile < board_height){
 					TileAtLinear(up_tile).bg = TileBG_Tunnel;
 					TileAtLinear(up_tile).fg = TileFG_None;
-					if(ToLinear(player->x,player->y) == up_tile){
-						//TODO player dies
-					}
-					if(ToLinear(other_player->x,other_player->y) == up_tile){
-						//TODO other player dies
-					}
+					if(ToLinear(player->x,      player->y      ) == up_tile) player_died = true;
+					if(ToLinear(other_player->x,other_player->y) == up_tile) other_died  = true;
 				}
 				
 				//explode down
@@ -408,12 +409,8 @@ void update_game(){
 				if(down_tile >= 0 && down_tile < board_height){
 					TileAtLinear(down_tile).bg = TileBG_Tunnel;
 					TileAtLinear(down_tile).fg = TileFG_None;
-					if(ToLinear(player->x,player->y) == down_tile){
-						//TODO player dies
-					}
-					if(ToLinear(other_player->x,other_player->y) == down_tile){
-						//TODO other player dies
-					}
+					if(ToLinear(player->x,      player->y      ) == down_tile) player_died = true;
+					if(ToLinear(other_player->x,other_player->y) == down_tile) other_died  = true;
 				}
 				
 				//explode right
@@ -421,12 +418,8 @@ void update_game(){
 				if(right_tile >= 0 && right_tile < board_height){
 					TileAtLinear(right_tile).bg = TileBG_Tunnel;
 					TileAtLinear(right_tile).fg = TileFG_None;
-					if(ToLinear(player->x,player->y) == right_tile){
-						//TODO player dies
-					}
-					if(ToLinear(other_player->x,other_player->y) == right_tile){
-						//TODO other player dies
-					}
+					if(ToLinear(player->x,      player->y      ) == right_tile) player_died = true;
+					if(ToLinear(other_player->x,other_player->y) == right_tile) other_died  = true;
 				}
 				
 				//explode left
@@ -434,12 +427,30 @@ void update_game(){
 				if(left_tile >= 0 && left_tile < board_height){
 					TileAtLinear(left_tile).bg = TileBG_Tunnel;
 					TileAtLinear(left_tile).fg = TileFG_None;
-					if(ToLinear(player->x,player->y) == left_tile){
-						//TODO player dies
-					}
-					if(ToLinear(other_player->x,other_player->y) == left_tile){
-						//TODO other player dies
-					}
+					if(ToLinear(player->x,      player->y      ) == left_tile) player_died = true;
+					if(ToLinear(other_player->x,other_player->y) == left_tile) other_died  = true;
+				}
+			}
+			
+			//check if the game should end
+			if(player_died){
+				if(other_died){
+					game_winner = 3;
+					game_active = 0;
+					menu_state  = 0;
+					deinit_board();
+				}else{
+					game_winner = 2;
+					game_active = 0;
+					menu_state  = 0;
+					deinit_board();
+				}
+			}else{
+				if(other_died){
+					game_winner = 1;
+					game_active = 0;
+					menu_state  = 0;
+					deinit_board();
 				}
 			}
 		}break;
@@ -449,9 +460,10 @@ void update_game(){
 			//do nothing
 		}break;
 		case Message_QuitGame:{
-			deinit_board();
+			game_winner = (player == &players[player_idx]) ? 2 : 1;
 			game_active = 0;
-			menu_state = 0;
+			menu_state  = 0;
+			deinit_board();
 		}break;
 	}
 	
