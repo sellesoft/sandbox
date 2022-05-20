@@ -35,36 +35,32 @@
 
 int main(){
 	//init deshi
+	Stopwatch deshi_watch = start_stopwatch();
 	memory_init(Gigabytes(1), Gigabytes(1));
 	platform_init();
 	logger_init();
+	window_create(str8l("suugu"));
 	console_init();
-	DeshWindow->Init(str8l("sandbox"), 1280, 720);
 	render_init();
 	Storage::Init();
 	UI::Init();
 	cmd_init();
-	DeshWindow->ShowWindow();
-    render_use_default_camera();
+	window_show(DeshWindow);
+	render_use_default_camera();
 	DeshThreadManager->init();
-
-
+	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
+	
 	//start main loop
-	Stopwatch frame_stopwatch = start_stopwatch();
-	while(!DeshWindow->ShouldClose()){DPZoneScoped;
-		DeshWindow->Update();
-		platform_update();
+	while(platform_update()){DPZoneScoped;
 		console_update();
 		UI::Update();
 		render_update();
 		logger_update();
 		memory_clear_temp();
-		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
 	}
 	
 	//cleanup deshi
-    render_cleanup();
-	DeshWindow->Cleanup();
+	render_cleanup();
 	logger_cleanup();
 	memory_cleanup();
 }
