@@ -204,16 +204,6 @@ ArenaList* create_arena_list(ArenaList* old){
     return nual;
 }
 
-void* add_item(void* data, upt size){
-    if(item_arena->size < item_arena->used+size) 
-        item_list = create_arena_list(item_list);
-    u8* cursor = item_arena->cursor;
-    CopyMemory(item_arena->cursor, data, size);
-    item_arena->cursor += size;
-    item_arena->used += size;
-    return cursor;
-}
-
 void* arena_add(Arena* arena, upt size){
     if(arena->size < arena->used+size) 
         item_list = create_arena_list(item_list);
@@ -229,6 +219,7 @@ uiDrawCmd drawcmd_alloc(vec2 counts){
         drawcmd_list = create_arena_list(drawcmd_list);
     di.vertices = (Vertex2*)drawcmd_arena->cursor;
     di.indicies = (u32*)drawcmd_arena->cursor + (u32)counts.x * sizeof(Vertex2);
+    di.texture = 0;
     drawcmd_arena->cursor += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
     drawcmd_arena->used += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
     di.counts = counts;
@@ -267,15 +258,8 @@ uiDrawCmdCounter ui_make_drawinfo_counts(u32 count, ...){
 T* name = (T*)arena_add(item_arena, sizeof(T));                                           \
 name->item.node.type = item_type;                                                         \
 name->item.draw_cmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_drawcmds);\
+name->item.draw_cmd_count = n_drawcmds;                                                   \
 insert_last(parent, &name->item.node);                                                    \
-
-uiItem* ui_begin_item(TNode* parent, Type item_type, u32 n_drawcmds){
-    uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
-    item->draw_cmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_drawcmds);
-    insert_last(parent, &item->node);
-    item->node.type = item_type;
-    
-}
 
 //@Functionality
 
@@ -343,6 +327,8 @@ uiButton* ui_make_button(uiWindow* window, str8 text, Action action, Flags flags
     button->flags = flags;
 
     u32 text_size = str8_length(text);
+    vec2 tsize = UI::CalcTextSize(text);
+    button->item.size = vec2(tsize.x*1.4, tsize.y*1.3);
 
     uiDrawCmdCounter counter = 
         ui_make_drawinfo_counts(3,
@@ -350,34 +336,28 @@ uiButton* ui_make_button(uiWindow* window, str8 text, Action action, Flags flags
             render_make_rect_counts(),
             render_make_text_counts(str8_length(text))
         );
-    
-
-    vec2 tsize = UI::CalcTextSize(text);
-
-    button->item.size = vec2(tsize.x*1.4, tsize.y*1.3);
-
     uiDrawCmd* di = button->item.draw_cmds;
-    *di = drawcmd_alloc(counter.sums[counter.n-1]);
-    
-    di = button->item.draw_cmds;
-    render_make_filledrect(di->vertices, di->indicies, {0,0}, 
+    di[0] = drawcmd_alloc(counter.sums[1]);
+    di[1] = drawcmd_alloc(counter.counts[2]);
+   
+    render_make_filledrect(di[0].vertices, di[0].indicies, {0,0}, 
         window->item.pos + button->item.pos, 
         button->item.size,
         uiContext.style.colors[uiColor_WindowBg]);
     
-    render_make_rect(di->vertices, di->indicies, counter.sums[0], 
+    render_make_rect(di[0].vertices, di[0].indicies, counter.sums[0], 
         window->item.pos + button->item.pos, 
         button->item.size, 3, 
         uiContext.style.colors[uiColor_WindowBorder]);
 
-    di = button->item.draw_cmds + 1;
-    render_make_text(di->vertices, di->indicies, counter.sums[1], 
+    render_make_text(di[1].vertices, di[1].indicies, {0,0}, 
         text, 
         uiContext.style.font, 
         window->item.pos + button->item.pos, 
         uiContext.style.colors[uiColor_Text], 
         vec2::ONE);
-    di->texture = uiContext.style.font->tex;
+
+    di[1].texture = uiContext.style.font->tex;
     return button;
 }
 
@@ -394,10 +374,11 @@ void ui_init(){
     style->font = Storage::CreateFontFromFileBDF(str8l("gohufont-11.bdf")).second;
 }
 
-void ui_recur(TNode* node){
+void ui_recur(TNode* node, vec2 parent_offset){
     uiItem* item = ItemFromNode(node);
     forI(item->draw_cmd_count){
-        render_start_cmd2(5, item->draw_cmds[i].texture, item->pos, item->size);
+        render_set_active_surface_idx(0);
+        render_start_cmd2(5, item->draw_cmds[i].texture, parent_offset + item->pos, item->size);
         render_add_vertices2(5, item->draw_cmds[i].vertices, item->draw_cmds[i].counts.x, item->draw_cmds[i].indicies, item->draw_cmds[i].counts.y);
     }
     
@@ -415,14 +396,14 @@ void ui_recur(TNode* node){
     
     if(node->child_count){
         for_node(node->first_child){
-            ui_recur(it);
+            ui_recur(it, item->pos);
         }
     }
 }
 
 void ui_update(){
     if(uiContext.base.child_count){
-        ui_recur(uiContext.base.first_child);
+        ui_recur(uiContext.base.first_child, vec2::ZERO);
     }
 }
 
@@ -430,11 +411,13 @@ void ui_update(){
 #define MakeButton()
 
 int main(){
-    memory_init(Gigabytes(1), Gigabytes(1));
-    platform_init();
+	//init deshi
+	Stopwatch deshi_watch = start_stopwatch();
+	memory_init(Gigabytes(1), Gigabytes(1));
+	platform_init();
 	logger_init();
-	console_init();
 	window_create(str8l("suugu"));
+	console_init();
 	render_init();
 	Storage::Init();
 	UI::Init();
@@ -443,15 +426,17 @@ int main(){
     render_use_default_camera();
 	DeshThreadManager->init();
     ui_init();
+	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
+
 
     uiWindow* win = ui_make_window(str8l("test"), vec2::ONE*300, vec2::ONE*300);
     uiButton* button = ui_make_button(win, str8l("button"), 0, 0);
-
-    Stopwatch frame_stopwatch = start_stopwatch();
+	
+	//start main loop
 	while(platform_update()){DPZoneScoped;
-        console_update();
-		ui_update();
-        UI::Update();
+		console_update();
+        ui_update();
+		UI::Update();
 		render_update();
 		logger_update();
 
@@ -459,8 +444,7 @@ int main(){
 	}
 	
 	//cleanup deshi
-    render_cleanup();
-	DeshWindow->Cleanup();
+	render_cleanup();
 	logger_cleanup();
 	memory_cleanup();
 }
