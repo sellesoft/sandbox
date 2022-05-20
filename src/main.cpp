@@ -34,6 +34,8 @@
 
     Retained UI is stored in arenas while immediate UI is temp allocated
 
+    Any time an item is modified or removed we find it's parent window and recalculate it entirely
+
 */
 
 
@@ -88,15 +90,16 @@ local const uiStyleVarType uiStyleTypes[] = {
 array<uiStyleVarMod>   stack_var;
 array<uiStyleColorMod> stack_color;
 
-//@DrawInfo
+//@uiDrawCmd
 
-struct DrawInfo{
+struct uiDrawCmd{
+    Texture* texture;
     Vertex2* vertices;
-    u32* indicies;
-    vec2 counts;
+    u32*     indicies;
+    vec2     counts;
 };
 
-struct DrawInfoCounter{
+struct uiDrawCmdCounter{
     u64 n; //number of counts
     vec2* counts;
     vec2* sums;
@@ -126,8 +129,11 @@ struct uiItem{
         vec2 size;
     };
 
-    DrawInfo dinfo;
+    u64 draw_cmd_count;
+    uiDrawCmd* draw_cmds;
     
+    uiStyle style; // style at time of making this item. eventually this should be optimized to not store the entire style
+
     uiItem(){} //C++ is retarded
 };
 
@@ -187,9 +193,9 @@ struct ArenaList{
 #define ArenaListFromNode(x) CastFromMember(ArenaList, node, x);
 
 ArenaList* item_list;
-ArenaList* drawinfo_list;
+ArenaList* drawcmd_list;
 #define item_arena item_list->arena
-#define drawinfo_arena drawinfo_list->arena
+#define drawcmd_arena drawcmd_list->arena
 
 ArenaList* create_arena_list(ArenaList* old){
     ArenaList* nual = (ArenaList*)memalloc(sizeof(ArenaList));
@@ -208,23 +214,23 @@ void* add_item(void* data, upt size){
     return cursor;
 }
 
-void* make_item(upt size){
-    if(item_arena->size < item_arena->used+size) 
+void* arena_add(Arena* arena, upt size){
+    if(arena->size < arena->used+size) 
         item_list = create_arena_list(item_list);
-    u8* cursor = item_arena->cursor;
-    item_arena->cursor += size;
-    item_arena->used += size;
+    u8* cursor = arena->cursor;
+    arena->cursor += size;
+    arena->used += size;
     return cursor;
 }
 
-DrawInfo drawinfo_alloc(vec2 counts){
-    DrawInfo di;
-    if(drawinfo_arena->size < drawinfo_arena->used + counts.x * sizeof(Vertex2) + counts.y * sizeof(u32))
-        drawinfo_list = create_arena_list(drawinfo_list);
-    di.vertices = (Vertex2*)drawinfo_arena->cursor;
-    di.indicies = (u32*)drawinfo_arena->cursor + (u32)counts.x * sizeof(Vertex2);
-    drawinfo_arena->cursor += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
-    drawinfo_arena->used += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
+uiDrawCmd drawcmd_alloc(vec2 counts){
+    uiDrawCmd di;
+    if(drawcmd_arena->size < drawcmd_arena->used + counts.x * sizeof(Vertex2) + counts.y * sizeof(u32))
+        drawcmd_list = create_arena_list(drawcmd_list);
+    di.vertices = (Vertex2*)drawcmd_arena->cursor;
+    di.indicies = (u32*)drawcmd_arena->cursor + (u32)counts.x * sizeof(Vertex2);
+    drawcmd_arena->cursor += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
+    drawcmd_arena->used += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
     di.counts = counts;
     return di;
 }
@@ -238,8 +244,8 @@ vec2 ui_decide_item_pos(uiWindow* window){
     return pos;
 }
 
-DrawInfoCounter ui_make_drawinfo_counts(u32 count, ...){
-    DrawInfoCounter counter;
+uiDrawCmdCounter ui_make_drawinfo_counts(u32 count, ...){
+    uiDrawCmdCounter counter;
     counter.n = count;
     counter.counts = (vec2*)memtalloc(sizeof(vec2)*count);
     counter.sums = (vec2*)memtalloc(sizeof(vec2)*count);
@@ -255,6 +261,22 @@ DrawInfoCounter ui_make_drawinfo_counts(u32 count, ...){
     return counter;
 }
 
+//initializes a uiItem of some type
+//used at the beginning of all uiItem functions
+#define uiBeginItem(T, name, parent, item_type, n_drawcmds)                               \
+T* name = (T*)arena_add(item_arena, sizeof(T));                                           \
+name->item.node.type = item_type;                                                         \
+name->item.draw_cmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_drawcmds);\
+insert_last(parent, &name->item.node);                                                    \
+
+uiItem* ui_begin_item(TNode* parent, Type item_type, u32 n_drawcmds){
+    uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
+    item->draw_cmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_drawcmds);
+    insert_last(parent, &item->node);
+    item->node.type = item_type;
+    
+}
+
 //@Functionality
 
 void ui_push_var(Type idx, f32 nu){
@@ -267,52 +289,46 @@ void ui_push_var(Type idx, vec2 nu){
 
 // makes a window to place items in
 //
-// name:   name of the window
-// pos:    initial position of the window
-// size:   initial size of the window
+// name: name of the window
+//  pos: initial position of the window
+// size: initial size of the window
 uiWindow* ui_make_window(str8 name, vec2 pos, vec2 size){
-    uiWindow* me       = (uiWindow*)make_item(sizeof(uiWindow));
-    me->item.node.type = uiItemType_Window;
-    me->item.pos       = pos;
-    me->item.size      = size;
-    me->cursor         = vec2::ZERO;
-    DrawInfo* di = &me->item.dinfo;
-    
-    DrawInfoCounter counter = 
+    uiBeginItem(uiWindow, win, &uiContext.base, uiItemType_Window, 1);
+    win->item.pos       = pos;
+    win->item.size      = size;
+    win->cursor         = vec2::ZERO;
+
+    uiDrawCmdCounter counter = 
         ui_make_drawinfo_counts(2,
             render_make_filledrect_counts(),
             render_make_rect_counts()
         );
     
-    *di = drawinfo_alloc(counter.sums[counter.n-1]);
-    
+    uiDrawCmd* di = win->item.draw_cmds;
+    *di = drawcmd_alloc(counter.sums[counter.n-1]);
+
     render_make_filledrect(di->vertices, di->indicies, {0,0}, pos, size, uiContext.style.colors[uiColor_WindowBg]);
     render_make_rect(di->vertices, di->indicies, counter.sums[0], pos, size, 3, uiContext.style.colors[uiColor_WindowBorder]);
 
-    insert_last(&uiContext.base, &me->item.node);
-    return me;
+    return win;
 }
 
 // makes a child window inside another window
 //
 // window: uiWindow to emplace this window in
-// name:   name of the window
-// pos:    initial position of the window
-// size:   initial size of the window
+//   name: name of the window
+//    pos: initial position of the window
+//   size: initial size of the window
 uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2 size){
-    uiWindow* me       = (uiWindow*)make_item(sizeof(uiWindow));
-    me->item.node.type = uiItemType_Window;
-    me->item.pos       = ui_decide_item_pos(window);
-    me->item.size      = size;
-    me->cursor         = vec2::ZERO;
+    uiBeginItem(uiWindow, win, &window->item.node, uiItemType_Window, 1);
+    win->item.pos       = ui_decide_item_pos(window);
+    win->item.size      = size;
+    win->cursor         = vec2::ZERO;
     
     vec2 draw_counts = 
         render_make_filledrect_counts() +
         render_make_rect_counts();
-    //me->item.dinfo = drawinfo_alloc(draw_counts.x, draw_counts.y);
-//
-    //insert_last(&window->item.node, &me->item.node);
-    return me;
+    return win;
 }
 
 // window: uiWindow to emplace the button in
@@ -321,39 +337,53 @@ uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2 size){
 //         if 0 is passed, the button will just set it's clicked flag
 // flags:  uiButtonFlags to be given to the button
 uiButton* ui_make_button(uiWindow* window, str8 text, Action action, Flags flags){
-    uiButton* button = (uiButton*)make_item(sizeof(uiButton));
-    button->item.node.type = uiItemType_Button;
+    uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, 2);
     button->item.pos = ui_decide_item_pos(window);
     button->action = action;
     button->flags = flags;
-    DrawInfo* di = &button->item.dinfo;
+
     u32 text_size = str8_length(text);
 
-    DrawInfoCounter counter = 
+    uiDrawCmdCounter counter = 
         ui_make_drawinfo_counts(3,
             render_make_filledrect_counts(),
             render_make_rect_counts(),
             render_make_text_counts(str8_length(text))
         );
     
-    *di = drawinfo_alloc(counter.sums[counter.n-1]);
 
     vec2 tsize = UI::CalcTextSize(text);
 
     button->item.size = vec2(tsize.x*1.4, tsize.y*1.3);
 
-    render_make_filledrect(di->vertices, di->indicies, {0,0}, window->item.pos + button->item.pos, button->item.size, uiContext.style.colors[uiColor_WindowBg]);
-    render_make_rect(di->vertices, di->indicies, counter.sums[0], window->item.pos + button->item.pos, button->item.size, 3, uiContext.style.colors[uiColor_WindowBorder]);
-    render_make_text(di->vertices, di->indicies, counter.sums[1], text, uiContext.style.font, window->item.pos + button->item.pos, uiContext.style.colors[uiColor_Text], vec2::ONE);
+    uiDrawCmd* di = button->item.draw_cmds;
+    *di = drawcmd_alloc(counter.sums[counter.n-1]);
     
-    insert_last(&window->item.node, &button->item.node);
+    di = button->item.draw_cmds;
+    render_make_filledrect(di->vertices, di->indicies, {0,0}, 
+        window->item.pos + button->item.pos, 
+        button->item.size,
+        uiContext.style.colors[uiColor_WindowBg]);
+    
+    render_make_rect(di->vertices, di->indicies, counter.sums[0], 
+        window->item.pos + button->item.pos, 
+        button->item.size, 3, 
+        uiContext.style.colors[uiColor_WindowBorder]);
 
+    di = button->item.draw_cmds + 1;
+    render_make_text(di->vertices, di->indicies, counter.sums[1], 
+        text, 
+        uiContext.style.font, 
+        window->item.pos + button->item.pos, 
+        uiContext.style.colors[uiColor_Text], 
+        vec2::ONE);
+    di->texture = uiContext.style.font->tex;
     return button;
 }
 
 void ui_init(){
     item_list = create_arena_list(0);
-    drawinfo_list = create_arena_list(0);
+    drawcmd_list = create_arena_list(0);
     SetNextPos(-MAX_F32, -MAX_F32);
     SetNextSize(-MAX_F32, -MAX_F32);
     uiStyle* style = &uiContext.style;
@@ -366,8 +396,10 @@ void ui_init(){
 
 void ui_recur(TNode* node){
     uiItem* item = ItemFromNode(node);
-    render_start_cmd2(5, 0, item->pos, item->size);
-    render_add_vertices2(5, item->dinfo.vertices, item->dinfo.counts.x, item->dinfo.indicies, item->dinfo.counts.y);
+    forI(item->draw_cmd_count){
+        render_start_cmd2(5, item->draw_cmds[i].texture, item->pos, item->size);
+        render_add_vertices2(5, item->draw_cmds[i].vertices, item->draw_cmds[i].counts.x, item->draw_cmds[i].indicies, item->draw_cmds[i].counts.y);
+    }
     
     //switch(node->type){
     //    case uiItemType_Window:{
@@ -402,12 +434,12 @@ int main(){
     platform_init();
 	logger_init();
 	console_init();
-	DeshWindow->Init(str8l("sandbox"), 1280, 720);
+	window_create(str8l("suugu"));
 	render_init();
 	Storage::Init();
 	UI::Init();
 	cmd_init();
-	DeshWindow->ShowWindow();
+	window_show(DeshWindow);
     render_use_default_camera();
 	DeshThreadManager->init();
     ui_init();
@@ -416,10 +448,7 @@ int main(){
     uiButton* button = ui_make_button(win, str8l("button"), 0, 0);
 
     Stopwatch frame_stopwatch = start_stopwatch();
-	while(!DeshWindow->ShouldClose()){DPZoneScoped;
-        
-        DeshWindow->Update();
-		
+	while(platform_update()){DPZoneScoped;
         console_update();
 		ui_update();
         UI::Update();
@@ -427,7 +456,6 @@ int main(){
 		logger_update();
 
 		memory_clear_temp();
-		DeshTime->frameTime = reset_stopwatch(&frame_stopwatch);
 	}
 	
 	//cleanup deshi
