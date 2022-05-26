@@ -220,9 +220,9 @@ uiDrawCmd drawcmd_alloc(vec2 counts){
     di.vertices = (Vertex2*)drawcmd_arena->cursor;
     di.indicies = (u32*)drawcmd_arena->cursor + (u32)counts.x * sizeof(Vertex2);
     di.texture = 0;
+    di.counts = counts;
     drawcmd_arena->cursor += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
     drawcmd_arena->used += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
-    di.counts = counts;
     return di;
 }
 
@@ -271,6 +271,8 @@ void ui_push_var(Type idx, vec2 nu){
 
 }
 
+uiWindow* theguy = 0;
+
 // makes a window to place items in
 //
 // name: name of the window
@@ -280,6 +282,7 @@ uiWindow* ui_make_window(str8 name, vec2 pos, vec2 size){
     uiBeginItem(uiWindow, win, &uiContext.base, uiItemType_Window, 1);
     win->item.pos       = pos;
     win->item.size      = size;
+
     win->cursor         = vec2::ZERO;
 
     uiDrawCmdCounter counter = 
@@ -430,6 +433,7 @@ int main(){
 
 
     uiWindow* win = ui_make_window(str8l("test"), vec2::ONE*300, vec2::ONE*300);
+    theguy = win;
     uiButton* button = ui_make_button(win, str8l("button"), 0, 0);
 	
 	//start main loop
