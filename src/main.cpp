@@ -30,11 +30,23 @@
 
     Everything in this new system is a uiItem.
 
-    Make functions are used with retained UI while Begin is used with immediate UI
+    (maybe) Make functions are used with retained UI while Begin is used with immediate UI
 
     Retained UI is stored in arenas while immediate UI is temp allocated
 
     Any time an item is modified or removed we find it's parent window and recalculate it entirely
+        this can probably be optimized
+    
+    For the reason above, initial generation of a uiItem and it's actual drawinfo generation
+        are in separate functions
+
+    UI macros always automatically apply the str8_lit macro to arguments that ask for text
+
+    uiWindow cursors never take into account styling such as padding (or well, not sure yet)
+
+    Everything in the interface is prefixed with "ui" (always lowercase)
+        type and macro names follow the prefix and are UpperCamelCase
+        function names have a _ after the prefix and are lower_snake_case
 
 */
 
@@ -57,8 +69,8 @@ enum{
 };
 
 struct uiStyle{
-    vec2  window_margins;
-    vec2  item_spacing;
+    vec2i window_margins;
+    vec2i item_spacing;
     f32   window_border_size;
     f32   button_border_size;
     color colors[uiColor_COUNT];
@@ -92,23 +104,30 @@ array<uiStyleColorMod> stack_color;
 
 //@uiDrawCmd
 
+struct uiDrawCmdCounter{
+    u64 n; //number of counts
+    vec2i* counts;
+    vec2i* sums;
+};
+
 struct uiDrawCmd{
     Texture* texture;
     Vertex2* vertices;
     u32*     indicies;
-    vec2     counts;
+    vec2i    counts;
+    struct{
+        u64 n;
+        vec2i* counts;
+        vec2i* sums;
+    }counter;
 };
 
-struct uiDrawCmdCounter{
-    u64 n; //number of counts
-    vec2* counts;
-    vec2* sums;
-};
 
 //@Item
 
 enum uiItemType_{
-    uiItemType_Window,
+    uiItemType_Window, 
+    uiItemType_ChildWindow,
     uiItemType_Button,
 };typedef u32 uiItemType;
 
@@ -116,28 +135,32 @@ struct uiItem{
     TNode node;
     union{
         struct{
-            f32 x;
-            f32 y;
+            s32 x;
+            s32 y;
         };
-        vec2 pos;
+        vec2i pos;
     };
     union{
         struct{
-            f32 width;
-            f32 height;
+            s32 width;
+            s32 height;
         };
-        vec2 size;
+        vec2i size;
     };
 
     u64 draw_cmd_count;
-    uiDrawCmd* draw_cmds;
+    uiDrawCmd* drawcmds;
+    uiDrawCmdCounter counter;
     
     uiStyle style; // style at time of making this item. eventually this should be optimized to not store the entire style
 
-    uiItem(){} //C++ is retarded
+    uiItem(){} // C++ is retarded
+
+    str8 file_created;
+    upt  line_created;
 };
 
-#define ItemFromNode(x) CastFromMember(uiItem, node, x)
+#define uiItemFromNode(x) CastFromMember(uiItem, node, x)
 
 //@Window
 
@@ -146,39 +169,40 @@ struct uiWindow{
     str8 name;
     union{
         struct{
-            f32 curx;
-            f32 cury;
+            s32 curx;
+            s32 cury;
         };
-        vec2 cursor;
+        vec2i cursor;
     };
 
     uiWindow(){} //C++ is retarded
 };
-#define WindowFromNode(x) CastFromMember(uiWindow, item, CastFromMember(uiItem, node, x))
+#define uiWindowFromNode(x) CastFromMember(uiWindow, item, CastFromMember(uiItem, node, x))
 
 //@Button
 
 enum {
-    uiButtonFlags_ActOnPressed,  // button performs its action when the mouse is pressed over it 
-    uiButtonFlags_ActOnReleased, // button performs its action when the mouse is released over it
-    uiButtonFlags_ActOnDown,     // button performs its action when the mouse is down over it
+    uiButtonFlags_ActOnPressed,  // button performs its action as soon as its clicked
+    uiButtonFlags_ActOnReleased, // button waits for the mouse to be released before performing its action
+    uiButtonFlags_ActOnDown,     // button performs its action for the duration the mouse is held down over it
 };
 
 struct uiButton{
     uiItem item;
     Action action;
+    void*  action_data;
     Flags  flags;
     b32    clicked;
 };
-#define ButtonFromNode(x) CastFromMember(uiButton, item, CastFromMember(uiItem, node, x))
+#define uiButtonFromNode(x) CastFromMember(uiButton, item, CastFromMember(uiItem, node, x))
 
 //@Context
 
 #define SetNextPos(x,y) uiContext.nextPos = {x,y};
 #define SetNextSize(x,y) uiContext.nextSize = {x,y};
 struct Context{
-    vec2 nextPos;  // default: -MAx_F32, -MAX_F32; MAX_F32 does nothing
-    vec2 nextSize; // default: -MAx_F32, -MAX_F32; MAX_F32 in either indiciates to stretch item to the edge of the window in that direction
+    vec2i nextPos;  // default: -MAx_F32, -MAX_F32; MAX_F32 does nothing
+    vec2i nextSize; // default: -MAx_F32, -MAX_F32; MAX_F32 in either indiciates to stretch item to the edge of the window in that direction
     TNode base;
     uiWindow* curwin; //current working window in immediate contexts 
     uiStyle style;
@@ -213,7 +237,7 @@ void* arena_add(Arena* arena, upt size){
     return cursor;
 }
 
-uiDrawCmd drawcmd_alloc(vec2 counts){
+uiDrawCmd drawcmd_alloc(vec2i counts){
     uiDrawCmd di;
     if(drawcmd_arena->size < drawcmd_arena->used + counts.x * sizeof(Vertex2) + counts.y * sizeof(u32))
         drawcmd_list = create_arena_list(drawcmd_list);
@@ -230,21 +254,21 @@ uiDrawCmd drawcmd_alloc(vec2 counts){
 
 //@Helpers
 
-vec2 ui_decide_item_pos(uiWindow* window){
-    vec2 pos = window->cursor + uiContext.style.window_margins;
+vec2i ui_decide_item_pos(uiWindow* window){
+    vec2i pos = window->cursor + uiContext.style.window_margins;
     return pos;
 }
 
 uiDrawCmdCounter ui_make_drawinfo_counts(u32 count, ...){
     uiDrawCmdCounter counter;
     counter.n = count;
-    counter.counts = (vec2*)memtalloc(sizeof(vec2)*count);
-    counter.sums = (vec2*)memtalloc(sizeof(vec2)*count);
-    vec2 sum;
+    counter.counts = (vec2i*)memtalloc(sizeof(vec2i)*count);
+    counter.sums = (vec2i*)memtalloc(sizeof(vec2i)*count);
+    vec2i sum;
     va_list args;
     va_start(args, count);
     forI(count){
-        vec2 v = va_arg(args, vec2);
+        vec2i v = va_arg(args, vec2i);
         sum+=v;
         counter.sums[i] = sum;
         counter.counts[i] = v;
@@ -252,13 +276,31 @@ uiDrawCmdCounter ui_make_drawinfo_counts(u32 count, ...){
     return counter;
 }
 
+//walks up the tree until it finds the top most window containing the item and returns it's screen position
+vec2i ui_get_item_screenpos(uiItem* item){
+    TNode* node = &item->node;
+    vec2i spsum = vec2i::ZERO;
+    while(1){
+        if(node->type == uiItemType_Window){
+            if(node->parent == &uiContext.base){
+                return spsum;
+            }
+        }
+
+    }
+}
+
 //initializes a uiItem of some type
-//used at the beginning of all uiItem functions
-#define uiBeginItem(T, name, parent, item_type, n_drawcmds)                               \
+// used at the beginning of all uiItem functions
+// n_drawcmds is the planned amount of drawcmds an item will have while n_primitives is the total amount
+// of shapes an item will have 
+#define uiBeginItem(T, name, parent, item_type, n_drawcmds, n_primitives, file, line)                               \
 T* name = (T*)arena_add(item_arena, sizeof(T));                                           \
 name->item.node.type = item_type;                                                         \
-name->item.draw_cmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_drawcmds);\
+name->item.drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_drawcmds); \
 name->item.draw_cmd_count = n_drawcmds;                                                   \
+name->item.file_created = file;                                                           \
+name->item.line_created = line;                                                           \
 insert_last(parent, &name->item.node);                                                    \
 
 //@Functionality
@@ -271,32 +313,34 @@ void ui_push_var(Type idx, vec2 nu){
 
 }
 
-uiWindow* theguy = 0;
-
 // makes a window to place items in
 //
 // name: name of the window
 //  pos: initial position of the window
 // size: initial size of the window
-uiWindow* ui_make_window(str8 name, vec2 pos, vec2 size){
-    uiBeginItem(uiWindow, win, &uiContext.base, uiItemType_Window, 1);
-    win->item.pos       = pos;
-    win->item.size      = size;
-
-    win->cursor         = vec2::ZERO;
-
-    uiDrawCmdCounter counter = 
+#define uiMakeWindow(name, pos, size, flags) ui_make_window(STR8(name),pos,size,STR8(__FILE__),__LINE__)
+void ui_make_window_gen_drawinfo(uiWindow* win, vec2i pos, vec2i size, Flags flags){
+     uiDrawCmdCounter counter = 
         ui_make_drawinfo_counts(2,
             render_make_filledrect_counts(),
             render_make_rect_counts()
         );
     
-    uiDrawCmd* di = win->item.draw_cmds;
+    uiDrawCmd* di = win->item.drawcmds;
     *di = drawcmd_alloc(counter.sums[counter.n-1]);
 
     render_make_filledrect(di->vertices, di->indicies, {0,0}, pos, size, uiContext.style.colors[uiColor_WindowBg]);
     render_make_rect(di->vertices, di->indicies, counter.sums[0], pos, size, 3, uiContext.style.colors[uiColor_WindowBorder]);
+}
+uiWindow* ui_make_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line){
+    uiBeginItem(uiWindow, win, &uiContext.base, uiItemType_Window, 1, file, line);
+    win->item.pos  = pos;
+    win->item.size = size;
+    win->name      = name;
+    win->cursor    = vec2i::ZERO;
 
+    ui_make_window_gen_drawinfo(win, pos, size, flags);
+   
     return win;
 }
 
@@ -306,11 +350,12 @@ uiWindow* ui_make_window(str8 name, vec2 pos, vec2 size){
 //   name: name of the window
 //    pos: initial position of the window
 //   size: initial size of the window
-uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2 size){
-    uiBeginItem(uiWindow, win, &window->item.node, uiItemType_Window, 1);
-    win->item.pos       = ui_decide_item_pos(window);
-    win->item.size      = size;
-    win->cursor         = vec2::ZERO;
+uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line){
+    uiBeginItem(uiWindow, win, &window->item.node, uiItemType_Window, 1, file, line);
+    win->item.pos  = ui_decide_item_pos(window);
+    win->item.size = size;
+    win->name      = name;
+    win->cursor    = vec2i::ZERO;
     
     vec2 draw_counts = 
         render_make_filledrect_counts() +
@@ -318,30 +363,24 @@ uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2 size){
     return win;
 }
 
-// window: uiWindow to emplace the button in
-// text:   text to be displayed in the button
-// action: function pointer of type Action ( void name(void*) ) that is called when the button is clicked
-//         if 0 is passed, the button will just set it's clicked flag
-// flags:  uiButtonFlags to be given to the button
-uiButton* ui_make_button(uiWindow* window, str8 text, Action action, Flags flags){
-    uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, 2);
-    button->item.pos = ui_decide_item_pos(window);
-    button->action = action;
-    button->flags = flags;
-
-    u32 text_size = str8_length(text);
-    vec2 tsize = UI::CalcTextSize(text);
-    button->item.size = vec2(tsize.x*1.4, tsize.y*1.3);
-
-    uiDrawCmdCounter counter = 
+//      window: uiWindow to emplace the button in
+//        text: text to be displayed in the button
+//      action: function pointer of type Action ( void name(void*) ) that is called when the button is clicked
+//              if 0 is passed, the button will just set it's clicked flag
+// action_data: data passed to the action function 
+//       flags: uiButtonFlags to be given to the button
+#define uiMakeButton(window, text, action, action_data, flags) ui_make_button(window, STR8(text), action, action_data, flags, STR8(__FILE__), __LINE__)
+void ui_make_button_gen_drawinfo(uiWindow* window, uiButton* button, str8 text, Flags flags){
+    uiDrawCmdCounter counter = //NOTE(sushi) this can probably be cached on the item at creation time, but the fact that it uses arrays makes that tedious, so probably implement it later
         ui_make_drawinfo_counts(3,
             render_make_filledrect_counts(),
             render_make_rect_counts(),
             render_make_text_counts(str8_length(text))
         );
-    uiDrawCmd* di = button->item.draw_cmds;
+    uiDrawCmd* di = button->item.drawcmds;
     di[0] = drawcmd_alloc(counter.sums[1]);
     di[1] = drawcmd_alloc(counter.counts[2]);
+    di[1].texture = uiContext.style.font->tex;
    
     render_make_filledrect(di[0].vertices, di[0].indicies, {0,0}, 
         window->item.pos + button->item.pos, 
@@ -359,9 +398,26 @@ uiButton* ui_make_button(uiWindow* window, str8 text, Action action, Flags flags
         window->item.pos + button->item.pos, 
         uiContext.style.colors[uiColor_Text], 
         vec2::ONE);
+}
+uiButton* ui_make_button(uiWindow* window, str8 text, Action action, void* action_data, Flags flags, str8 file, upt line){
+    uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, 2, file, line);
+    button->item.pos    = ui_decide_item_pos(window);
+    button->action      = action;
+    button->action_data = action_data;
+    button->flags       = flags;
 
-    di[1].texture = uiContext.style.font->tex;
+    u32 text_size = str8_length(text);
+    vec2 tsize = UI::CalcTextSize(text);
+    button->item.size = vec2i(tsize.x*1.4, tsize.y*1.3);
+
+    ui_make_button_gen_drawinfo(window, button, text, flags);
+    
     return button;
+}
+
+//same as a div in HTML, just a section that items will place themselves in
+void ui_make_section(vec2i pos, vec2i size){
+
 }
 
 void ui_init(){
@@ -377,25 +433,35 @@ void ui_init(){
     style->font = Storage::CreateFontFromFileBDF(str8l("gohufont-11.bdf")).second;
 }
 
-void ui_recur(TNode* node, vec2 parent_offset){
-    uiItem* item = ItemFromNode(node);
+void ui_adjust_item_pos(vec2i offset){
+
+}
+
+void ui_adjust_item_size(){
+
+}
+
+void ui_recur(TNode* node, vec2i parent_offset){
+    //do updates of each item type
+    switch(node->type){
+        case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
+            {//dragging
+                vec2i mp = vec2i(DeshInput->mouseX, DeshInput->mouseY); 
+
+            }
+        }break;
+        case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);
+            
+        }break;
+    }
+
+    //render item
+    uiItem* item = uiItemFromNode(node);
     forI(item->draw_cmd_count){
         render_set_active_surface_idx(0);
-        render_start_cmd2(5, item->draw_cmds[i].texture, parent_offset + item->pos, item->size);
-        render_add_vertices2(5, item->draw_cmds[i].vertices, item->draw_cmds[i].counts.x, item->draw_cmds[i].indicies, item->draw_cmds[i].counts.y);
+        render_start_cmd2(5, item->drawcmds[i].texture, parent_offset + item->pos, item->size);
+        render_add_vertices2(5, item->drawcmds[i].vertices, item->drawcmds[i].counts.x, item->drawcmds[i].indicies, item->drawcmds[i].counts.y);
     }
-    
-    //switch(node->type){
-    //    case uiItemType_Window:{
-    //        uiWindow* w = WindowFromNode(node);
-    //        render_start_cmd2(5, 0, w->item.pos, w->item.size);
-    //        render_add_vertices2(5, w->item.dinfo.vertices, w->item.dinfo.counts.x, w->item.dinfo.indicies, w->item.dinfo.counts.y);
-    //    }break;
-    //    case uiItemType_Button:{
-    //        uiButton* b = ButtonFromNode(node);
-    //        render_add_vertices2(5, b->item.dinfo.vertices, b->item.)
-    //    }break;
-    //}
     
     if(node->child_count){
         for_node(node->first_child){
@@ -411,7 +477,10 @@ void ui_update(){
 }
 
 
-#define MakeButton()
+
+void action(void* data){
+
+}
 
 int main(){
 	//init deshi
@@ -432,14 +501,19 @@ int main(){
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 
 
-    uiWindow* win = ui_make_window(str8l("test"), vec2::ONE*300, vec2::ONE*300);
-    theguy = win;
-    uiButton* button = ui_make_button(win, str8l("button"), 0, 0);
+    uiWindow* win = uiMakeWindow("test", vec2::ONE*300, vec2::ONE*300);
+    uiButton* button = uiMakeButton(win,"button", 0, 0);
 	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		console_update();
         ui_update();
+        {
+            using namespace UI;
+            Begin(STR8("debuggingUIwithUI"));{
+
+            }End();
+        }
 		UI::Update();
 		render_update();
 		logger_update();
