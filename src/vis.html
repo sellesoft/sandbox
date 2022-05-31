@@ -1,0 +1,48 @@
+<style>
+    .memblock{
+        border-left-style: solid;
+        border-left-width: 1px;
+        overflow: hidden;
+        background-color: rgb(39, 36, 36);
+    }
+    .flexcont{
+        display:flex;
+        align-items: flex-start;
+    }
+</style>
+
+<html>
+    <body>
+        <div class="flexcont">
+            <div class="memblock" style="flex: calc(200/272) 0;">
+                uiWindow
+                <div class="flexcont">
+                    <div class="memblock" style="flex: calc(176/200) 0;">
+                        <img></div>
+                        uiItem
+                        <div style="display:flex;align-items: flex-start;">
+                            <div class="memblock" style="flex: calc(72/176) 0;">node</div>
+                            <div class="memblock" style="flex: calc(8/176)  0;">pos</div>
+                            <div class="memblock" style="flex: calc(8/176)  0;">size</div>
+                            <div class="memblock" style="flex: calc(8/176)  0;">dcc</div>
+                            <div class="memblock" style="flex: calc(8/176) 0;">drawcmds</div>
+                            <div class="memblock" style="flex: calc(48/176) 0;">style</div>
+                            <div class="memblock" style="flex: calc(16/176) 0;">file</div>
+                            <div class="memblock" style="flex: calc(8/176) 0;">line</div>
+                        </div>
+                    </div>
+                    <div class="memblock" style="flex: calc(16/200) 0;">name</div>
+                    <div class="memblock" style="flex: calc(8/200) 0;">cursor</div>
+                </div>
+            </div>
+            <div class="memblock" style="flex: calc(56/200) 0;">drawCmd</div>
+            <div class="memblock" style="flex: calc(16/200) 0;">
+                counter
+                <div class="flexcont">
+                    <div class="memblock" style="flex: calc(8/16) 0">c0</div>
+                    <div class="memblock" style="flex: calc(8/16) 0">c1</div>
+                </div> 
+            </div>
+        </div>  
+    </body>
+</html>
