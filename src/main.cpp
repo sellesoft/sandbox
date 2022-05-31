@@ -15,6 +15,7 @@
 #define DESHI_DISABLE_IMGUI
 #include "core/commands.h"
 #include "core/console.h"
+#include "core/file.h"
 #include "core/graphing.h"
 #include "core/input.h"
 #include "core/logger.h"
@@ -26,7 +27,6 @@
 #include "core/time.h"
 #include "core/ui.h"
 #include "core/window.h"
-#include "core/file.h"
 #include "math/math.h"
 
 #if BUILD_INTERNAL
@@ -50,6 +50,11 @@ int main(){
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
+	File* in = file_init(STR8("H:/HACKING!!!!/xonotic/addr_lists/zpos.csv"), FileAccess_Read);
+	str8 buffer = file_read_alloc(in, in->bytes, deshi_allocator);
+
+
+
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		console_update();

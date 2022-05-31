@@ -25,6 +25,7 @@
 .vscode/
 build/
 docs/doxygen/
+latest/
 
 #data ignores
 data/cfg/*
