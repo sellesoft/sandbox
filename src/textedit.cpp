@@ -5,6 +5,8 @@ cursor is drawn to the left of the index it represents
 
 TextChunks will never stretch across lines
 
+Buffer memory is NOT contiguous and is stitched together when we save the file
+
 */
 
 Arena* static_arena;
@@ -121,15 +123,56 @@ void init_editor(){
 	load_file(STR8("src/test.txt"));
 }
 
+
+FORCE_INLINE //returns how many bytes the cursor moved by
+u64 move_cursor_left(Cursor* cursor){
+	u64 begin = cursor->start;
+	if(cursor->start > 0){
+		while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
+		cursor->start -= 1;
+		cursor->count  = 0;
+		return begin - cursor->start;
+	}else if(cursor->chunk->node.prev != &root_chunk){
+		cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
+		cursor->start = cursor->chunk->raw.count;
+		while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
+		cursor->start -= 1;
+		cursor->count  = 0;
+		return cursor->chunk->raw.count - cursor->start;
+	}
+}
+
+FORCE_INLINE //returns how many bytes the cursor moved by
+u64 move_cursor_right(Cursor* cursor){
+	u64 begin = cursor->start;
+	if(cursor->start < cursor->chunk->raw.count){
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
+		cursor->start += dc.advance;
+		if(   cursor->start >= cursor->chunk->raw.count
+			&& cursor->chunk->node.next != &root_chunk){
+			cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
+			cursor->start = 0;
+		}
+		cursor->count  = 0;
+		return cursor->start - begin;
+	}else if(cursor->chunk->node.next != &root_chunk){
+		u64 move = cursor->chunk->node.size - cursor->start;
+		cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
+		cursor->start = 0;
+		cursor->count = 0;
+		return move;
+	}
+}
+
 void update_editor(){
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
 	//// text input ////
-	if(DeshInput->charCount){
-        persist TextChunk* last_insert = 0;
-        Arena* edit_arena = *edit_arenas.last;
+	persist TextChunk* current_edit_chunk = 0;
+    Arena* edit_arena = *edit_arenas.last;
+	if(DeshInput->charCount){ //TODO(sushi) replace selection
 		//TODO(delle) handle multiple cursor input  
-        if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != last_insert){//we must branch a new chunk from the loaded file 
+        if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
             TextChunk* curchunk = main_cursor.chunk;
             if(main_cursor.start == 0){
                 Log("chnksplt", "   Splitting at beginning of old chunk");
@@ -145,7 +188,7 @@ void update_editor(){
                 prev->newline = false;
                 NodeInsertPrev(&curchunk->node, &prev->node);
             }
-            else{ //split chunk if cursor is in the middle of it 
+            else { //split chunk if cursor is in the middle of it 
                 TextChunk* prev = new_chunk();
                 prev->raw = {curchunk->raw.str, (s64)main_cursor.start};
                 prev->bg = curchunk->bg;
@@ -164,37 +207,79 @@ void update_editor(){
                 
                 curchunk->newline = 0;
             }
-           //edit_arena->cursor += 1;
-            last_insert = curchunk;
+            current_edit_chunk = curchunk;
             curchunk->raw = {edit_arena->cursor, 0};
             main_cursor.start = 0;
         }
+		if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+			edit_arenas.add(memory_create_arena(Kilobytes(1)));
+			edit_arena = *edit_arenas.last;
+		}
         memcpy(edit_arena->cursor, DeshInput->charIn, DeshInput->charCount);
         main_cursor.start += DeshInput->charCount;
         edit_arena->cursor += DeshInput->charCount;
+		edit_arena->used += DeshInput->charCount;
         main_cursor.chunk->raw.count += DeshInput->charCount;
 	}
 	
 	//// text deletion ////
-	
+	if(key_pressed(Key_BACKSPACE)){//TODO(sushi) selection backspace
+		TextChunk* curchunk = main_cursor.chunk;
+		if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
+			if(main_cursor.start == 0){ //special case where cursor is at the beginning of a chunk
+				//move cursor into previous chunk and set it to the end so following if can handle it 
+				move_cursor_left(&main_cursor); 
+				curchunk = main_cursor.chunk;
+				main_cursor.start = curchunk->raw.count;
+				if(curchunk->newline) curchunk->newline = 0;
+			}
+			if(main_cursor.start == curchunk->raw.count){
+				//copy old chunks memory into edit arena and repoint it
+				if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+					edit_arenas.add(memory_create_arena(Kilobytes(1)));
+					edit_arena = *edit_arenas.last;
+				}
+				memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+				curchunk->raw.str = edit_arena->cursor;
+				edit_arena->cursor += curchunk->raw.count;
+				edit_arena->used += curchunk->raw.count;
+				
+				current_edit_chunk = curchunk;
+			}
+			else{ //split chunk 
+				TextChunk* next = new_chunk();
+				next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
+				next->bg = curchunk->bg;
+				next->fg = curchunk->fg;
+				next->offset = curchunk->offset + main_cursor.start;
+				next->newline = curchunk->newline;
+				
+				curchunk->raw.count = main_cursor.start;
+
+				NodeInsertNext(&curchunk->node, &next->node);
+				
+				if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+					edit_arenas.add(memory_create_arena(Kilobytes(1)));
+					edit_arena = *edit_arenas.last;
+				}
+				memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+				curchunk->raw.str = edit_arena->cursor;
+				edit_arena->cursor += curchunk->raw.count;
+				edit_arena->used += curchunk->raw.count;
+				curchunk->newline = 0;
+			}
+		}
+		u64 bytes_moved = move_cursor_left(&main_cursor);
+		edit_arena->cursor -= bytes_moved;
+		edit_arena->used -= bytes_moved;
+		curchunk->raw.count -= bytes_moved;
+	}
 	
 	//// cursor movement ////
 	if(key_pressed(Bind_Cursor_Left)){
-		if(main_cursor.start > 0){
-			while(utf8_continuation_byte(*(main_cursor.chunk->raw.str + main_cursor.start - 1))) main_cursor.start -= 1;
-			main_cursor.start -= 1;
-			main_cursor.count  = 0;
-		}else if(main_cursor.chunk->node.prev != &root_chunk){
-			main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
-			main_cursor.start = main_cursor.chunk->raw.count;
-			while(utf8_continuation_byte(*(main_cursor.chunk->raw.str + main_cursor.start - 1))) main_cursor.start -= 1;
-			main_cursor.start -= 1;
-			main_cursor.count  = 0;
-		}
+		move_cursor_left(&main_cursor);
 	}
 	if(key_pressed(Bind_Cursor_WordLeft)){
-		
-		
 		
 	}
 	if(key_pressed(Bind_Cursor_WordPartLeft)){
@@ -202,20 +287,7 @@ void update_editor(){
 	}
 	
 	if(key_pressed(Bind_Cursor_Right)){
-		if(main_cursor.start < main_cursor.chunk->raw.count){
-			DecodedCodepoint dc = decoded_codepoint_from_utf8(main_cursor.chunk->raw.str+main_cursor.start, 4);
-			main_cursor.start += dc.advance;
-			if(   main_cursor.start >= main_cursor.chunk->raw.count
-			   && main_cursor.chunk->node.next != &root_chunk){
-				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.next);
-				main_cursor.start = 0;
-			}
-			main_cursor.count  = 0;
-		}else if(main_cursor.chunk->node.next != &root_chunk){
-			main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.next);
-			main_cursor.start = 0;
-			main_cursor.count = 0;
-		}
+		move_cursor_right(&main_cursor);
 	}
 	if(key_pressed(Bind_Cursor_WordRight)){
 		

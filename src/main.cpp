@@ -56,7 +56,6 @@ int main(){
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 
 	init_editor();
-	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		update_editor();
