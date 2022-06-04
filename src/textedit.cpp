@@ -226,19 +226,8 @@ void insert_text(str8 text){
 	main_cursor.chunk->raw.count += text.count;
 }
 
-void update_editor(){
-	//-////////////////////////////////////////////////////////////////////////////////////////////
-	//// input
-	//// text input ////
-	if(DeshInput->charCount){ //TODO(sushi) replace selection
-		//TODO(delle) handle multiple cursor input  
-        insert_text({DeshInput->charIn, (s64)DeshInput->charCount});
-	}
-	if(key_pressed(Key_TAB | InputMod_None)){
-		insert_text(str8l("\t"));
-	}
-	
-	//// text deletion ////
+//handles delete and backspace
+void remove_text(){
 	persist Stopwatch backspace_repeat = start_stopwatch();
 	persist Stopwatch backspace_throttle = start_stopwatch();
 	b32 do_backspace = false;
@@ -250,65 +239,83 @@ void update_editor(){
 			reset_stopwatch(&backspace_throttle);
 	}
 
-	if(do_backspace){//TODO(sushi) selection backspace
-		TextChunk* curchunk = main_cursor.chunk;
-		if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
-			if(main_cursor.start == 0){ //special case where cursor is at the beginning of a chunk
-				//move cursor into previous chunk and set it to the end so following if can handle it 
-				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
-				curchunk = main_cursor.chunk;
-				main_cursor.start = curchunk->raw.count;
-				if(curchunk->newline) curchunk->newline = 0;
-			}
-			if(main_cursor.start == curchunk->raw.count){
-				//copy old chunks memory into edit arena and repoint it
-				if(edit_arena->used + DeshInput->charCount > edit_arena->size){
-					edit_arenas.add(memory_create_arena(Kilobytes(1)));
-					edit_arena = *edit_arenas.last;
-				}
-				memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
-				curchunk->raw.str = edit_arena->cursor;
-				edit_arena->cursor += curchunk->raw.count;
-				edit_arena->used += curchunk->raw.count;
-				
-				current_edit_chunk = curchunk;
-			}
-			else{ //split chunk 
-				TextChunk* next = new_chunk();
-				next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
-				next->bg = curchunk->bg;
-				next->fg = curchunk->fg;
-				next->offset = curchunk->offset + main_cursor.start;
-				next->newline = curchunk->newline;
-				
-				curchunk->raw.count = main_cursor.start;
-				
-				NodeInsertNext(&curchunk->node, &next->node);
-				
-				if(edit_arena->used + DeshInput->charCount > edit_arena->size){
-					edit_arenas.add(memory_create_arena(Kilobytes(1)));
-					edit_arena = *edit_arenas.last;
-				}
-				memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
-				curchunk->raw.str = edit_arena->cursor;
-				edit_arena->cursor += curchunk->raw.count;
-				edit_arena->used += curchunk->raw.count;
-				curchunk->newline = 0;
-			}
+	if(!do_backspace) return;
+
+	Arena* edit_arena = *edit_arenas.last;
+	TextChunk* curchunk = main_cursor.chunk;
+	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
+		if(main_cursor.start == 0){ //special case where cursor is at the beginning of a chunk
+			//move cursor into previous chunk and set it to the end so following if can handle it 
+			main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
+			curchunk = main_cursor.chunk;
+			main_cursor.start = curchunk->raw.count;
+			if(curchunk->newline) curchunk->newline = 0;
 		}
-		u64 bytes_moved = move_cursor_left(&main_cursor);
-		edit_arena->cursor  -= bytes_moved;
-		edit_arena->used    -= bytes_moved;
-		curchunk->raw.count -= bytes_moved;
-		if(!curchunk->raw.count){
-			//if we completely remove a node we move the cursor into the previous chunk and remove the current chunk node
-			//TODO(sushi) possible optimization is tracking removed nodes and using them before making new ones
-			TextChunk* prev = TextChunkFromNode(main_cursor.chunk->node.prev);
-			main_cursor.chunk = prev;
-			main_cursor.start = prev->raw.count;
-			NodeRemove(&curchunk->node);
+		if(main_cursor.start == curchunk->raw.count){
+			//copy old chunks memory into edit arena and repoint it
+			if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+				edit_arenas.add(memory_create_arena(Kilobytes(1)));
+				edit_arena = *edit_arenas.last;
+			}
+			memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+			curchunk->raw.str = edit_arena->cursor;
+			edit_arena->cursor += curchunk->raw.count;
+			edit_arena->used += curchunk->raw.count;
+			
+			current_edit_chunk = curchunk;
+		}
+		else{ //split chunk 
+			TextChunk* next = new_chunk();
+			next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
+			next->bg = curchunk->bg;
+			next->fg = curchunk->fg;
+			next->offset = curchunk->offset + main_cursor.start;
+			next->newline = curchunk->newline;
+			
+			curchunk->raw.count = main_cursor.start;
+			
+			NodeInsertNext(&curchunk->node, &next->node);
+			
+			if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+				edit_arenas.add(memory_create_arena(Kilobytes(1)));
+				edit_arena = *edit_arenas.last;
+			}
+			memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+			curchunk->raw.str = edit_arena->cursor;
+			edit_arena->cursor += curchunk->raw.count;
+			edit_arena->used += curchunk->raw.count;
+			curchunk->newline = 0;
 		}
 	}
+	u64 bytes_moved = move_cursor_left(&main_cursor);
+	edit_arena->cursor  -= bytes_moved;
+	edit_arena->used    -= bytes_moved;
+	curchunk->raw.count -= bytes_moved;
+	if(!curchunk->raw.count){
+		//if we completely remove a node we move the cursor into the previous chunk and remove the current chunk node
+		//TODO(sushi) possible optimization is tracking removed nodes and using them before making new ones
+		TextChunk* prev = TextChunkFromNode(main_cursor.chunk->node.prev);
+		main_cursor.chunk = prev;
+		main_cursor.start = prev->raw.count;
+		NodeRemove(&curchunk->node);
+	}
+	
+}
+
+void update_editor(){
+	//-////////////////////////////////////////////////////////////////////////////////////////////
+	//// input
+	//// text input ////
+	if(DeshInput->charCount){ //TODO(sushi) replace selection
+		//TODO(delle) handle multiple cursor input  
+        insert_text({DeshInput->charIn, (s64)DeshInput->charCount});
+	}
+	if(key_pressed(Key_TAB | InputMod_None)){
+		insert_text(str8l("\t"));
+	}
+
+
+	remove_text();
 	
 	//// cursor movement ////
 	if(key_pressed(Bind_Cursor_Left)){
