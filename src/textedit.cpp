@@ -3,7 +3,7 @@ Notes
 -----
 cursor is drawn to the left of the index it represents
 TextChunks will never stretch across lines
-cursor favors being at the end of a chunk than at the beginning (never before first character except in the first chunk)
+cursor favors being at the end of a chunk than at the beginning
 
 Buffer memory is NOT contiguous and is stitched together when we save the file
 
@@ -134,8 +134,8 @@ void init_editor(){
 
 //returns how many bytes the cursor moved by
 u64 move_cursor_left(Cursor* cursor){
-	u64 begin = cursor->start;
 	if(cursor->start > 0){
+		u64 begin = cursor->start;
 		while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
 		cursor->start -= 1;
 		cursor->count  = 0;
@@ -143,33 +143,24 @@ u64 move_cursor_left(Cursor* cursor){
 	}else if(cursor->chunk->node.prev != &root_chunk){
 		cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
 		cursor->start = cursor->chunk->raw.count;
-		while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
-		cursor->start -= 1;
-		cursor->count  = 0;
-		return cursor->chunk->raw.count - cursor->start;
+		if(!cursor->chunk->newline) cursor->start -= 1;
+		cursor->count = 0;
 	}
 	return 0;
 }
 
 //returns how many bytes the cursor moved by
 u64 move_cursor_right(Cursor* cursor){
-	u64 begin = cursor->start;
 	if(cursor->start < cursor->chunk->raw.count){
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
 		cursor->start += dc.advance;
-		if(   cursor->start >= cursor->chunk->raw.count
-		   && cursor->chunk->node.next != &root_chunk){
-			cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
-			cursor->start = 0;
-		}
 		cursor->count  = 0;
-		return cursor->start - begin;
+		return dc.advance;
 	}else if(cursor->chunk->node.next != &root_chunk){
-		u64 move = cursor->chunk->raw.count - cursor->start;
+		TextChunk* prev_chunk = cursor->chunk;
 		cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
-		cursor->start = 0;
+		cursor->start = (prev_chunk->newline) ? 0 : 1;
 		cursor->count = 0;
-		return move;
 	}
 	return 0;
 }
@@ -319,7 +310,7 @@ void delete_text(){
 			curchunk->raw.count = curchunk->raw.count - main_cursor.start;
 			
 			main_cursor.start = 0;
-
+			
 			NodeInsertPrev(&curchunk->node, &prev->node);
 			
 			if(edit_arena->used + DeshInput->charCount > edit_arena->size){
@@ -366,10 +357,10 @@ void save_buffer(){
 			stitched->used++;
 		}
 	}
-
+	
 	//truncate file
 	file_change_access(file, FileAccess_ReadWriteTruncate);
-		
+	
 	//flush file 
 	file_write(file, stitched->start, stitched->used);
 }
@@ -385,47 +376,115 @@ void update_editor(){
 	if(key_pressed(Key_TAB | InputMod_None)){
 		insert_text(str8l("\t"));
 	}
-
+	
+	//// text deletion ////
 	//TODO(sushi) this sucks do it better
 	persist Stopwatch repeat_hold = start_stopwatch();
 	persist Stopwatch repeat_throttle = start_stopwatch();
 	b32 can_repeat = peek_stopwatch(repeat_hold) > 500 && peek_stopwatch(repeat_throttle) > 50;
 	
-	if(key_pressed(Key_BACKSPACE)){ backspace_text(); reset_stopwatch(&repeat_hold); }
-	if(key_down(Key_BACKSPACE) && can_repeat){ backspace_text(); reset_stopwatch(&repeat_throttle); }
+	if(key_pressed(Bind_DeleteLeft)){ backspace_text(); reset_stopwatch(&repeat_hold); }
+	if(key_down(Bind_DeleteLeft) && can_repeat){ backspace_text(); reset_stopwatch(&repeat_throttle); }
 	
-	if(key_pressed(Key_DELETE)){ delete_text(); reset_stopwatch(&repeat_hold); }
-	if(key_down(Key_DELETE) && can_repeat){ delete_text(); reset_stopwatch(&repeat_throttle); }
+	if(key_pressed(Bind_DeleteRight)){ delete_text(); reset_stopwatch(&repeat_hold); }
+	if(key_down(Bind_DeleteRight) && can_repeat){ delete_text(); reset_stopwatch(&repeat_throttle); }
 	
 	//// cursor movement ////
-	if(key_pressed(Bind_Cursor_Left))           { move_cursor_left(&main_cursor); reset_stopwatch(&repeat_hold); }
-	if(key_down(Bind_Cursor_Left) && can_repeat){ move_cursor_left(&main_cursor); reset_stopwatch(&repeat_throttle); }
+	if(key_pressed(Bind_CursorLeft))           { move_cursor_left(&main_cursor); reset_stopwatch(&repeat_hold); }
+	if(key_down(Bind_CursorLeft) && can_repeat){ move_cursor_left(&main_cursor); reset_stopwatch(&repeat_throttle); }
 
-	if(key_pressed(Bind_Cursor_WordLeft)){
-		
-	}
-	if(key_pressed(Bind_Cursor_WordPartLeft)){
-		
-	}
-
-	if(key_pressed(Bind_Cursor_Right))       { move_cursor_right(&main_cursor); reset_stopwatch(&repeat_hold); }
-	if(key_down(Bind_Cursor_Right) && can_repeat){ move_cursor_right(&main_cursor); reset_stopwatch(&repeat_throttle); }
+	persist Stopwatch remove_repeat = start_stopwatch();
+	persist Stopwatch remove_throttle = start_stopwatch();
+	if(key_pressed(Bind_DeleteLeft)){ backspace_text(); reset_stopwatch(&remove_repeat); }
+	if(key_pressed(Bind_DeleteRight)){ delete_text(); reset_stopwatch(&remove_repeat); }
+	b32 repeat = peek_stopwatch(remove_repeat) > 500 && peek_stopwatch(remove_throttle) > 50;
+	if(key_down(Bind_DeleteLeft) && repeat){ backspace_text(); reset_stopwatch(&remove_throttle); }
+	if(key_down(Bind_DeleteRight) && repeat){ delete_text(); reset_stopwatch(&remove_throttle); }
 	
-	if(key_pressed(Bind_Cursor_WordRight)){
-		
+	//// cursor movement ////
+	if(key_pressed(Bind_CursorWordLeft)){
+		b32 skip_alnum = -1;
+		for(;;){
+			if(main_cursor.start > 0){
+				if(skip_alnum == -1) skip_alnum = isalnum(*(main_cursor.chunk->raw.str + main_cursor.start - 1));
+				
+				while(utf8_continuation_byte(*(main_cursor.chunk->raw.str + main_cursor.start - 1))) main_cursor.start -= 1;
+				main_cursor.start -= 1;
+				main_cursor.count  = 0;
+				
+				if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
+				if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
+				if(main_cursor.start == 0 && main_cursor.chunk->node.prev != &root_chunk && TextChunkFromNode(main_cursor.chunk->node.prev)->newline) break;
+			}else if(main_cursor.chunk->node.prev != &root_chunk){
+				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
+				main_cursor.start = main_cursor.chunk->raw.count;
+				
+				if(skip_alnum == -1) skip_alnum = isalnum(*(main_cursor.chunk->raw.str + main_cursor.start - 1));
+				
+				while(utf8_continuation_byte(*(main_cursor.chunk->raw.str + main_cursor.start - 1))) main_cursor.start -= 1;
+				main_cursor.start -= 1;
+				main_cursor.count  = 0;
+				
+				if(main_cursor.chunk->newline){ main_cursor.start += 1; break; }
+				if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
+				if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
+			}else{
+				break;
+			}
+		}
 	}
-	if(key_pressed(Bind_Cursor_WordPartRight)){
-		
-	}
-	
-	if(key_pressed(Bind_Cursor_Up)){
-		
-	}
-	if(key_pressed(Bind_Cursor_Down)){
+	if(key_pressed(Bind_CursorWordPartLeft)){
 		
 	}
 
-	if(key_pressed(Bind_Save_Buffer)){
+	if(key_pressed(Bind_CursorRight))           { move_cursor_right(&main_cursor); reset_stopwatch(&repeat_hold); }
+	if(key_down(Bind_CursorRight) && can_repeat){ move_cursor_right(&main_cursor); reset_stopwatch(&repeat_throttle); }
+	
+	if(key_pressed(Bind_CursorWordRight)){
+		b32 skip_alnum = -1;
+		for(;;){
+			if(main_cursor.start < main_cursor.chunk->raw.count){
+				DecodedCodepoint dc = decoded_codepoint_from_utf8(main_cursor.chunk->raw.str+main_cursor.start, 4);
+				if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
+				
+				main_cursor.start += dc.advance;
+				main_cursor.count  = 0;
+				
+				if(main_cursor.start >= main_cursor.chunk->raw.count){
+					if(main_cursor.chunk->newline) break;
+				}else{
+					if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))) break;
+					if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))) break;
+				}
+			}else if(main_cursor.chunk->node.next != &root_chunk){
+				TextChunk* prev_chunk = main_cursor.chunk;
+				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.next);
+				main_cursor.start = 0;
+				main_cursor.count = 0;
+				
+				DecodedCodepoint dc = decoded_codepoint_from_utf8(main_cursor.chunk->raw.str+main_cursor.start, 4);
+				if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
+				
+				if(prev_chunk->newline) break;
+				if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ break; }
+				if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ break; }
+			}else{
+				break;
+			}
+		}
+	}
+	if(key_pressed(Bind_CursorWordPartRight)){
+		
+	}
+	
+	if(key_pressed(Bind_CursorUp)){
+		
+	}
+	if(key_pressed(Bind_CursorDown)){
+		
+	}
+	
+	if(key_pressed(Bind_SaveBuffer)){
 		save_buffer();
 	}
 	
@@ -540,12 +599,24 @@ void update_editor(){
 			}
 			
 #if 1 //DEBUG
-            //render chunk outline
-            render_quad2(chunk_pos, size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
+			//left vertical line
+			render_line2(chunk_pos + size.yComp(), chunk_pos + (size.yComp()/2.f), (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
+			
+			//right vertical line
+			render_line2(chunk_pos + size, chunk_pos + vec2(size.x, size.y/2.f), (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
+			
+			//right vertical newline
+			if(chunk->newline){
+				render_line2(chunk_pos + size.xComp(), chunk_pos + vec2(size.x, size.y/2.f), Color_Yellow);
+			}
+			
+			//bottom line
+			render_line2(chunk_pos + size.yComp(), chunk_pos + size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
 #endif
 			
 			if(chunk->newline){
 				if(config.show_symbol_eol){
+					visual_cursor.x += 1;
 					if(*(chunk->raw.str + chunk->raw.count) == '\r'){
 						vec2 slashr_size = CalcTextSize(str8l("\\r"));
 						render_quad_filled2(visual_cursor, slashr_size, config.text_color);

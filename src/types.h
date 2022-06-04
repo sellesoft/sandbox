@@ -51,22 +51,31 @@ struct Cursor{
 };
 
 typedef KeyCode Bind; enum{
-    Bind_Cursor_Left         = Key_LEFT | InputMod_None,
-	Bind_Cursor_WordLeft     = Key_LEFT | InputMod_AnyCtrl,
-	Bind_Cursor_WordPartLeft = Key_LEFT | InputMod_AnyAlt,
-    Bind_Cursor_Right         = Key_RIGHT | InputMod_None,
-    Bind_Cursor_WordRight     = Key_RIGHT | InputMod_AnyCtrl,
-    Bind_Cursor_WordPartRight = Key_RIGHT | InputMod_AnyAlt,
+    Bind_CursorLeft         = Key_LEFT | InputMod_None,
+	Bind_CursorWordLeft     = Key_LEFT | InputMod_AnyCtrl,
+	Bind_CursorWordPartLeft = Key_LEFT | InputMod_AnyAlt,
     
-	Bind_Cursor_Up    = Key_UP    | InputMod_None,
-    Bind_Cursor_Down  = Key_DOWN  | InputMod_None,
+	Bind_CursorRight         = Key_RIGHT | InputMod_None,
+    Bind_CursorWordRight     = Key_RIGHT | InputMod_AnyCtrl,
+    Bind_CursorWordPartRight = Key_RIGHT | InputMod_AnyAlt,
+    
+	Bind_CursorUp    = Key_UP    | InputMod_None,
+    Bind_CursorDown  = Key_DOWN  | InputMod_None,
 	
-    Bind_Cursor_Anchor = Key_SPACE | InputMod_AnyCtrl,
+    Bind_CursorAnchor = Key_SPACE | InputMod_AnyCtrl,
 	
-    Bind_Select_Left  = Key_LEFT  | InputMod_AnyShift,
-    Bind_Select_Right = Key_RIGHT | InputMod_AnyShift,
-    Bind_Select_Up    = Key_UP    | InputMod_AnyShift,
-    Bind_Select_Down  = Key_DOWN  | InputMod_AnyShift,
-
-    Bind_Save_Buffer = Key_S | InputMod_AnyCtrl,
+    Bind_SelectLeft  = Key_LEFT  | InputMod_AnyShift,
+    Bind_SelectRight = Key_RIGHT | InputMod_AnyShift,
+    Bind_SelectUp    = Key_UP    | InputMod_AnyShift,
+    Bind_SelectDown  = Key_DOWN  | InputMod_AnyShift,
+	
+	Bind_DeleteLeft         = Key_BACKSPACE | InputMod_None,
+	Bind_DeleteWordLeft     = Key_BACKSPACE | InputMod_AnyCtrl,
+	Bind_DeleteWordPartLeft = Key_BACKSPACE | InputMod_AnyAlt,
+	
+	Bind_DeleteRight         = Key_DELETE | InputMod_None,
+	Bind_DeleteWordRight     = Key_DELETE | InputMod_AnyCtrl,
+	Bind_DeleteWordPartRight = Key_DELETE | InputMod_AnyAlt,
+	
+    Bind_SaveBuffer = Key_S | InputMod_AnyCtrl,
 };
