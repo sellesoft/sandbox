@@ -33,6 +33,20 @@
 #include "misc_testing.cpp"
 #endif
 
+struct XonoticPlayer{
+	f32 ukn0;
+	vec3 pos0;
+	vec3 pos1;
+	vec3 ukn1;
+	vec3 pos2;
+	vec3 pos3;
+	vec3 vel;
+	f32  ukn2;
+	vec3 look_ang0;
+	vec3 look_ang_mod;
+	f32  ukns[28];
+};
+
 int main(){
 	//init deshi
 	Stopwatch deshi_watch = start_stopwatch();
@@ -53,10 +67,21 @@ int main(){
 	File* in = file_init(STR8("H:/HACKING!!!!/xonotic/addr_lists/zpos.csv"), FileAccess_Read);
 	str8 buffer = file_read_alloc(in, in->bytes, deshi_allocator);
 
-
+	Process ac = platform_get_process_by_name(STR8("ac_client.exe"));
+	str8 cursor = buffer;
+	upt ptr;
+	platform_process_read(ac, 0x400000+0x0017e0a8, &ptr, sizeof(ptr));
+	vec3 pos;
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
+		using namespace UI;
+		platform_process_read(ac, ptr+0x30-sizeof(f32)*2, &pos, sizeof(pos));
+		Begin(STR8("testaddrs"));{
+			string ok = toStr(pos);
+			Text(str8{(u8*)ok.str, ok.count});
+		}End();	
+
 		console_update();
 		UI::Update();
 		render_update();
