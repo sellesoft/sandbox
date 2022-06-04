@@ -127,37 +127,25 @@ enum : u32{
     FL_NEG = 1 << 2,
 
     OP_NOP = 0,
-    OP_ADD,     //
-    OP_SUB,     //
-    OP_MUL,     //
-    OP_SMUL,    //
-    OP_DIV,     //
-    OP_SDIV,    //
-    OP_AND,     //
-    OP_OR,      //
-    OP_XOR,     //
-    OP_SHR,     //
-    OP_SHL,     //
-    OP_NOT,     //
-    OP_JMP,     //
-    OP_MOV,     //
-    //OP_LD,      //
-    //OP_ST,      //
-    //OP_JSR,     //
-    //OP_LDR,     //
-    //OP_STR,     //
-    //OP_RTI,     //
-    //OP_LDI,     //
-    //OP_STI,     //
-    //OP_RES,     //
-    //OP_LEA,     //
+    OP_ADD, 
+    OP_SUB, 
+    OP_MUL, 
+    OP_SMUL, 
+    OP_DIV, 
+    OP_SDIV,
+    OP_AND, 
+    OP_OR, 
+    OP_XOR, 
+    OP_SHR, 
+    OP_SHL, 
+    OP_NOT, 
+    OP_JMP, 
+    OP_JZ, 
+    OP_JNZ,
+    OP_JP,
+    OP_JN,
+    OP_MOV,
     OP_COUNT,
-
-    Destination=0, 
-    Source,
-    ImmediateMode,
-    OpcodeDependent, //bits left to the opcode to eval itself
-    Unused,
 };
 
 static const str8 opnames[] = {
@@ -178,27 +166,6 @@ static const str8 opnames[] = {
     str8l("mov"), 
 };
 
-//come back to this later
-
-struct oppart{
-    u8 type = Unused;
-    u8 nbits = 0;
-}; 
-
-struct operation{
-    void* ptr;
-    u32  args; //number of args after the normal reg 
-};
-
-struct opcode{
-    cstring name;
-    operation op;
-    
-
-
-};
-
-
 /*
 
 
@@ -212,7 +179,7 @@ struct opcode{
     bits = readbits(34, 20);
 
 ---------------------------------------------------------------------------------------------------------------
-NOP:
+nop:
   no operation
 
   does nothing
@@ -220,236 +187,277 @@ NOP:
   encoding:
     normal:
         000000 | ... |
-        NOP    | NU  |
+        nop    | nu  |
         63   58|57  0|
 ---------------------------------------------------------------------------------------------------------------
-ADD:
+add:
   addition
 
-  if the 49th bit is 0 then you add SR1 and SR2 and store the result in DR  
-  if it's 1 then you add a 49 bit number to SR1 and store the result in DR
+  if the 49th bit is 0 then you add sr1 and sr2 and store the result in dr  
+  if it's 1 then you add a 49 bit number to sr1 and store the result in dr
 
   sets condition flags
 
   encoding:
     normal:
         000001 | **** | **** | 0 | **** | ... |
-        ADD    |  DR  |  SR1 |   |  SR2 | NU  |
+        add    |  dr  |  sr1 |   |  sr2 | nu  |
         63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
         000001 | **** | **** | 1 |  ...  |
-        ADD    |  DR  |  SR1 |   | imm49 |
+        add    |  dr  |  sr1 |   | imm49 |
         63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-SUB:
+sub:
   subtraction
 
-  if the 49th bit is 0 then you subtract SR2 from SR1 and store the result in DR  
-  if it's 1 then you subtract a 49 bit number from SR1 and store the result in DR
+  if the 49th bit is 0 then you subtract sr2 from sr1 and store the result in dr  
+  if it's 1 then you subtract a 49 bit number from sr1 and store the result in dr
   
   sets condition flags
 
   encoding:
     normal:
         000010 | **** | **** | 0 | **** | ... |
-        SUB    |  DR  |  SR1 |   |  SR2 | NU  |
+        sub    |  dr  |  sr1 |   |  sr2 | nu  |
         63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
         000010 | **** | **** | 1 |  ...  |
-        SUB    |  DR  |  SR1 |   | imm49 |
+        sub    |  dr  |  sr1 |   | imm49 |
         63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-MUL:
+mul:
   unsigned multiplication
 
-  if the 49th bit is 0 then you multiply SR1 and SR2 and store the result in DR  
-  if it's 1 then you multiply SR1 by a 47 bit number and store the result in DR
+  if the 49th bit is 0 then you multiply sr1 and sr2 and store the result in dr  
+  if it's 1 then you multiply sr1 by a 47 bit number and store the result in dr
 
   sets condition flags
 
   encoding:
     normal:
         000011 | **** | **** | 0 | **** | ... |
-        MUL    |  DR  |  SR1 |   |  SR2 | NU  |
+        mul    |  dr  |  sr1 |   |  sr2 | nu  |
         63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
         000011 | **** | **** | 1 |  ...  |
-        MUL    |  DR  |  SR1 |   | imm49 |
+        mul    |  dr  |  sr1 |   | imm49 |
         63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-SMUL:
+smul:
   signed multiplication
 
-  if the 49th bit is 0 then you multiply SR1 and SR2 and store the result in DR  
-  if it's 1 then you multiply SR1 by a 47 bit number and store the result in DR
+  if the 49th bit is 0 then you multiply sr1 and sr2 and store the result in dr  
+  if it's 1 then you multiply sr1 by a 47 bit number and store the result in dr
 
   sets condition flags
 
   encoding:
     normal:
         000100 | **** | **** | 0 | **** | ... |
-        SMUL   |  DR  |  SR1 |   |  SR2 | NU  |
+        smul   |  dr  |  sr1 |   |  sr2 | nu  |
         63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
         000100 | **** | **** | 1 |  ...  |
-        SMUL   |  DR  |  SR1 |   | imm49 |
+        smul   |  dr  |  sr1 |   | imm49 |
         63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-DIV:
+div:
   unsigned division
 
-  if the 45th bit is 0 SR1 is divided by SR2 and the quotient and remainder are stored in QR and RR respectively
-  if it's 1 then SR1 is divided by imm45 and the quotient and remainder are stored in QR and RR respectively
+  if the 45th bit is 0 sr1 is divided by sr2 and the quotient and remainder are stored in qr and rr respectively
+  if it's 1 then sr1 is divided by imm45 and the quotient and remainder are stored in qr and rr respectively
 
   sets condition flags
 
   encoding:
     normal:
         000101 | **** | **** | **** | 0 | **** | ... |
-        DIV    |  QR  |  RR  |  SR1 |   |  SR2 | NU  |
+        div    |  qr  |  rr  |  sr1 |   |  sr2 | nu  |
         63   58|57  54|53  50|49  46| 45|44  41|40  0|
 
     immediate:
         000101 | **** | **** | **** | 1 |  ...  |
-        DIV    |  QR  |  RR  |  SR1 |   | imm45 |
+        div    |  qr  |  rr  |  sr1 |   | imm45 |
         63   58|57  54|53  50|49  46| 45|44    0|
 ---------------------------------------------------------------------------------------------------------------
-SDIV:
+sdiv:
   signed division
 
-  if the 45th bit is 0 SR1 is divided by SR2 and the quotient and remainder are stored in QR and RR respectively
-  if it's 1 then SR1 is divided by imm45 and the quotient and remainder are stored in QR and RR respectively
+  if the 45th bit is 0 sr1 is divided by sr2 and the quotient and remainder are stored in qr and rr respectively
+  if it's 1 then sr1 is divided by imm45 and the quotient and remainder are stored in qr and rr respectively
 
   sets condition flags
 
   encoding:
     normal:
         000110 | **** | **** | **** | 0 | **** | ... |
-        SDIV   |  QR  |  RR  |  SR1 |   |  SR2 | NU  |
+        sdiv   |  qr  |  rr  |  sr1 |   |  sr2 | nu  |
         63   58|57  54|53  50|49  46| 45|44  41|40  0|
 
     immediate:
         000110 | **** | **** | **** | 1 |  ...  |
-        SDIV   |  QR  |  RR  |  SR1 |   | imm45 |
+        sdiv   |  qr  |  rr  |  sr1 |   | imm45 |
         63   58|57  54|53  50|49  46| 45|44    0|
 ---------------------------------------------------------------------------------------------------------------
-AND:
+and:
   bitwise and
 
-    TODO desc
+    todo desc
   
   encoding:
     normal:
       000111 | **** | **** | 0 | **** | ... |
-      AND    |  DR  |  SR1 |   |  SR2 | NU  |
+      and    |  dr  |  sr1 |   |  sr2 | nu  |
       63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
       000111 | **** | **** | 1 |  ...  |
-      AND    |  DR  |  SR1 |   | imm49 |
+      and    |  dr  |  sr1 |   | imm49 |
       63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-OR:
+or:
   bitwise or
 
-    TODO desc
+    todo desc
   
   encoding:
     normal:
       001000 | **** | **** | 0 | **** | ... |
-      OR     |  DR  |  SR1 |   |  SR2 | NU  |
+      or     |  dr  |  sr1 |   |  sr2 | nu  |
       63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
       001000 | **** | **** | 1 |  ...  |
-      OR     |  DR  |  SR1 |   | imm49 |
+      or     |  dr  |  sr1 |   | imm49 |
       63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-XOR:
+xor:
   bitwise xor
 
-  TODO desc
+  todo desc
   
   encoding:
     normal:
       001001 | **** | **** | 0 | **** | ... |
-      XOR    |  DR  |  SR1 |   |  SR2 | NU  |
+      xor    |  dr  |  sr1 |   |  sr2 | nu  |
       63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
       001001 | **** | **** | 1 |  ...  |
-      XOR    |  DR  |  SR1 |   | imm49 |
+      xor    |  dr  |  sr1 |   | imm49 |
       63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-SHR:
+shr:
   bitwise shift right
 
-  TODO desc
+  todo desc
   
   encoding:
     normal:
       001010 | **** | **** | 0 | **** | ... |
-      SHR    |  DR  |  SR1 |   |  SR2 | NU  |
+      shr    |  dr  |  sr1 |   |  sr2 | nu  |
       63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
       001010 | **** | **** | 1 |  ...  |
-      SHR    |  DR  |  SR1 |   | imm49 |
+      shr    |  dr  |  sr1 |   | imm49 |
       63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-SHL:
+shl:
   bitwise shift left
 
-  TODO desc
+  todo desc
   
   encoding:
     normal:
       001011 | **** | **** | 0 | **** | ... |
-      SHL    |  DR  |  SR1 |   |  SR2 | NU  |
+      shl    |  dr  |  sr1 |   |  sr2 | nu  |
       63   58|57  54|53  50| 49|48  45|44  0|
 
     immediate:
       001011 | **** | **** | 1 |  ...  |
-      SHL    |  DR  |  SR1 |   | imm49 |
+      shl    |  dr  |  sr1 |   | imm49 |
       63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
-NOT:
-  bitwise NOT
+not:
+  bitwise not
 
-  TODO desc
+  todo desc
   
   encoding:
     normal:
       001100 | **** | **** | ... |
-      NOT    |  DR  |  SR1 | NU  |
+      not    |  dr  |  sr1 | nu  |
       63   58|57  54|53  50|49  0|
 ---------------------------------------------------------------------------------------------------------------
-JMP:
+jmp:
   jump unconditionally to the location specified in the register
   
   encoding:
     normal:
       001101 | **** | ... |
-      JMP    |  SR1 | NU  |
+      jmp    |  sr1 | nu  |
+      63   58|57  54|53  0|
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+NOTE: there is no cmp opcode
+      the equivalent of cmp is just subtracting 2 operands 
+      cmp can still be implemented in our ASM language, though
+---------------------------------------------------------------------------------------------------------------
+jz:
+  jump to the location specified in sr1 if the previous operation was 0
+  
+  encoding:
+    normal:
+      001110 | **** | ... |
+      je     |  sr1 | nu  |
       63   58|57  54|53  0|
 ---------------------------------------------------------------------------------------------------------------
-MOV:
-  if 53rd bit is 0, copies data from SR1 to DR
-  if 53rd bit is 1, copies data from imm53 to DR
+jnz:
+  jump to the location specified in sr1 if the previous operation was not 0
+  
+  encoding:
+    normal:
+      001111 | **** | ... |
+      jne    |  sr1 | nu  |
+      63   58|57  54|53  0|
+---------------------------------------------------------------------------------------------------------------
+jp:
+  jump to the location specified in sr1 if the previous operation resulted in a positive number
+  
+  encoding:
+    normal:
+      010000 | **** | ... |
+      jz     |  sr1 | nu  |
+      63   58|57  54|53  0|
+---------------------------------------------------------------------------------------------------------------
+jn:
+  jump to the location specified in sr1 if the previous operation resulted in a negative number
+  
+  encoding:
+    normal:
+      010001 | **** | ... |
+      jz     |  sr1 | nu  |
+      63   58|57  54|53  0|
+---------------------------------------------------------------------------------------------------------------
+mov:
+  if 53rd bit is 0, copies data from sr1 to dr
+  if 53rd bit is 1, copies data from imm53 to dr
   
   encoding:
     normal:
       001110 | **** | 0 | **** | ... |
-      MOV    |  DR  |   | SR1  | NU  |
+          |  dr  |   | sr1  | nu  |
       63   58|57  54| 53|52  49|48  0|
 
     immediate:
-      001110 | **** | 1 |  ...  |
-      MOV    |  DR  |   | imm53 |
+      010010 | **** | 1 |  ...  |
+      mov    |  dr  |   | imm53 |
       63   58|57  54| 53|52    0|
 
 
@@ -627,18 +635,22 @@ struct machine{
             case OP_ADD:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) + read.immval;
                 else             ureg(read.DR) = ureg(read.SR1) + ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_SUB:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) - read.immval;
                 else             ureg(read.DR) = ureg(read.SR1) - ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_MUL:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) * read.immval;
                 else                ureg(read.DR) = ureg(read.SR1) * ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_SMUL:{
                 if(read.immcond) sreg(read.DR) = sreg(read.SR1) * ConversionlessCast(s64,read.immval);
                 else                sreg(read.DR) = sreg(read.SR1) * sreg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_DIV:{
                 if(read.immcond){
@@ -649,6 +661,7 @@ struct machine{
                     ureg(read.QR) = ureg(read.SR1) / ureg(read.SR2);
                     ureg(read.RR) = ureg(read.SR1) % ureg(read.SR2);
                 }
+                update_flags(read.DR);
             }break;
             case OP_SDIV:{
                 if(read.immcond){
@@ -659,32 +672,51 @@ struct machine{
                     sreg(read.QR) = sreg(read.SR1) / sreg(read.SR2);
                     sreg(read.RR) = sreg(read.SR1) % sreg(read.SR2);
                 }
+                update_flags(read.DR);
             }break;
             case OP_AND:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) & read.immval;
-                else                ureg(read.DR) = ureg(read.SR1) & ureg(read.SR2);
+                else             ureg(read.DR) = ureg(read.SR1) & ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_OR:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) | read.immval;
-                else                ureg(read.DR) = ureg(read.SR1) | ureg(read.SR2);
+                else             ureg(read.DR) = ureg(read.SR1) | ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_XOR:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) ^ read.immval;
-                else                ureg(read.DR) = ureg(read.SR1) ^ ureg(read.SR2);
+                else             ureg(read.DR) = ureg(read.SR1) ^ ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_SHR:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) >> read.immval;
-                else                ureg(read.DR) = ureg(read.SR1) >> ureg(read.SR2);
+                else             ureg(read.DR) = ureg(read.SR1) >> ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_SHL:{
                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) << read.immval;
-                else                ureg(read.DR) = ureg(read.SR1) << ureg(read.SR2);
+                else             ureg(read.DR) = ureg(read.SR1) << ureg(read.SR2);
+                update_flags(read.DR);
             }break;
             case OP_NOT:{
                 ureg(read.DR) = !ureg(read.SR1);
+                update_flags(read.DR);
             }break;
             case OP_JMP:{
                 ureg(R_PC) = ureg(read.SR1);
+            }break;
+            case OP_JZ:{
+                if(ureg(R_COND) & FL_ZRO) ureg(R_PC) = ureg(read.SR1);
+            }break;
+            case OP_JNZ:{
+                if(!(ureg(R_COND) & FL_ZRO)) ureg(R_PC) = ureg(read.SR1);
+            }break;
+            case OP_JP:{
+                if(ureg(R_COND) & FL_POS) ureg(R_PC) = ureg(read.SR1);
+            }break;
+            case OP_JN:{
+                if(ureg(R_COND) & FL_NEG) ureg(R_PC) = ureg(read.SR1);
             }break;
             case OP_MOV:{
                 if(read.immcond) ureg(read.DR) = read.immval;
