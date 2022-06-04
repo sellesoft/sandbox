@@ -39,7 +39,6 @@ struct TextChunk{
 	color bg; 
 	color fg; 
 	b32   newline;
-    b32   original; //true if this chunk is a part of the original file
 };
 #define TextChunkFromNode(x) CastFromMember(TextChunk, node, x)
 
