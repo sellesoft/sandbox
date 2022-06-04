@@ -16,6 +16,7 @@
 #include "core/commands.h"
 #include "core/console.h"
 #include "core/graphing.h"
+#include "core/file.h"
 #include "core/input.h"
 #include "core/logger.h"
 #include "core/memory.h"
