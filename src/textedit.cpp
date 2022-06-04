@@ -387,28 +387,30 @@ void update_editor(){
 	}
 
 	//TODO(sushi) this sucks do it better
-	persist Stopwatch remove_repeat = start_stopwatch();
-	persist Stopwatch remove_throttle = start_stopwatch();
-	if(key_pressed(Key_BACKSPACE)){ backspace_text(); reset_stopwatch(&remove_repeat); }
-	if(key_pressed(Key_DELETE)){ delete_text(); reset_stopwatch(&remove_repeat); }
-	b32 repeat = peek_stopwatch(remove_repeat) > 500 && peek_stopwatch(remove_throttle) > 50;
-	if(key_down(Key_BACKSPACE) && repeat){ backspace_text(); reset_stopwatch(&remove_throttle); }
-	if(key_down(Key_DELETE) && repeat){ delete_text(); reset_stopwatch(&remove_throttle); }
+	persist Stopwatch repeat_hold = start_stopwatch();
+	persist Stopwatch repeat_throttle = start_stopwatch();
+	b32 can_repeat = peek_stopwatch(repeat_hold) > 500 && peek_stopwatch(repeat_throttle) > 50;
+	
+	if(key_pressed(Key_BACKSPACE)){ backspace_text(); reset_stopwatch(&repeat_hold); }
+	if(key_down(Key_BACKSPACE) && can_repeat){ backspace_text(); reset_stopwatch(&repeat_throttle); }
+	
+	if(key_pressed(Key_DELETE)){ delete_text(); reset_stopwatch(&repeat_hold); }
+	if(key_down(Key_DELETE) && can_repeat){ delete_text(); reset_stopwatch(&repeat_throttle); }
 	
 	//// cursor movement ////
-	if(key_pressed(Bind_Cursor_Left)){
-		move_cursor_left(&main_cursor);
-	}
+	if(key_pressed(Bind_Cursor_Left))           { move_cursor_left(&main_cursor); reset_stopwatch(&repeat_hold); }
+	if(key_down(Bind_Cursor_Left) && can_repeat){ move_cursor_left(&main_cursor); reset_stopwatch(&repeat_throttle); }
+
 	if(key_pressed(Bind_Cursor_WordLeft)){
 		
 	}
 	if(key_pressed(Bind_Cursor_WordPartLeft)){
 		
 	}
+
+	if(key_pressed(Bind_Cursor_Right))       { move_cursor_right(&main_cursor); reset_stopwatch(&repeat_hold); }
+	if(key_down(Bind_Cursor_Right) && can_repeat){ move_cursor_right(&main_cursor); reset_stopwatch(&repeat_throttle); }
 	
-	if(key_pressed(Bind_Cursor_Right)){
-		move_cursor_right(&main_cursor);
-	}
 	if(key_pressed(Bind_Cursor_WordRight)){
 		
 	}
