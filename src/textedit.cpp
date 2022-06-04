@@ -3,6 +3,7 @@ Notes
 -----
 cursor is drawn to the left of the index it represents
 
+TextChunks will never stretch across lines
 
 */
 
@@ -128,16 +129,19 @@ void update_editor(){
         persist TextChunk* last_insert = 0;
         Arena* edit_arena = *edit_arenas.last;
 		//TODO(delle) handle multiple cursor input  
-        if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != last_insert){//we must branch a new chunk from the loaded file 
+        if(main_cursor.start != main_cursor.chunk->raw.count-1 || main_cursor.chunk != last_insert){//we must branch a new chunk from the loaded file 
             TextChunk* curchunk = main_cursor.chunk;
             if(main_cursor.start == 0){
                 TextChunk* next = new_chunk();
                 memcpy(next, curchunk, sizeof(TextChunk));
                 NodeInsertNext(&curchunk->node,&next->node);
+
+                curchunk->newline = 0;
             }
             else if (main_cursor.start == main_cursor.chunk->raw.count){
                 TextChunk* prev = new_chunk();
                 memcpy(prev, curchunk, sizeof(TextChunk));
+                prev->newline = false;
                 NodeInsertPrev(&curchunk->node, &prev->node);
             }
             else{ //split chunk if cursor is in the middle of it 
@@ -147,21 +151,27 @@ void update_editor(){
                 prev->fg = curchunk->fg;
                 prev->offset = curchunk->offset;
                 prev->original = 1;
+                prev->newline = 0;
                 TextChunk* next = new_chunk();
                 next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
                 next->bg = curchunk->bg;
                 next->fg = curchunk->fg;
                 next->offset = curchunk->offset + main_cursor.start;
                 next->original = 1;
+                next->newline = curchunk->newline;
 				
                 NodeInsertPrev(&curchunk->node, &prev->node);        
                 NodeInsertNext(&curchunk->node, &next->node);
+                
+                curchunk->newline = 0;
             }
             last_insert = curchunk;
             curchunk->raw = {edit_arena->cursor, DeshInput->charCount};
+            main_cursor.start = 0;
         }
+        Log("Insert", "Writing to ", edit_arena->cursor);
         memcpy(edit_arena->cursor, DeshInput->charIn, DeshInput->charCount);
-        main_cursor.start = DeshInput->charCount;
+        main_cursor.start += DeshInput->charCount;
         main_cursor.chunk->raw.count += DeshInput->charCount;
         edit_arena->cursor += DeshInput->charCount;
 	}
@@ -316,6 +326,12 @@ void update_editor(){
 				vec2 cursor_bot_right = vec2(cursor_top_left.x, cursor_top_left.y+config.font_height);
 				render_line2(cursor_top_left, cursor_bot_right, config.cursor_color);
 			}
+
+#if 1 //DEBUG
+            //render chunk
+            render_quad2(visual_cursor, size, Color_Red);
+
+#endif
 			
 			if(chunk->newline){
                 visual_cursor.y += size.y;
@@ -326,6 +342,8 @@ void update_editor(){
             else{
                 visual_cursor.x += size.x;
             }
+
+
         }
     }
 }
