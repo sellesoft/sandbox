@@ -170,7 +170,6 @@ void insert_text(str8 text){
 	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 		TextChunk* curchunk = main_cursor.chunk;
 		if(main_cursor.start == 0){
-			Log("chnksplt", "   Splitting at beginning of old chunk");
 			TextChunk* next = new_chunk();
 			memcpy(next, curchunk, sizeof(TextChunk));
 			NodeInsertNext(&curchunk->node,&next->node);
@@ -217,6 +216,155 @@ void insert_text(str8 text){
 	main_cursor.chunk->raw.count += text.count;
 }
 
+void backspace_text(){
+	Arena* edit_arena = *edit_arenas.last;
+	TextChunk* curchunk = main_cursor.chunk;
+	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
+		if(main_cursor.start == 0){ //special case where cursor is at the beginning of a chunk
+			//move cursor into previous chunk and set it to the end so following if can handle it 
+			main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
+			curchunk = main_cursor.chunk;
+			main_cursor.start = curchunk->raw.count;
+			if(curchunk->newline) curchunk->newline = 0;
+		}
+		if(main_cursor.start == curchunk->raw.count){
+			//copy old chunks memory into edit arena and repoint it
+			if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+				edit_arenas.add(memory_create_arena(Kilobytes(1)));
+				edit_arena = *edit_arenas.last;
+			}
+			memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+			curchunk->raw.str = edit_arena->cursor;
+			edit_arena->cursor += curchunk->raw.count;
+			edit_arena->used += curchunk->raw.count;
+			
+			current_edit_chunk = curchunk;
+		}
+		else{ //split chunk 
+			TextChunk* next = new_chunk();
+			next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
+			next->bg = curchunk->bg;
+			next->fg = curchunk->fg;
+			next->offset = curchunk->offset + main_cursor.start;
+			next->newline = curchunk->newline;
+			
+			curchunk->raw.count = main_cursor.start;
+			
+			NodeInsertNext(&curchunk->node, &next->node);
+			
+			if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+				edit_arenas.add(memory_create_arena(Kilobytes(1)));
+				edit_arena = *edit_arenas.last;
+			}
+			memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+			curchunk->raw.str = edit_arena->cursor;
+			edit_arena->cursor += curchunk->raw.count;
+			edit_arena->used += curchunk->raw.count;
+			curchunk->newline = 0;
+		}
+	}
+	u64 bytes_moved = move_cursor_left(&main_cursor);
+	edit_arena->cursor  -= bytes_moved;
+	edit_arena->used    -= bytes_moved;
+	curchunk->raw.count -= bytes_moved;
+	if(!curchunk->raw.count){
+		//if we completely remove a node we move the cursor into the previous chunk and remove the current chunk node
+		//TODO(sushi) possible optimization is tracking removed nodes and using them before making new ones
+		TextChunk* prev = TextChunkFromNode(main_cursor.chunk->node.prev);
+		main_cursor.chunk = prev;
+		main_cursor.start = prev->raw.count;
+		NodeRemove(&curchunk->node);
+	}
+	
+}
+
+void delete_text(){
+	Arena* edit_arena = *edit_arenas.last;
+	TextChunk* curchunk = main_cursor.chunk;
+	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
+		if(main_cursor.start == curchunk->raw.count){//
+			//do nothing, because this can only happen at the very end of a file
+		}
+		else if(main_cursor.start == 0){ 
+			//copy old chunks memory into edit arena and repoint it
+			if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+				edit_arenas.add(memory_create_arena(Kilobytes(1)));
+				edit_arena = *edit_arenas.last;
+			}
+			memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+			curchunk->raw.str = edit_arena->cursor;
+			edit_arena->cursor += curchunk->raw.count;
+			edit_arena->used += curchunk->raw.count;
+			
+			current_edit_chunk = curchunk;
+		}
+		else{ //split chunk 
+			TextChunk* prev = new_chunk();
+			prev->raw = {curchunk->raw.str, (s64)main_cursor.start};
+			prev->bg = curchunk->bg;
+			prev->fg = curchunk->fg;
+			prev->offset = curchunk->offset;
+			prev->newline = 0;
+			
+			curchunk->raw.str += main_cursor.start;
+			curchunk->raw.count = curchunk->raw.count - main_cursor.start;
+			
+			main_cursor.start = 0;
+			
+			NodeInsertPrev(&curchunk->node, &prev->node);
+			
+			if(edit_arena->used + DeshInput->charCount > edit_arena->size){
+				edit_arenas.add(memory_create_arena(Kilobytes(1)));
+				edit_arena = *edit_arenas.last;
+			}
+			memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
+			curchunk->raw.str = edit_arena->cursor;
+			edit_arena->cursor += curchunk->raw.count;
+			edit_arena->used += curchunk->raw.count;
+			curchunk->newline = 0;
+		}
+	}
+	str8_advance(&curchunk->raw);
+	if(!curchunk->raw.count){
+		//if we completely delete a chunk we move the cursor to the next one and remove the empty chunk
+		//TODO(sushi) possible optimization is tracking removed nodes and using them before making new ones
+		TextChunk* next = TextChunkFromNode(main_cursor.chunk->node.next);
+		main_cursor.chunk = next;
+		main_cursor.start = 0;
+		NodeRemove(&curchunk->node);
+	}
+}
+
+//stitches together the edits into the static arena then flushes it to the file
+void save_buffer(){
+	//temp weak approximation of growth
+	//this should be better tracked later in editing functions
+	u64 growth = 0;
+	for(auto ea : edit_arenas){
+		growth += ea->used;
+	}
+	Arena* stitched = memory_create_arena(static_arena->size + growth);
+	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
+		TextChunk* chunk = TextChunkFromNode(it);
+		memcpy(stitched->cursor, chunk->raw.str, chunk->raw.count);
+		//repoint chunk to stitched memory
+		chunk->raw.str = stitched->cursor;
+		stitched->cursor += chunk->raw.count;
+		stitched->used += chunk->raw.count;
+		if(chunk->newline){ //TODO(sushi) handle other line endings i guess
+			memset(stitched->cursor, '\n', 1);
+			stitched->cursor++;
+			stitched->used++;
+		}
+	}
+	
+	//truncate file
+	file_change_access(file, FileAccess_ReadWriteTruncate);
+	
+	//flush file 
+	file_write(file, stitched->start, stitched->used);
+}
+
 void update_editor(){
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
@@ -230,58 +378,14 @@ void update_editor(){
 	}
 	
 	//// text deletion ////
-	if(key_pressed(Bind_DeleteLeft)){//TODO(sushi) selection backspace
-		Arena* edit_arena = *edit_arenas.last;
-		TextChunk* curchunk = main_cursor.chunk;
-		if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
-			if(main_cursor.start == 0){ //special case where cursor is at the beginning of a chunk
-				//move cursor into previous chunk and set it to the end so following if can handle it 
-				move_cursor_left(&main_cursor); 
-				curchunk = main_cursor.chunk;
-				main_cursor.start = curchunk->raw.count;
-				if(curchunk->newline) curchunk->newline = 0;
-			}
-			if(main_cursor.start == curchunk->raw.count){
-				//copy old chunks memory into edit arena and repoint it
-				if(edit_arena->used + DeshInput->charCount > edit_arena->size){
-					edit_arenas.add(memory_create_arena(Kilobytes(1)));
-					edit_arena = *edit_arenas.last;
-				}
-				memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
-				curchunk->raw.str = edit_arena->cursor;
-				edit_arena->cursor += curchunk->raw.count;
-				edit_arena->used += curchunk->raw.count;
-				
-				current_edit_chunk = curchunk;
-			}
-			else{ //split chunk 
-				TextChunk* next = new_chunk();
-				next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
-				next->bg = curchunk->bg;
-				next->fg = curchunk->fg;
-				next->offset = curchunk->offset + main_cursor.start;
-				next->newline = curchunk->newline;
-				
-				curchunk->raw.count = main_cursor.start;
-				
-				NodeInsertNext(&curchunk->node, &next->node);
-				
-				if(edit_arena->used + DeshInput->charCount > edit_arena->size){
-					edit_arenas.add(memory_create_arena(Kilobytes(1)));
-					edit_arena = *edit_arenas.last;
-				}
-				memcpy(edit_arena->cursor, curchunk->raw.str, curchunk->raw.count);
-				curchunk->raw.str = edit_arena->cursor;
-				edit_arena->cursor += curchunk->raw.count;
-				edit_arena->used += curchunk->raw.count;
-				curchunk->newline = 0;
-			}
-		}
-		u64 bytes_moved = move_cursor_left(&main_cursor);
-		edit_arena->cursor -= bytes_moved;
-		edit_arena->used -= bytes_moved;
-		curchunk->raw.count -= bytes_moved;
-	}
+	//TODO(sushi) this sucks do it better
+	persist Stopwatch remove_repeat = start_stopwatch();
+	persist Stopwatch remove_throttle = start_stopwatch();
+	if(key_pressed(Bind_DeleteLeft)){ backspace_text(); reset_stopwatch(&remove_repeat); }
+	if(key_pressed(Bind_DeleteRight)){ delete_text(); reset_stopwatch(&remove_repeat); }
+	b32 repeat = peek_stopwatch(remove_repeat) > 500 && peek_stopwatch(remove_throttle) > 50;
+	if(key_down(Bind_DeleteLeft) && repeat){ backspace_text(); reset_stopwatch(&remove_throttle); }
+	if(key_down(Bind_DeleteRight) && repeat){ delete_text(); reset_stopwatch(&remove_throttle); }
 	
 	//// cursor movement ////
 	if(key_pressed(Bind_CursorLeft)){
@@ -367,6 +471,10 @@ void update_editor(){
 	}
 	if(key_pressed(Bind_CursorDown)){
 		
+	}
+	
+	if(key_pressed(Bind_SaveBuffer)){
+		save_buffer();
 	}
 	
 	

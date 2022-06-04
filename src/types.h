@@ -76,4 +76,6 @@ typedef KeyCode Bind; enum{
 	Bind_DeleteRight         = Key_DELETE | InputMod_None,
 	Bind_DeleteWordRight     = Key_DELETE | InputMod_AnyCtrl,
 	Bind_DeleteWordPartRight = Key_DELETE | InputMod_AnyAlt,
+	
+    Bind_SaveBuffer = Key_S | InputMod_AnyCtrl,
 };
