@@ -132,9 +132,10 @@ void update_editor(){
         persist TextChunk* last_insert = 0;
         Arena* edit_arena = *edit_arenas.last;
 		//TODO(delle) handle multiple cursor input  
-        if(main_cursor.start != main_cursor.chunk->raw.count-1 || main_cursor.chunk != last_insert){//we must branch a new chunk from the loaded file 
+        if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != last_insert){//we must branch a new chunk from the loaded file 
             TextChunk* curchunk = main_cursor.chunk;
             if(main_cursor.start == 0){
+                Log("chnksplt", "   Splitting at beginning of old chunk");
                 TextChunk* next = new_chunk();
                 memcpy(next, curchunk, sizeof(TextChunk));
                 NodeInsertNext(&curchunk->node,&next->node);
@@ -153,30 +154,28 @@ void update_editor(){
                 prev->bg = curchunk->bg;
                 prev->fg = curchunk->fg;
                 prev->offset = curchunk->offset;
-                prev->original = 1;
                 prev->newline = 0;
                 TextChunk* next = new_chunk();
                 next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
                 next->bg = curchunk->bg;
                 next->fg = curchunk->fg;
                 next->offset = curchunk->offset + main_cursor.start;
-                next->original = 1;
                 next->newline = curchunk->newline;
 				
-                NodeInsertPrev(&curchunk->node, &prev->node);        
+                NodeInsertPrev(&curchunk->node, &prev->node);
                 NodeInsertNext(&curchunk->node, &next->node);
                 
                 curchunk->newline = 0;
             }
+			//edit_arena->cursor += 1;
             last_insert = curchunk;
-            curchunk->raw = {edit_arena->cursor, DeshInput->charCount};
+            curchunk->raw = {edit_arena->cursor, 0};
             main_cursor.start = 0;
         }
-        Log("Insert", "Writing to ", edit_arena->cursor);
         memcpy(edit_arena->cursor, DeshInput->charIn, DeshInput->charCount);
         main_cursor.start += DeshInput->charCount;
-        main_cursor.chunk->raw.count += DeshInput->charCount;
         edit_arena->cursor += DeshInput->charCount;
+        main_cursor.chunk->raw.count += DeshInput->charCount;
 	}
 	
 	//// text deletion ////
@@ -322,9 +321,9 @@ void update_editor(){
 				}
 			}
 			
-#if 0 //DEBUG
+#if 1 //DEBUG
             //render chunk outline
-            render_quad2(visual_cursor, size, Color_Red);
+            render_quad2(visual_cursor, size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
 #endif
 			
 			if(chunk->newline){
