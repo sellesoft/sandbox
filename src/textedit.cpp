@@ -179,7 +179,6 @@ void insert_text(str8 text){
 	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 		TextChunk* curchunk = main_cursor.chunk;
 		if(main_cursor.start == 0){
-			Log("chnksplt", "   Splitting at beginning of old chunk");
 			TextChunk* next = new_chunk();
 			memcpy(next, curchunk, sizeof(TextChunk));
 			NodeInsertNext(&curchunk->node,&next->node);
@@ -345,6 +344,36 @@ void delete_text(){
 	}
 }
 
+//stitches together the edits into the static arena then flushes it to the file
+void save_buffer(){
+	//temp weak approximation of growth
+	//this should be better tracked later in editing functions
+	u64 growth = 0;
+	for(auto ea : edit_arenas){
+		growth += ea->used;
+	}
+	Arena* stitched = memory_create_arena(static_arena->size + growth);
+	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
+		TextChunk* chunk = TextChunkFromNode(it);
+		memcpy(stitched->cursor, chunk->raw.str, chunk->raw.count);
+		//repoint chunk to stitched memory
+		chunk->raw.str = stitched->cursor;
+		stitched->cursor += chunk->raw.count;
+		stitched->used += chunk->raw.count;
+		if(chunk->newline){ //TODO(sushi) handle other line endings i guess
+			memset(stitched->cursor, '\n', 1);
+			stitched->cursor++;
+			stitched->used++;
+		}
+	}
+
+	//truncate file
+	file_change_access(file, FileAccess_ReadWriteTruncate);
+		
+	//flush file 
+	file_write(file, stitched->start, stitched->used);
+}
+
 void update_editor(){
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
@@ -392,6 +421,10 @@ void update_editor(){
 	}
 	if(key_pressed(Bind_Cursor_Down)){
 		
+	}
+
+	if(key_pressed(Bind_Save_Buffer)){
+		save_buffer();
 	}
 	
 	

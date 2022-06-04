@@ -67,4 +67,6 @@ typedef KeyCode Bind; enum{
     Bind_Select_Right = Key_RIGHT | InputMod_AnyShift,
     Bind_Select_Up    = Key_UP    | InputMod_AnyShift,
     Bind_Select_Down  = Key_DOWN  | InputMod_AnyShift,
+
+    Bind_Save_Buffer = Key_S | InputMod_AnyCtrl,
 };
