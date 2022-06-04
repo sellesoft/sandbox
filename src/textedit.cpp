@@ -108,7 +108,7 @@ void init_editor(){
     config.font           = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
     config.font_height    = 11; 
 
-    load_file(STR8("C:/src/sandbox/src/test.txt"));
+    load_file(STR8("src/test.txt"));
 }
 
 void update_editor(){
