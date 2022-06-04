@@ -393,14 +393,6 @@ void update_editor(){
 	if(key_pressed(Bind_CursorLeft))           { move_cursor_left(&main_cursor); reset_stopwatch(&repeat_hold); }
 	if(key_down(Bind_CursorLeft) && can_repeat){ move_cursor_left(&main_cursor); reset_stopwatch(&repeat_throttle); }
 
-	persist Stopwatch remove_repeat = start_stopwatch();
-	persist Stopwatch remove_throttle = start_stopwatch();
-	if(key_pressed(Bind_DeleteLeft)){ backspace_text(); reset_stopwatch(&remove_repeat); }
-	if(key_pressed(Bind_DeleteRight)){ delete_text(); reset_stopwatch(&remove_repeat); }
-	b32 repeat = peek_stopwatch(remove_repeat) > 500 && peek_stopwatch(remove_throttle) > 50;
-	if(key_down(Bind_DeleteLeft) && repeat){ backspace_text(); reset_stopwatch(&remove_throttle); }
-	if(key_down(Bind_DeleteRight) && repeat){ delete_text(); reset_stopwatch(&remove_throttle); }
-	
 	//// cursor movement ////
 	if(key_pressed(Bind_CursorWordLeft)){
 		b32 skip_alnum = -1;
