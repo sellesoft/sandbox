@@ -2,8 +2,8 @@
 Notes
 -----
 cursor is drawn to the left of the index it represents
-
 TextChunks will never stretch across lines
+cursor favors being at the end of a chunk than at the beginning (never before first character except in the first chunk)
 
 */
 
@@ -28,13 +28,15 @@ vec2 CalcTextSize(str8 text){DPZoneScoped;
 		case FontType_BDF: case FontType_NONE:{
 			u32 codepoint;
 			while(text && (codepoint = str8_advance(&text).codepoint)){
-				if      (codepoint == U'\n'){
+				if      (codepoint == U'\r'){
+					continue;
+				}else if(codepoint == U'\n'){
 					result.y += config.font_height;
 					line_width = 0;
 				}else if(codepoint == U'\t'){
-					line_width += config.tab_width * (config.font->max_width * config.font_height / config.font->aspect_ratio / config.font->max_width);
+					line_width += config.tab_width * (config.font->max_width * config.font_height / config.font->max_height);
 				}else{
-					line_width += config.font->max_width * config.font_height / config.font->aspect_ratio / config.font->max_width;
+					line_width += config.font->max_width * config.font_height / config.font->max_height;
 				}
 				if(line_width > result.x) result.x = line_width;
 			}
@@ -42,13 +44,15 @@ vec2 CalcTextSize(str8 text){DPZoneScoped;
 		case FontType_TTF:{
 			u32 codepoint;
 			while(text && (codepoint = str8_advance(&text).codepoint)){
-				if      (codepoint == U'\n'){
+				if      (codepoint == U'\r'){
+					continue;
+				}else if(codepoint == U'\n'){
 					result.y += config.font_height;
 					line_width = 0;
 				}else if(codepoint == U'\t'){
-					line_width += config.tab_width * (font_packed_char(config.font, U' ')->xadvance * config.font_height / config.font->aspect_ratio / config.font->max_width);
+					line_width += config.tab_width * (font_packed_char(config.font, U' ')->xadvance * config.font_height / config.font->max_height);
 				}else{
-					line_width += font_packed_char(config.font, codepoint)->xadvance * config.font_height / config.font->aspect_ratio / config.font->max_width;
+					line_width += font_packed_char(config.font, codepoint)->xadvance * config.font_height / config.font->max_height;
 				}
 				if(line_width > result.x) result.x = line_width;
 			}
@@ -242,7 +246,7 @@ void update_editor(){
     render_quad2(config.buffer_padding, DeshWindow->dimensions-config.buffer_padding*2, color(200,200,200));
 	
     //text
-    vec2i visual_cursor = config.buffer_margin + config.buffer_padding;
+    vec2  visual_cursor = config.buffer_margin + config.buffer_padding;
     vec2i file_pos = vec2::ZERO; //line/column TODO(sushi) decide if this is necessary
     vec2  text_space = DeshWindow->dimensions - (config.buffer_margin + config.buffer_padding) * 2;
     vec2  text_scale = vec2::ONE * config.font_height / (f32)config.font->max_height;
@@ -250,7 +254,7 @@ void update_editor(){
     render_start_cmd2(0, config.font->tex, config.buffer_padding, text_space);
 	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
         TextChunk* chunk = TextChunkFromNode(it);
-		vec2i chunk_pos = visual_cursor;
+		vec2 chunk_pos = visual_cursor;
 		vec2 size = CalcTextSize(chunk->raw); //maybe this can be cached?
 		
         //dont render anything if it goes beyond buffer width
@@ -264,7 +268,6 @@ void update_editor(){
             render_quad_filled2(visual_cursor, size, chunk->bg);
 			
 			//draw chunk text
-            //render_text2(config.font, chunk->raw, visual_cursor, text_scale, chunk->fg);
 			str8 text = chunk->raw;
 			Vertex2         vp[4];
 			RenderTwodIndex ip[6];
@@ -291,10 +294,10 @@ void update_editor(){
 							f32 topoff = (dy * (f32)(decoded.codepoint - 32)) + config.font->uv_yoffset;
 							f32 botoff = topoff + dy;
 							ip[0] = 0; ip[1] = 1; ip[2] = 2; ip[3] = 0; ip[4] = 2; ip[5] = 3;
-							vp[0].pos = { (f32)visual_cursor.x + 0,(f32)visual_cursor.y + 0 }; vp[0].uv = { 0,topoff }; vp[0].color = chunk->fg.rgba; //top left
-							vp[1].pos = { (f32)visual_cursor.x + w,(f32)visual_cursor.y + 0 }; vp[1].uv = { 1,topoff }; vp[1].color = chunk->fg.rgba; //top right
-							vp[2].pos = { (f32)visual_cursor.x + w,(f32)visual_cursor.y + h }; vp[2].uv = { 1,botoff }; vp[2].color = chunk->fg.rgba; //bot right
-							vp[3].pos = { (f32)visual_cursor.x + 0,(f32)visual_cursor.y + h }; vp[3].uv = { 0,botoff }; vp[3].color = chunk->fg.rgba; //bot left
+							vp[0].pos = { visual_cursor.x + 0,visual_cursor.y + 0 }; vp[0].uv = { 0,topoff }; vp[0].color = chunk->fg.rgba; //top left
+							vp[1].pos = { visual_cursor.x + w,visual_cursor.y + 0 }; vp[1].uv = { 1,topoff }; vp[1].color = chunk->fg.rgba; //top right
+							vp[2].pos = { visual_cursor.x + w,visual_cursor.y + h }; vp[2].uv = { 1,botoff }; vp[2].color = chunk->fg.rgba; //bot right
+							vp[3].pos = { visual_cursor.x + 0,visual_cursor.y + h }; vp[3].uv = { 0,botoff }; vp[3].color = chunk->fg.rgba; //bot left
 							render_add_vertices2(render_active_layer(), vp, 4, ip, 6);
 							visual_cursor.x += w;
 							
@@ -313,8 +316,8 @@ void update_editor(){
 						//handle special characters
 						if(decoded.codepoint == U'\t'){
 							packed_char* pc = font_packed_char(config.font, U' ');
-							f32 w = (pc->xoff2 - pc->xoff) * text_scale.x;
-							f32 h = (pc->yoff2 - pc->yoff) * text_scale.y;
+							f32 w = pc->xadvance * text_scale.x;
+							f32 h = config.font_height;
 							
 							if(config.show_symbol_whitespace){
 								render_quad_filled2({visual_cursor.x + w/2.f - 1, visual_cursor.y + h/2.f - 1},
@@ -323,9 +326,7 @@ void update_editor(){
 							
 							visual_cursor.x += w * config.tab_width;
 						}else{
-							vec2 temp(visual_cursor);
-							aligned_quad q = font_aligned_quad(config.font, decoded.codepoint, &temp, text_scale);
-							visual_cursor = {(s32)temp.x, (s32)temp.y};
+							aligned_quad q = font_aligned_quad(config.font, decoded.codepoint, &visual_cursor, text_scale);
 							ip[0] = 0; ip[1] = 1; ip[2] = 2; ip[3] = 0; ip[4] = 2; ip[5] = 3;
 							vp[0].pos = { q.x0,q.y0 }; vp[0].uv = { q.u0,q.v0 }; vp[0].color = chunk->fg.rgba; //top left
 							vp[1].pos = { q.x1,q.y0 }; vp[1].uv = { q.u1,q.v0 }; vp[1].color = chunk->fg.rgba; //top right
@@ -344,7 +345,7 @@ void update_editor(){
 			
 #if 1 //DEBUG
             //render chunk outline
-            render_quad2(visual_cursor, size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
+            render_quad2(chunk_pos, size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
 #endif
 			
 			if(chunk->newline){
