@@ -17,12 +17,16 @@ struct Config{
 	b32   cursor_pulse; //whether the cursor transitions from transparent to visible
 	f32   cursor_pulse_duration; //full cycle time from visible to transparent to visisble in ms
 	Type  cursor_shape;
-
+	
     color buffer_color;
 	color text_color;
     vec2  buffer_margin;
     vec2  buffer_padding;
+	
     b32   word_wrap;
+	
+	u32   tab_width;
+	
     u32   font_height; //visual height of font when rendered
     Font* font;
 };
@@ -55,9 +59,9 @@ typedef KeyCode Bind; enum{
     
 	Bind_Cursor_Up    = Key_UP    | InputMod_None,
     Bind_Cursor_Down  = Key_DOWN  | InputMod_None,
-
+	
     Bind_Cursor_Anchor = Key_SPACE | InputMod_AnyCtrl,
-
+	
     Bind_Select_Left  = Key_LEFT  | InputMod_AnyShift,
     Bind_Select_Right = Key_RIGHT | InputMod_AnyShift,
     Bind_Select_Up    = Key_UP    | InputMod_AnyShift,

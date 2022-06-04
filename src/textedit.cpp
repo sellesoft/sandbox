@@ -27,22 +27,28 @@ vec2 CalcTextSize(str8 text){DPZoneScoped;
 		case FontType_BDF: case FontType_NONE:{
 			u32 codepoint;
 			while(text && (codepoint = str8_advance(&text).codepoint)){
-				if(codepoint == '\n'){
+				if      (codepoint == U'\n'){
 					result.y += config.font_height;
 					line_width = 0;
+				}else if(codepoint == U'\t'){
+					line_width += config.tab_width * (config.font->max_width * config.font_height / config.font->aspect_ratio / config.font->max_width);
+				}else{
+					line_width += config.font->max_width * config.font_height / config.font->aspect_ratio / config.font->max_width;
 				}
-				line_width += config.font->max_width * config.font_height / config.font->aspect_ratio / config.font->max_width;
 				if(line_width > result.x) result.x = line_width;
 			}
 		}break;
 		case FontType_TTF:{
 			u32 codepoint;
 			while(text && (codepoint = str8_advance(&text).codepoint)){
-				if(codepoint == '\n'){
+				if      (codepoint == U'\n'){
 					result.y += config.font_height;
 					line_width = 0;
+				}else if(codepoint == U'\t'){
+					line_width += config.tab_width * (font_packed_char(config.font, U' ')->xadvance * config.font_height / config.font->aspect_ratio / config.font->max_width);
+				}else{
+					line_width += font_packed_char(config.font, codepoint)->xadvance * config.font_height / config.font->aspect_ratio / config.font->max_width;
 				}
-				line_width += font_packed_char(config.font, codepoint)->xadvance * config.font_height / config.font->aspect_ratio / config.font->max_width;
 				if(line_width > result.x) result.x = line_width;
 			}
 		}break;
@@ -105,11 +111,13 @@ void init_editor(){
 	config.text_color     = color(128,128,128,255);
     config.buffer_margin  = vec2{10.f,10.f};
     config.buffer_padding = vec2{10.f,10.f};
-	config.word_wrap      = 0;
+	config.word_wrap      = false;
+	config.tab_width      = 4;
     config.font           = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
     config.font_height    = 11; 
 	
-    load_file(STR8("src/test.txt"));
+    //load_file(STR8(__FILE__));
+	load_file(STR8("src/test.txt"));
 }
 
 void update_editor(){
@@ -241,8 +249,65 @@ void update_editor(){
         //TODO(sushi) word wrapping
         if(config.word_wrap) NotImplemented;
         else{
+			//draw chunk bg
             render_quad_filled2(visual_cursor, size, chunk->bg);
-            render_text2(config.font, chunk->raw, visual_cursor, text_scale, chunk->fg);
+			
+			//draw chunk text
+            //render_text2(config.font, chunk->raw, visual_cursor, text_scale, chunk->fg);
+			str8 text = chunk->raw;
+			vec2 pos  = visual_cursor;
+			Vertex2         vp[4];
+			RenderTwodIndex ip[6];
+			switch(config.font->type){
+				//// BDF (and NULL) font rendering ////
+				case FontType_BDF: case FontType_NONE:{
+					f32 w  = config.font->max_width  * text_scale.x;
+					f32 h  = config.font->max_height * text_scale.y;
+					f32 dy = 1.f / (f32)config.font->count;
+					
+					while(text){
+						DecodedCodepoint decoded = str8_advance(&text);
+						if(decoded.codepoint == 0) break;
+						
+						//handle special characters
+						if(decoded.codepoint == U'\t'){
+							pos.x += w * config.tab_width;
+						}else{
+							f32 topoff = (dy * (f32)(decoded.codepoint - 32)) + config.font->uv_yoffset;
+							f32 botoff = topoff + dy;
+							ip[0] = 0; ip[1] = 1; ip[2] = 2; ip[3] = 0; ip[4] = 2; ip[5] = 3;
+							vp[0].pos = { pos.x + 0,pos.y + 0 }; vp[0].uv = { 0,topoff }; vp[0].color = chunk->fg.rgba; //top left
+							vp[1].pos = { pos.x + w,pos.y + 0 }; vp[1].uv = { 1,topoff }; vp[1].color = chunk->fg.rgba; //top right
+							vp[2].pos = { pos.x + w,pos.y + h }; vp[2].uv = { 1,botoff }; vp[2].color = chunk->fg.rgba; //bot right
+							vp[3].pos = { pos.x + 0,pos.y + h }; vp[3].uv = { 0,botoff }; vp[3].color = chunk->fg.rgba; //bot left
+							render_add_vertices2(render_active_layer(), vp, 4, ip, 6);
+							pos.x += w;
+						}
+					}
+				}break;
+				//// TTF font rendering ////
+				case FontType_TTF:{
+					while(text){
+						DecodedCodepoint decoded = str8_advance(&text);
+						if(decoded.codepoint == 0) break;
+						
+						//handle special characters
+						if(decoded.codepoint == U'\t'){
+							packed_char* pc = font_packed_char(config.font, U' ');
+							pos.x += config.tab_width * ((pc->xoff2 - pc->xoff) * text_scale.x);
+						}else{
+							aligned_quad q = font_aligned_quad(config.font, decoded.codepoint, &pos, text_scale);
+							ip[0] = 0; ip[1] = 1; ip[2] = 2; ip[3] = 0; ip[4] = 2; ip[5] = 3;
+							vp[0].pos = { q.x0,q.y0 }; vp[0].uv = { q.u0,q.v0 }; vp[0].color = chunk->fg.rgba; //top left
+							vp[1].pos = { q.x1,q.y0 }; vp[1].uv = { q.u1,q.v0 }; vp[1].color = chunk->fg.rgba; //top right
+							vp[2].pos = { q.x1,q.y1 }; vp[2].uv = { q.u1,q.v1 }; vp[2].color = chunk->fg.rgba; //bot right
+							vp[3].pos = { q.x0,q.y1 }; vp[3].uv = { q.u0,q.v1 }; vp[3].color = chunk->fg.rgba; //bot left
+							render_add_vertices2(render_active_layer(), vp, 4, ip, 6);
+						}
+					}break;
+					default: Assert(!"unhandled font type"); break;
+				}
+			}
             
 			//draw cursor
 			if(main_cursor.chunk == chunk){
