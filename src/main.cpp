@@ -34,6 +34,7 @@
 
 //// nasau includes ////
 #include "hardware.h"
+#include "assembler.cpp"
 //#include "machine.cpp"
 #define nbits(n) ((u64(1) << u64(n)) - u64(1)) 
 #define MchnInst(ptr, bits) *ptr=bits;ptr+=1
@@ -288,6 +289,7 @@ int main(){
 	while(!DeshWindow->ShouldClose()){DPZoneScoped;
 		DeshWindow->Update();
 		{//update debug
+#if 0 //temp disable because of ui's changes to unicode
 			using namespace UI;
 			SetNextWindowPos(0,0);
 			SetNextWindowSize(DeshWinSize);
@@ -447,6 +449,7 @@ int main(){
                     EndRow();
                 }EndChild();
 			}End();
+#endif
 		}
 		UI::ShowMetricsWindow();
 		UI::Update();

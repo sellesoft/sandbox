@@ -24,7 +24,6 @@
 .vs/
 .vscode/
 build/
-latest/
 docs/doxygen/
 
 #data ignores
