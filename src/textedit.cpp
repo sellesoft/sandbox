@@ -117,7 +117,7 @@ void init_editor(){
 	config.show_symbol_whitespace = true;
 	config.show_symbol_eol        = true;
 	config.show_symbol_wordwrap   = true;
-    config.font           = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
+    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
     config.font_height    = 11; 
 	
     //load_file(STR8(__FILE__));
@@ -281,6 +281,11 @@ void update_editor(){
 						
 						//handle special characters
 						if(decoded.codepoint == U'\t'){
+							if(config.show_symbol_whitespace){
+								render_quad_filled2({visual_cursor.x + w/2.f - 1, visual_cursor.y + h/2.f - 1},
+													vec2{(w * (config.tab_width-1)),2}, config.text_color/2.f);
+							}
+							
 							visual_cursor.x += w * config.tab_width;
 						}else{
 							f32 topoff = (dy * (f32)(decoded.codepoint - 32)) + config.font->uv_yoffset;
@@ -292,6 +297,10 @@ void update_editor(){
 							vp[3].pos = { (f32)visual_cursor.x + 0,(f32)visual_cursor.y + h }; vp[3].uv = { 0,botoff }; vp[3].color = chunk->fg.rgba; //bot left
 							render_add_vertices2(render_active_layer(), vp, 4, ip, 6);
 							visual_cursor.x += w;
+							
+							if(config.show_symbol_whitespace && decoded.codepoint == U' '){
+								render_quad_filled2({visual_cursor.x - w/2.f - 1, visual_cursor.y + h/2.f - 1}, vec2{2,2}, config.text_color/2.f);
+							}
 						}
 					}
 				}break;
@@ -304,7 +313,15 @@ void update_editor(){
 						//handle special characters
 						if(decoded.codepoint == U'\t'){
 							packed_char* pc = font_packed_char(config.font, U' ');
-							visual_cursor.x += config.tab_width * ((pc->xoff2 - pc->xoff) * text_scale.x);
+							f32 w = (pc->xoff2 - pc->xoff) * text_scale.x;
+							f32 h = (pc->yoff2 - pc->yoff) * text_scale.y;
+							
+							if(config.show_symbol_whitespace){
+								render_quad_filled2({visual_cursor.x + w/2.f - 1, visual_cursor.y + h/2.f - 1},
+													vec2{(w * (config.tab_width-1)),2}, config.text_color/2.f);
+							}
+							
+							visual_cursor.x += w * config.tab_width;
 						}else{
 							vec2 temp(visual_cursor);
 							aligned_quad q = font_aligned_quad(config.font, decoded.codepoint, &temp, text_scale);
@@ -315,6 +332,10 @@ void update_editor(){
 							vp[2].pos = { q.x1,q.y1 }; vp[2].uv = { q.u1,q.v1 }; vp[2].color = chunk->fg.rgba; //bot right
 							vp[3].pos = { q.x0,q.y1 }; vp[3].uv = { q.u0,q.v1 }; vp[3].color = chunk->fg.rgba; //bot left
 							render_add_vertices2(render_active_layer(), vp, 4, ip, 6);
+							
+							if(config.show_symbol_whitespace && decoded.codepoint == U' '){
+								render_quad_filled2({visual_cursor.x - (q.x1 - q.x0)/2.f - 1, visual_cursor.y + (q.y1 - q.y0)/2.f - 1}, vec2{2,2}, config.text_color/2.f);
+							}
 						}
 					}break;
 					default: Assert(!"unhandled font type"); break;
