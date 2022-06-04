@@ -11,6 +11,7 @@ Buffer memory is NOT contiguous and is stitched together when we save the file
 
 Arena* static_arena;
 array<Arena*> edit_arenas;
+TextChunk* current_edit_chunk = 0;
 
 Node root_chunk;
 
@@ -123,7 +124,7 @@ void init_editor(){
 	config.show_symbol_whitespace = true;
 	config.show_symbol_eol        = true;
 	config.show_symbol_wordwrap   = true;
-    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.ttf"), 11).second;
+    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
     config.font_height    = 11; 
 	
     //load_file(STR8(__FILE__));
@@ -131,7 +132,7 @@ void init_editor(){
 }
 
 
-FORCE_INLINE //returns how many bytes the cursor moved by
+//returns how many bytes the cursor moved by
 u64 move_cursor_left(Cursor* cursor){
 	u64 begin = cursor->start;
 	if(cursor->start > 0){
@@ -147,16 +148,17 @@ u64 move_cursor_left(Cursor* cursor){
 		cursor->count  = 0;
 		return cursor->chunk->raw.count - cursor->start;
 	}
+	return 0;
 }
 
-FORCE_INLINE //returns how many bytes the cursor moved by
+//returns how many bytes the cursor moved by
 u64 move_cursor_right(Cursor* cursor){
 	u64 begin = cursor->start;
 	if(cursor->start < cursor->chunk->raw.count){
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
 		cursor->start += dc.advance;
 		if(   cursor->start >= cursor->chunk->raw.count
-			&& cursor->chunk->node.next != &root_chunk){
+		   && cursor->chunk->node.next != &root_chunk){
 			cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
 			cursor->start = 0;
 		}
@@ -169,68 +171,76 @@ u64 move_cursor_right(Cursor* cursor){
 		cursor->count = 0;
 		return move;
 	}
+	return 0;
+}
+
+void insert_text(str8 text){
+	Arena* edit_arena = *edit_arenas.last;
+	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
+		TextChunk* curchunk = main_cursor.chunk;
+		if(main_cursor.start == 0){
+			Log("chnksplt", "   Splitting at beginning of old chunk");
+			TextChunk* next = new_chunk();
+			memcpy(next, curchunk, sizeof(TextChunk));
+			NodeInsertNext(&curchunk->node,&next->node);
+			
+			curchunk->newline = 0;
+		}
+		else if (main_cursor.start == main_cursor.chunk->raw.count){
+			TextChunk* prev = new_chunk();
+			memcpy(prev, curchunk, sizeof(TextChunk));
+			prev->newline = false;
+			NodeInsertPrev(&curchunk->node, &prev->node);
+		}
+		else { //split chunk if cursor is in the middle of it 
+			TextChunk* prev = new_chunk();
+			prev->raw = {curchunk->raw.str, (s64)main_cursor.start};
+			prev->bg = curchunk->bg;
+			prev->fg = curchunk->fg;
+			prev->offset = curchunk->offset;
+			prev->newline = 0;
+			TextChunk* next = new_chunk();
+			next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
+			next->bg = curchunk->bg;
+			next->fg = curchunk->fg;
+			next->offset = curchunk->offset + main_cursor.start;
+			next->newline = curchunk->newline;
+			
+			NodeInsertPrev(&curchunk->node, &prev->node);
+			NodeInsertNext(&curchunk->node, &next->node);
+			
+			curchunk->newline = 0;
+		}
+		current_edit_chunk = curchunk;
+		curchunk->raw = {edit_arena->cursor, 0};
+		main_cursor.start = 0;
+	}
+	if(edit_arena->used + text.count > edit_arena->size){
+		edit_arenas.add(memory_create_arena(Kilobytes(1)));
+		edit_arena = *edit_arenas.last;
+	}
+	memcpy(edit_arena->cursor, text.str, text.count);
+	main_cursor.start  += text.count;
+	edit_arena->cursor += text.count;
+	edit_arena->used   += text.count;
+	main_cursor.chunk->raw.count += text.count;
 }
 
 void update_editor(){
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
 	//// text input ////
-	persist TextChunk* current_edit_chunk = 0;
-    Arena* edit_arena = *edit_arenas.last;
 	if(DeshInput->charCount){ //TODO(sushi) replace selection
 		//TODO(delle) handle multiple cursor input  
-        if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
-            TextChunk* curchunk = main_cursor.chunk;
-            if(main_cursor.start == 0){
-                Log("chnksplt", "   Splitting at beginning of old chunk");
-                TextChunk* next = new_chunk();
-                memcpy(next, curchunk, sizeof(TextChunk));
-                NodeInsertNext(&curchunk->node,&next->node);
-				
-                curchunk->newline = 0;
-            }
-            else if (main_cursor.start == main_cursor.chunk->raw.count){
-                TextChunk* prev = new_chunk();
-                memcpy(prev, curchunk, sizeof(TextChunk));
-                prev->newline = false;
-                NodeInsertPrev(&curchunk->node, &prev->node);
-            }
-            else { //split chunk if cursor is in the middle of it 
-                TextChunk* prev = new_chunk();
-                prev->raw = {curchunk->raw.str, (s64)main_cursor.start};
-                prev->bg = curchunk->bg;
-                prev->fg = curchunk->fg;
-                prev->offset = curchunk->offset;
-                prev->newline = 0;
-                TextChunk* next = new_chunk();
-                next->raw = {curchunk->raw.str + main_cursor.start, curchunk->raw.count - (s64)main_cursor.start};
-                next->bg = curchunk->bg;
-                next->fg = curchunk->fg;
-                next->offset = curchunk->offset + main_cursor.start;
-                next->newline = curchunk->newline;
-				
-                NodeInsertPrev(&curchunk->node, &prev->node);
-                NodeInsertNext(&curchunk->node, &next->node);
-                
-                curchunk->newline = 0;
-            }
-            current_edit_chunk = curchunk;
-            curchunk->raw = {edit_arena->cursor, 0};
-            main_cursor.start = 0;
-        }
-		if(edit_arena->used + DeshInput->charCount > edit_arena->size){
-			edit_arenas.add(memory_create_arena(Kilobytes(1)));
-			edit_arena = *edit_arenas.last;
-		}
-        memcpy(edit_arena->cursor, DeshInput->charIn, DeshInput->charCount);
-        main_cursor.start += DeshInput->charCount;
-        edit_arena->cursor += DeshInput->charCount;
-		edit_arena->used += DeshInput->charCount;
-        main_cursor.chunk->raw.count += DeshInput->charCount;
+        insert_text({DeshInput->charIn, (s64)DeshInput->charCount});
+	}
+	if(key_pressed(Key_TAB | InputMod_None)){
+		insert_text(str8l("\t"));
 	}
 	
 	//// text deletion ////
-	if(key_pressed(Key_BACKSPACE)){//TODO(sushi) selection backspace
+	if(key_pressed(Key_BACKSPACE | InputMod_None)){//TODO(sushi) selection backspace
+		Arena* edit_arena = *edit_arenas.last;
 		TextChunk* curchunk = main_cursor.chunk;
 		if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
 			if(main_cursor.start == 0){ //special case where cursor is at the beginning of a chunk
@@ -262,7 +272,7 @@ void update_editor(){
 				next->newline = curchunk->newline;
 				
 				curchunk->raw.count = main_cursor.start;
-
+				
 				NodeInsertNext(&curchunk->node, &next->node);
 				
 				if(edit_arena->used + DeshInput->charCount > edit_arena->size){
