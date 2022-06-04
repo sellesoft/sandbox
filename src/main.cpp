@@ -34,13 +34,17 @@
 #include "misc_testing.cpp"
 #endif
 
+//// text editor includes ////
+#include "types.h"
+#include "textedit.cpp"
+
 int main(){
 	//init deshi
 	Stopwatch deshi_watch = start_stopwatch();
 	memory_init(Gigabytes(1), Gigabytes(1));
 	platform_init();
 	logger_init();
-	window_create(str8l("suugu"));
+	window_create(str8l("textedit"));
 	console_init();
 	render_init();
 	Storage::Init();
@@ -50,9 +54,12 @@ int main(){
 	render_use_default_camera();
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
+
+	init_editor();
 	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
+		update_editor();
 		console_update();
 		UI::Update();
 		render_update();
