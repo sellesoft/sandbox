@@ -121,7 +121,7 @@ void init_editor(){
 	config.show_symbol_whitespace = true;
 	config.show_symbol_eol        = true;
 	config.show_symbol_wordwrap   = true;
-    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
+    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.ttf"), 11).second;
     config.font_height    = 11; 
 	
     //load_file(STR8(__FILE__));
@@ -317,7 +317,7 @@ void update_editor(){
 						if(decoded.codepoint == U'\t'){
 							packed_char* pc = font_packed_char(config.font, U' ');
 							f32 w = pc->xadvance * text_scale.x;
-							f32 h = config.font_height;
+							f32 h = config.font_height * text_scale.y;
 							
 							if(config.show_symbol_whitespace){
 								render_quad_filled2({visual_cursor.x + w/2.f - 1, visual_cursor.y + h/2.f - 1},
@@ -335,7 +335,10 @@ void update_editor(){
 							render_add_vertices2(render_active_layer(), vp, 4, ip, 6);
 							
 							if(config.show_symbol_whitespace && decoded.codepoint == U' '){
-								render_quad_filled2({visual_cursor.x - (q.x1 - q.x0)/2.f - 1, visual_cursor.y + (q.y1 - q.y0)/2.f - 1}, vec2{2,2}, config.text_color/2.f);
+								packed_char* pc = font_packed_char(config.font, U' ');
+								f32 w = pc->xadvance * text_scale.x;
+								f32 h = config.font_height * text_scale.y;
+								render_quad_filled2({visual_cursor.x - w/2.f - 1, visual_cursor.y + h/2.f - 1}, vec2{2,2}, config.text_color/2.f);
 							}
 						}
 					}break;
