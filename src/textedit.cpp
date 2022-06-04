@@ -112,8 +112,11 @@ void init_editor(){
 	config.text_color     = color(192,192,192,255);
     config.buffer_margin  = vec2{10.f,10.f};
     config.buffer_padding = vec2{10.f,10.f};
-	config.word_wrap      = false;
 	config.tab_width      = 4;
+	config.word_wrap      = false;
+	config.show_symbol_whitespace = true;
+	config.show_symbol_eol        = true;
+	config.show_symbol_wordwrap   = true;
     config.font           = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
     config.font_height    = 11; 
 	
@@ -135,7 +138,7 @@ void update_editor(){
                 TextChunk* next = new_chunk();
                 memcpy(next, curchunk, sizeof(TextChunk));
                 NodeInsertNext(&curchunk->node,&next->node);
-
+				
                 curchunk->newline = 0;
             }
             else if (main_cursor.start == main_cursor.chunk->raw.count){
@@ -188,9 +191,7 @@ void update_editor(){
 		}else if(main_cursor.chunk->node.prev != &root_chunk){
 			main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
 			main_cursor.start = main_cursor.chunk->raw.count;
-			while(utf8_continuation_byte(*(main_cursor.chunk->raw.str + main_cursor.start - 1))) main_cursor.start -= 1;
-			main_cursor.start -= 1;
-			main_cursor.count  = 0;
+			main_cursor.count = 0;
 		}
 	}
 	if(key_pressed(Bind_Cursor_WordLeft)){
@@ -206,7 +207,7 @@ void update_editor(){
 		if(main_cursor.start < main_cursor.chunk->raw.count){
 			DecodedCodepoint dc = decoded_codepoint_from_utf8(main_cursor.chunk->raw.str+main_cursor.start, 4);
 			main_cursor.start += dc.advance;
-			if(   main_cursor.start >= main_cursor.chunk->raw.count
+			if(   main_cursor.start > main_cursor.chunk->raw.count
 			   && main_cursor.chunk->node.next != &root_chunk){
 				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.next);
 				main_cursor.start = 0;
@@ -250,6 +251,7 @@ void update_editor(){
     render_start_cmd2(0, config.font->tex, config.buffer_padding, text_space);
 	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
         TextChunk* chunk = TextChunkFromNode(it);
+		vec2i chunk_pos = visual_cursor;
 		vec2 size = CalcTextSize(chunk->raw); //maybe this can be cached?
 		
         //dont render anything if it goes beyond buffer width
@@ -265,7 +267,6 @@ void update_editor(){
 			//draw chunk text
             //render_text2(config.font, chunk->raw, visual_cursor, text_scale, chunk->fg);
 			str8 text = chunk->raw;
-			vec2 pos  = visual_cursor;
 			Vertex2         vp[4];
 			RenderTwodIndex ip[6];
 			switch(config.font->type){
@@ -281,17 +282,17 @@ void update_editor(){
 						
 						//handle special characters
 						if(decoded.codepoint == U'\t'){
-							pos.x += w * config.tab_width;
+							visual_cursor.x += w * config.tab_width;
 						}else{
 							f32 topoff = (dy * (f32)(decoded.codepoint - 32)) + config.font->uv_yoffset;
 							f32 botoff = topoff + dy;
 							ip[0] = 0; ip[1] = 1; ip[2] = 2; ip[3] = 0; ip[4] = 2; ip[5] = 3;
-							vp[0].pos = { pos.x + 0,pos.y + 0 }; vp[0].uv = { 0,topoff }; vp[0].color = chunk->fg.rgba; //top left
-							vp[1].pos = { pos.x + w,pos.y + 0 }; vp[1].uv = { 1,topoff }; vp[1].color = chunk->fg.rgba; //top right
-							vp[2].pos = { pos.x + w,pos.y + h }; vp[2].uv = { 1,botoff }; vp[2].color = chunk->fg.rgba; //bot right
-							vp[3].pos = { pos.x + 0,pos.y + h }; vp[3].uv = { 0,botoff }; vp[3].color = chunk->fg.rgba; //bot left
+							vp[0].pos = { (f32)visual_cursor.x + 0,(f32)visual_cursor.y + 0 }; vp[0].uv = { 0,topoff }; vp[0].color = chunk->fg.rgba; //top left
+							vp[1].pos = { (f32)visual_cursor.x + w,(f32)visual_cursor.y + 0 }; vp[1].uv = { 1,topoff }; vp[1].color = chunk->fg.rgba; //top right
+							vp[2].pos = { (f32)visual_cursor.x + w,(f32)visual_cursor.y + h }; vp[2].uv = { 1,botoff }; vp[2].color = chunk->fg.rgba; //bot right
+							vp[3].pos = { (f32)visual_cursor.x + 0,(f32)visual_cursor.y + h }; vp[3].uv = { 0,botoff }; vp[3].color = chunk->fg.rgba; //bot left
 							render_add_vertices2(render_active_layer(), vp, 4, ip, 6);
-							pos.x += w;
+							visual_cursor.x += w;
 						}
 					}
 				}break;
@@ -304,9 +305,11 @@ void update_editor(){
 						//handle special characters
 						if(decoded.codepoint == U'\t'){
 							packed_char* pc = font_packed_char(config.font, U' ');
-							pos.x += config.tab_width * ((pc->xoff2 - pc->xoff) * text_scale.x);
+							visual_cursor.x += config.tab_width * ((pc->xoff2 - pc->xoff) * text_scale.x);
 						}else{
-							aligned_quad q = font_aligned_quad(config.font, decoded.codepoint, &pos, text_scale);
+							vec2 temp(visual_cursor);
+							aligned_quad q = font_aligned_quad(config.font, decoded.codepoint, &temp, text_scale);
+							visual_cursor = {(s32)temp.x, (s32)temp.y};
 							ip[0] = 0; ip[1] = 1; ip[2] = 2; ip[3] = 0; ip[4] = 2; ip[5] = 3;
 							vp[0].pos = { q.x0,q.y0 }; vp[0].uv = { q.u0,q.v0 }; vp[0].color = chunk->fg.rgba; //top left
 							vp[1].pos = { q.x1,q.y0 }; vp[1].uv = { q.u1,q.v0 }; vp[1].color = chunk->fg.rgba; //top right
@@ -318,32 +321,39 @@ void update_editor(){
 					default: Assert(!"unhandled font type"); break;
 				}
 			}
-            
-			//draw cursor
-			if(main_cursor.chunk == chunk){
-				f32 x_offset = CalcTextSize({chunk->raw.str, (s64)main_cursor.start}).x;
-				vec2 cursor_top_left  = vec2(visual_cursor.x+x_offset, visual_cursor.y);
-				vec2 cursor_bot_right = vec2(cursor_top_left.x, cursor_top_left.y+config.font_height);
-				render_line2(cursor_top_left, cursor_bot_right, config.cursor_color);
-			}
-
+			
 #if 0 //DEBUG
             //render chunk outline
             render_quad2(visual_cursor, size, Color_Red);
-
 #endif
 			
 			if(chunk->newline){
+				if(config.show_symbol_eol){
+					if(*(chunk->raw.str + chunk->raw.count) == '\r'){
+						vec2 slashr_size = CalcTextSize(str8l("\\r"));
+						render_quad_filled2(visual_cursor, slashr_size, config.text_color);
+						render_text2(config.font, str8l("\\r"), visual_cursor, text_scale, config.buffer_color);
+						visual_cursor.x += slashr_size.x;
+					}
+					vec2 slashn_size = CalcTextSize(str8l("\\n"));
+					render_quad_filled2(visual_cursor, slashn_size, config.text_color);
+					render_text2(config.font, str8l("\\n"), visual_cursor, text_scale, config.buffer_color);
+					visual_cursor.x += slashn_size.x;
+				}
+				
                 visual_cursor.y += size.y;
                 if(visual_cursor.y > text_space.y) break; //we've gone beyond the visual bounds so no need to render anymore
                 visual_cursor.x = config.buffer_margin.x + config.buffer_padding.x;
-                file_pos.x++;
+                file_pos.x += 1;
             }
-            else{
-                visual_cursor.x += size.x;
-            }
-
-
+			
+			//draw cursor
+			if(main_cursor.chunk == chunk){
+				f32 x_offset = CalcTextSize({chunk->raw.str, (s64)main_cursor.start}).x;
+				vec2 cursor_top_left  = vec2(chunk_pos.x+x_offset, chunk_pos.y);
+				vec2 cursor_bot_right = vec2(cursor_top_left.x, cursor_top_left.y+config.font_height);
+				render_line2(cursor_top_left, cursor_bot_right, config.cursor_color);
+			}
         }
     }
 }

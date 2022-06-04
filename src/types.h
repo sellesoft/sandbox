@@ -23,9 +23,11 @@ struct Config{
     vec2  buffer_margin;
     vec2  buffer_padding;
 	
-    b32   word_wrap;
-	
-	u32   tab_width;
+	u32 tab_width;
+    b32 word_wrap;
+	b32 show_symbol_whitespace; //spaces and tabs
+	b32 show_symbol_eol; //carraige return and newline
+	b32 show_symbol_wordwrap; //word wrap symbol
 	
     u32   font_height; //visual height of font when rendered
     Font* font;
