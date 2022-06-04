@@ -321,7 +321,6 @@ void delete_text(){
 			curchunk->raw.str = edit_arena->cursor;
 			edit_arena->cursor += curchunk->raw.count;
 			edit_arena->used += curchunk->raw.count;
-			curchunk->newline = 0;
 		}
 	}
 	str8_advance(&curchunk->raw);
@@ -363,6 +362,10 @@ void save_buffer(){
 	
 	//flush file 
 	file_write(file, stitched->start, stitched->used);
+
+	//replace old static arena with new
+	memory_delete_arena(static_arena);
+	static_arena = stitched;
 }
 
 void update_editor(){
