@@ -60,15 +60,16 @@ TextChunk* new_chunk(){
 void load_file(str8 filepath){
 	file = file_init(filepath, FileAccess_ReadWrite);
 	if(!file){ Assert(false); return; }
-
+	
     static_arena = memory_create_arena(file->bytes+1);
 	str8 buffer = file_read(file, static_arena->start, static_arena->size);
-
+	
 	str8 remaining = buffer;
     while(remaining){
 		str8 line = str8_eat_until(remaining, U'\n');
 		str8_increment(&remaining, line.count+1);
-
+		if(*(line.str+line.count-1) == '\r') line.count -= 1;
+		
 		TextChunk* t = new_chunk();
 		NodeInsertPrev(&root_chunk, &t->node);
 		t->raw     = line;
@@ -80,7 +81,7 @@ void load_file(str8 filepath){
 		static_arena->cursor += line.count;
 		static_arena->used   += line.count;
     }
-
+	
 	main_cursor.chunk = TextChunkFromNode(root_chunk.next);
 	main_cursor.start = 0;
 	main_cursor.count = 0;
@@ -90,12 +91,12 @@ void init_editor(){
 	edit_arenas = array<Arena*>(deshi_allocator);
 	edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	extra_cursors = array<Cursor>(deshi_allocator);
-
+	
 	root_chunk.next = root_chunk.prev = &root_chunk;
 	main_cursor.chunk = 0;
 	main_cursor.start = 0;
 	main_cursor.count = 0;
-
+	
 	config.cursor_color   = Color_White; 
 	config.cursor_pulse   = false;
 	config.cursor_pulse_duration = 1000;
@@ -107,7 +108,7 @@ void init_editor(){
 	config.word_wrap      = 0;
     config.font           = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
     config.font_height    = 11; 
-
+	
     load_file(STR8("src/test.txt"));
 }
 
@@ -144,7 +145,7 @@ void update_editor(){
                 next->fg = curchunk->fg;
                 next->offset = curchunk->offset + main_cursor.start;
                 next->original = 1;
-
+				
                 NodeInsertPrev(&curchunk->node, &prev->node);        
                 NodeInsertNext(&curchunk->node, &next->node);
             }
@@ -176,11 +177,11 @@ void update_editor(){
 	}
 	if(key_pressed(Bind_Cursor_WordLeft)){
 		
-
+		
 		
 	}
 	if(key_pressed(Bind_Cursor_WordPartLeft)){
-
+		
 	}
 	
 	if(key_pressed(Bind_Cursor_Right)){
@@ -200,20 +201,20 @@ void update_editor(){
 		}
 	}
 	if(key_pressed(Bind_Cursor_WordRight)){
-
+		
 	}
 	if(key_pressed(Bind_Cursor_WordPartRight)){
-
+		
 	}
-
+	
 	if(key_pressed(Bind_Cursor_Up)){
 		
 	}
 	if(key_pressed(Bind_Cursor_Down)){
 		
 	}
-
-
+	
+	
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// render
 	render_start_cmd2(0, 0, vec2::ZERO, DeshWindow->dimensions);
@@ -221,7 +222,7 @@ void update_editor(){
     render_quad_filled2(config.buffer_padding, DeshWindow->dimensions-config.buffer_padding*2, config.buffer_color);
     //buffer outline
     render_quad2(config.buffer_padding, DeshWindow->dimensions-config.buffer_padding*2, color(200,200,200));
-
+	
     //text
     vec2i visual_cursor = config.buffer_margin + config.buffer_padding;
     vec2i file_pos = vec2::ZERO; //line/column TODO(sushi) decide if this is necessary
@@ -232,7 +233,7 @@ void update_editor(){
 	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
         TextChunk* chunk = TextChunkFromNode(it);
 		vec2 size = CalcTextSize(chunk->raw); //maybe this can be cached?
-
+		
         //dont render anything if it goes beyond buffer width
         //this should probably not take into account right padding
         //possibly an option
