@@ -629,10 +629,16 @@ void update_editor(){
 			
 			//draw cursor
 			if(main_cursor.chunk == chunk){
+				persist Stopwatch cursor_blink = start_stopwatch();
+				if(DeshInput->anyKeyDown) reset_stopwatch(&cursor_blink);
 				f32 x_offset = CalcTextSize({chunk->raw.str, (s64)main_cursor.start}).x;
 				vec2 cursor_top_left  = vec2(chunk_pos.x+x_offset, chunk_pos.y);
 				vec2 cursor_bot_right = vec2(cursor_top_left.x, cursor_top_left.y+config.font_height);
-				render_line2(cursor_top_left, cursor_bot_right, config.cursor_color);
+				color col = config.cursor_color;
+				f32 mult = M_PI*peek_stopwatch(cursor_blink)/config.cursor_pulse_duration;
+				f32 offset = M_PI / 2.f;
+				col.a = u8(255*(sin(mult + offset + cos(mult + offset))+1)/2);
+				render_line2(cursor_top_left, cursor_bot_right, col);
 			}
         }
     }
