@@ -103,7 +103,7 @@ void init_editor(){
 	config.cursor_pulse_duration = 1000;
 	config.cursor_shape   = CursorShape_VerticalLine;
 	config.buffer_color   = color( 12, 12, 12,255);
-	config.text_color     = color(128,128,128,255);
+	config.text_color     = color(192,192,192,255);
     config.buffer_margin  = vec2{10.f,10.f};
     config.buffer_padding = vec2{10.f,10.f};
 	config.word_wrap      = 0;
@@ -262,8 +262,8 @@ void update_editor(){
 				render_line2(cursor_top_left, cursor_bot_right, config.cursor_color);
 			}
 
-#if 1 //DEBUG
-            //render chunk
+#if 0 //DEBUG
+            //render chunk outline
             render_quad2(visual_cursor, size, Color_Red);
 
 #endif
