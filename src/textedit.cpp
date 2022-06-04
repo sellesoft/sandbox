@@ -123,7 +123,7 @@ void init_editor(){
 	config.show_symbol_whitespace = true;
 	config.show_symbol_eol        = true;
 	config.show_symbol_wordwrap   = true;
-    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.ttf"), 11).second;
+    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
     config.font_height    = 11; 
 	
     //load_file(STR8(__FILE__));
@@ -230,12 +230,23 @@ void update_editor(){
 	}
 	
 	//// text deletion ////
-	if(key_pressed(Key_BACKSPACE)){//TODO(sushi) selection backspace
+	persist Stopwatch backspace_repeat = start_stopwatch();
+	persist Stopwatch backspace_throttle = start_stopwatch();
+	b32 do_backspace = false;
+	if(key_pressed(Key_BACKSPACE)){ do_backspace = true; reset_stopwatch(&backspace_repeat); }
+	if(key_down(Key_BACKSPACE) && 
+		peek_stopwatch(backspace_repeat) > 500 && 
+		peek_stopwatch(backspace_throttle) > 50){
+			do_backspace = true;
+			reset_stopwatch(&backspace_throttle);
+	}
+
+	if(do_backspace){//TODO(sushi) selection backspace
 		TextChunk* curchunk = main_cursor.chunk;
 		if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
 			if(main_cursor.start == 0){ //special case where cursor is at the beginning of a chunk
 				//move cursor into previous chunk and set it to the end so following if can handle it 
-				move_cursor_left(&main_cursor); 
+				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
 				curchunk = main_cursor.chunk;
 				main_cursor.start = curchunk->raw.count;
 				if(curchunk->newline) curchunk->newline = 0;
@@ -277,9 +288,17 @@ void update_editor(){
 			}
 		}
 		u64 bytes_moved = move_cursor_left(&main_cursor);
-		edit_arena->cursor -= bytes_moved;
-		edit_arena->used -= bytes_moved;
+		edit_arena->cursor  -= bytes_moved;
+		edit_arena->used    -= bytes_moved;
 		curchunk->raw.count -= bytes_moved;
+		if(!curchunk->raw.count){
+			//if we completely remove a node we move the cursor into the previous chunk and remove the current chunk node
+			//TODO(sushi) possible optimization is tracking removed nodes and using them before making new ones
+			TextChunk* prev = TextChunkFromNode(main_cursor.chunk->node.prev);
+			main_cursor.chunk = prev;
+			main_cursor.start = prev->raw.count;
+			NodeRemove(&curchunk->node);
+		}
 	}
 	
 	//// cursor movement ////
