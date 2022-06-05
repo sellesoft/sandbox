@@ -37,6 +37,8 @@ struct TextChunk{
 	b32   newline;
 };
 #define TextChunkFromNode(x) CastFromMember(TextChunk, node, x)
+#define NextTextChunk(x) TextChunkFromNode(x->node.next)
+#define PrevTextChunk(x) TextChunkFromNode(x->node.prev)
 
 struct Cursor{
 	TextChunk* chunk;

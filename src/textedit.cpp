@@ -17,6 +17,9 @@ TextChunk* current_edit_chunk = 0;
 
 Node root_chunk;
 
+mutex linelock; //locks following node
+Node root_line_chunks; // maintained indexing of lines
+
 Cursor main_cursor;
 array<Cursor> extra_cursors;
 
@@ -170,9 +173,16 @@ void init_editor(){
 	load_file(STR8("data/cfg/editor.cfg"));
 }
 
+//returns the number of bytes the cursor moved
+// this function should only return 0 in three cases (that i can think of):
+//   1. the cursor moves from one line to another
+//	    since we dont track \n in our buffer, there are no bytes for the cursor to move over
+//   
+//   2. the cursor is at the beginning of the file and tries to move left
+// 
+//   3. the cursor is at the end of the file and tries to move right
 u64 move_cursor(Cursor* cursor, Bind bind){
 	u64 count = 0;
-	
 	switch(bind){
 		
 		case Bind_CursorLeft:{
@@ -293,9 +303,105 @@ u64 move_cursor(Cursor* cursor, Bind bind){
 				}
 			}
 		}break;		
+		//oh my
+		//TODO(sushi) clean this up eventually
+		//TODO(sushi) latch the column the cursor wants to go to so it tries to stay at the same column with consecutive up/down inputs
+		case Bind_CursorUp:{
+			if(cursor->chunk->node.prev == &root_chunk) break;
+			Cursor seek = *cursor;
+			u64 chars_moved = 0;
+			enum{ Finished, MoveLeftToPrevLine, MoveLeftToLineBegin, MoveRightToChar } state = MoveLeftToPrevLine;
+			while(state){
+				switch(state){
+					case MoveLeftToPrevLine:{ // move to the previous line and count how many chars it takes to get there
+						count += move_cursor(&seek, Bind_CursorLeft);
+						if(seek.chunk != cursor->chunk && seek.chunk->newline) state = MoveLeftToLineBegin;
+						else chars_moved++;
+					}break;
+					case MoveLeftToLineBegin:{ // move to the beginning of the prev line so we can advance to column
+						if(seek.chunk->node.prev == &root_chunk || 
+							PrevTextChunk(seek.chunk)->newline){ 
+								state = MoveRightToChar; 
+								seek.start = 0; 
+						} 
+						else seek.chunk = PrevTextChunk(seek.chunk);
+					}break;
+					case MoveRightToChar:{ // advance to column
+						if(chars_moved--){ 
+							u64 moved = move_cursor(&seek, Bind_CursorRight); 
+							if(!moved){ 
+								//if we reach the end of the line early out
+								state = Finished; 
+								seek.chunk = PrevTextChunk(seek.chunk);
+								seek.start = seek.chunk->raw.count;
+							} else count += moved;
+						} else state = Finished; 
+					}break;
+				}
+			}
+			*cursor = seek;
+		}break;
+
+		case Bind_CursorDown:{
+			if(cursor->chunk->node.next == &root_chunk) break;
+			Cursor seek = *cursor;
+			u64 chars_moved = 0;
+			enum{ Finished, MoveLeftToLineBegin, MoveRightToNextLine, MoveRightToChar } state = MoveLeftToLineBegin;
+			while(state){
+				switch(state){
+					case MoveLeftToLineBegin:{ // find what coulmn we're on 
+						u64 moved = move_cursor(&seek, Bind_CursorLeft);
+						if(moved) { 
+							chars_moved++; 
+							count += moved; 
+						}
+						else {
+							state = MoveRightToNextLine; 
+							seek = *cursor; //we set the cursor back here because we know that it's closer than seek 
+						}
+					}break;
+					case MoveRightToNextLine:{ // proceed to next line
+						if(seek.chunk->newline) {state = MoveRightToChar; seek.start = 0;} 
+						seek.chunk = NextTextChunk(seek.chunk);
+					}break;
+					case MoveRightToChar:{
+						if(chars_moved--){ 
+							u64 moved = move_cursor(&seek, Bind_CursorRight); 
+							if(!moved){ 
+								//if we reach the end of the line early out
+								state = Finished; 
+								seek.chunk = PrevTextChunk(seek.chunk);
+								seek.start = seek.chunk->raw.count;
+							} else count += moved;
+						} else state = Finished; 
+					}break;
+				}
+			}
+			*cursor = seek;
+		}break;
 		
 	}
 	return count;
+}
+
+//TODO(sushi) do this (for fun)
+void index_lines(){
+	linelock.lock();
+	Cursor cursor;
+
+	if(!root_line_chunks.next){//initialize
+		TextChunk* init = new_chunk();
+		NodeInsertNext(&root_line_chunks, &init->node);
+	}
+
+	TextChunk* curline = TextChunkFromNode(root_line_chunks.next);
+	TextChunk* line_start = TextChunkFromNode(root_chunk.next);
+	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
+		
+	}
+
+	linelock.unlock();
+	platform_sleep(100);
 }
 
 //TODO(sushi) support newlines
@@ -662,7 +768,7 @@ void update_editor(){
 				}
 			}
 			
-#if 1 //DEBUG
+#if 0 //DEBUG
 			//left vertical line
 			render_line2(chunk_pos + size.yComp(), chunk_pos + (size.yComp()/2.f), (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
 			
