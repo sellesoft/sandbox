@@ -18,7 +18,31 @@ Node root_chunk;
 Cursor main_cursor;
 array<Cursor> extra_cursors;
 
+
 Config config;
+#define CMI(name, type, var) ConfigMapItem{STR8(name), (type), (var)}
+global_ ConfigMapItem ConfigMap[] = {
+	CMI("\n//// Cursor ////\n",       ConfigValueType_PADSECTION, (void*)21),
+	CMI("cursor_color", 		  ConfigValueType_Col,  &config.cursor_color),
+	CMI("cursor_pulse", 		  ConfigValueType_B32,  &config.cursor_pulse),
+	CMI("cursor_pulse_duration",  ConfigValueType_F32,  &config.cursor_pulse_duration),
+	CMI("cursor_shape",           ConfigValueType_Str8, &CursorShapeStrs[config.cursor_shape]), 
+
+	CMI("\n//// Buffer Style ////\n", ConfigValueType_PADSECTION, (void*)22),
+	CMI("buffer_color",           ConfigValueType_Col,  &config.buffer_color),
+	CMI("text_color",             ConfigValueType_Col,  &config.text_color),
+	CMI("buffer_margin",          ConfigValueType_FV2,  &config.buffer_margin),
+	CMI("buffer_padding",         ConfigValueType_FV2,  &config.buffer_padding),
+	CMI("tab_width",              ConfigValueType_U32,  &config.tab_width),
+	CMI("word_wrap",              ConfigValueType_B32,  &config.word_wrap),
+	CMI("show_symbol_whitespace", ConfigValueType_B32,  &config.show_symbol_whitespace),
+	CMI("show_symbol_eol",        ConfigValueType_B32,  &config.show_symbol_eol),
+	CMI("show_symbol_wordwrap",   ConfigValueType_B32,  &config.show_symbol_wordwrap),
+	CMI("font",                   ConfigValueType_Font, &config.font),
+	CMI("font_height",            ConfigValueType_U32,  &config.font_height),
+};
+#undef CMI
+
 
 File* file;
 
@@ -101,7 +125,32 @@ void load_file(str8 filepath){
 	main_cursor.count = 0;
 }
 
+void load_config(){
+	if(!file_exists(STR8("data/cfg/editor.cfg"))){
+		config.cursor_color           = Color_White; 
+		config.cursor_pulse           = false;
+		config.cursor_pulse_duration  = 1000;
+		config.cursor_shape           = CursorShape_VerticalLine;
+		config.buffer_color           = color( 12, 12, 12,255);
+		config.text_color             = color(192,192,192,255);
+		config.buffer_margin          = vec2{10.f,10.f};
+		config.buffer_padding         = vec2{10.f,10.f};
+		config.tab_width              = 4;
+		config.word_wrap              = false;
+		config.show_symbol_whitespace = true;
+		config.show_symbol_eol        = true;
+		config.show_symbol_wordwrap   = true;
+		config.font                   = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
+		config.font_height            = 11; 
+		config_save(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
+	}
+	else{
+		config_load(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
+	}
+}
+
 void init_editor(){
+
 	edit_arenas = array<Arena*>(deshi_allocator);
 	edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	extra_cursors = array<Cursor>(deshi_allocator);
@@ -111,22 +160,8 @@ void init_editor(){
 	main_cursor.start = 0;
 	main_cursor.count = 0;
 	
-	config.cursor_color   = Color_White; 
-	config.cursor_pulse   = false;
-	config.cursor_pulse_duration = 1000;
-	config.cursor_shape   = CursorShape_VerticalLine;
-	config.buffer_color   = color( 12, 12, 12,255);
-	config.text_color     = color(192,192,192,255);
-    config.buffer_margin  = vec2{10.f,10.f};
-    config.buffer_padding = vec2{10.f,10.f};
-	config.tab_width      = 4;
-	config.word_wrap      = false;
-	config.show_symbol_whitespace = true;
-	config.show_symbol_eol        = true;
-	config.show_symbol_wordwrap   = true;
-    config.font           = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
-    config.font_height    = 11; 
-	
+	load_config();
+
     //load_file(STR8(__FILE__));
 	load_file(STR8("src/test.txt"));
 }
@@ -335,6 +370,7 @@ void delete_text(){
 }
 
 //stitches together the edits into the static arena then flushes it to the file
+//TODO(sushi) optimize this by joining chunks 
 void save_buffer(){
 	//temp weak approximation of growth
 	//this should be better tracked later in editing functions
@@ -371,6 +407,12 @@ void save_buffer(){
 void update_editor(){
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
+	//TODO(sushi) this sucks do it better
+	persist Stopwatch repeat_hold = start_stopwatch();
+	persist Stopwatch repeat_throttle = start_stopwatch();
+	b32 can_repeat = peek_stopwatch(repeat_hold) > 500 && peek_stopwatch(repeat_throttle) > 50;
+	
+
 	//// text input ////
 	if(DeshInput->charCount){ //TODO(sushi) replace selection
 		//TODO(delle) handle multiple cursor input  
@@ -379,12 +421,10 @@ void update_editor(){
 	if(key_pressed(Key_TAB | InputMod_None)){
 		insert_text(str8l("\t"));
 	}
+	if(key_pressed(Key_ENTER | InputMod_None)){ insert_text(STR8("\n")); reset_stopwatch(&repeat_hold); }
+	if(key_down(Key_ENTER | InputMod_None)){ insert_text(STR8("\n")); reset_stopwatch(&repeat_hold); }
 	
 	//// text deletion ////
-	//TODO(sushi) this sucks do it better
-	persist Stopwatch repeat_hold = start_stopwatch();
-	persist Stopwatch repeat_throttle = start_stopwatch();
-	b32 can_repeat = peek_stopwatch(repeat_hold) > 500 && peek_stopwatch(repeat_throttle) > 50;
 	
 	if(key_pressed(Bind_DeleteLeft)){ backspace_text(); reset_stopwatch(&repeat_hold); }
 	if(key_down(Bind_DeleteLeft) && can_repeat){ backspace_text(); reset_stopwatch(&repeat_throttle); }

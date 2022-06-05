@@ -3,13 +3,6 @@
 #include "kigu/color.h"
 #include "core/input.h"
 
-enum{
-	CursorShape_VerticalLine,
-	CursorShape_VerticalLineThick,
-	CursorShape_Underline,
-	CursorShape_Rectangle,
-	CursorShape_FilledRectangle,
-};
 
 struct Config{
 	//// cursor config ////
@@ -33,6 +26,7 @@ struct Config{
     Font* font;
 };
 
+
 struct TextChunk{
 	Node  node;
 	str8  raw;
@@ -48,6 +42,22 @@ struct Cursor{
 	TextChunk* chunk;
 	u64 start; //byte index into chunk
 	u64 count; //byte selection size
+};
+
+enum{
+	CursorShape_VerticalLine,
+	CursorShape_VerticalLineThick,
+	CursorShape_Underline,
+	CursorShape_Rectangle,
+	CursorShape_FilledRectangle,
+};
+
+global_ str8 CursorShapeStrs[] = {
+	STR8("VerticalLine"),
+	STR8("VerticalLineThick"),
+	STR8("Underline"),
+	STR8("Rectangle"),
+	STR8("FilledRectangle"),
 };
 
 typedef KeyCode Bind; enum{

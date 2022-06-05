@@ -15,6 +15,7 @@
 #define DESHI_DISABLE_IMGUI
 #include "core/commands.h"
 #include "core/console.h"
+#include "core/config.h"
 #include "core/graphing.h"
 #include "core/file.h"
 #include "core/input.h"
@@ -55,6 +56,7 @@ int main(){
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 
+	Log("", color(255,155,255));
 	init_editor();
 	//start main loop
 	while(platform_update()){DPZoneScoped;
