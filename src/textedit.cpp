@@ -46,8 +46,9 @@ global_ ConfigMapItem ConfigMap[] = {
 
 File* file;
 
-//helpers
-//this should probably be moved to render
+//NOTE(delle) including this after the vars so it can access them
+#include "editor_commands.cpp"
+
 vec2 CalcTextSize(str8 text){DPZoneScoped;
 	vec2 result = vec2{0, f32(config.font_height)};
 	f32 line_width = 0;
@@ -94,7 +95,6 @@ TextChunk* new_chunk(){
 }
 
 //loads a file and chunks it by line 
-
 void load_file(str8 filepath){
 	file = file_init(filepath, FileAccess_ReadWrite);
 	if(!file){ Assert(false); return; }
@@ -161,7 +161,9 @@ void init_editor(){
 	main_cursor.count = 0;
 	
 	load_config();
-
+	
+	init_editor_commands();
+	
     //load_file(STR8(__FILE__));
 	load_file(STR8("src/test.txt"));
 }
@@ -398,7 +400,7 @@ void save_buffer(){
 	
 	//flush file 
 	file_write(file, stitched->start, stitched->used);
-
+	
 	//replace old static arena with new
 	memory_delete_arena(static_arena);
 	static_arena = stitched;
@@ -435,7 +437,7 @@ void update_editor(){
 	//// cursor movement ////
 	if(key_pressed(Bind_CursorLeft))           { move_cursor_left(&main_cursor); reset_stopwatch(&repeat_hold); }
 	if(key_down(Bind_CursorLeft) && can_repeat){ move_cursor_left(&main_cursor); reset_stopwatch(&repeat_throttle); }
-
+	
 	//// cursor movement ////
 	if(key_pressed(Bind_CursorWordLeft)){
 		b32 skip_alnum = -1;
@@ -471,7 +473,7 @@ void update_editor(){
 	if(key_pressed(Bind_CursorWordPartLeft)){
 		
 	}
-
+	
 	if(key_pressed(Bind_CursorRight))           { move_cursor_right(&main_cursor); reset_stopwatch(&repeat_hold); }
 	if(key_down(Bind_CursorRight) && can_repeat){ move_cursor_right(&main_cursor); reset_stopwatch(&repeat_throttle); }
 	
@@ -674,14 +676,41 @@ void update_editor(){
 			if(main_cursor.chunk == chunk){
 				persist Stopwatch cursor_blink = start_stopwatch();
 				if(DeshInput->anyKeyDown) reset_stopwatch(&cursor_blink);
-				f32 x_offset = CalcTextSize({chunk->raw.str, (s64)main_cursor.start}).x;
-				vec2 cursor_top_left  = vec2(chunk_pos.x+x_offset, chunk_pos.y);
-				vec2 cursor_bot_right = vec2(cursor_top_left.x, cursor_top_left.y+config.font_height);
-				color col = config.cursor_color;
+				color cursor_color = config.cursor_color;
 				f32 mult = M_PI*peek_stopwatch(cursor_blink)/config.cursor_pulse_duration;
-				f32 offset = M_PI / 2.f;
-				col.a = u8(255*(sin(mult + offset + cos(mult + offset))+1)/2);
-				render_line2(cursor_top_left, cursor_bot_right, col);
+				cursor_color.a = (u8)(255*(sin(mult + M_HALFPI + cos(mult + M_HALFPI))+1)/2);
+				
+				f32 x_offset = CalcTextSize({chunk->raw.str, (s64)main_cursor.start}).x;
+				switch(config.cursor_shape){
+					case CursorShape_VerticalLine:{
+						vec2 cursor_top = vec2(chunk_pos.x + x_offset, chunk_pos.y);
+						vec2 cursor_bot = vec2(cursor_top.x,           cursor_top.y + config.font_height);
+						render_line2(cursor_top, cursor_bot, cursor_color);
+					}break;
+					case CursorShape_VerticalLineThick:{
+						vec2 cursor_top = vec2(chunk_pos.x + x_offset, chunk_pos.y);
+						vec2 cursor_bot = vec2(cursor_top.x,           cursor_top.y + config.font_height);
+						render_line_thick2(cursor_top, cursor_bot, 2, cursor_color);
+					}break;
+					case CursorShape_Underline:{
+						f32 x_width = CalcTextSize(str8_eat_one(str8{chunk->raw.str+main_cursor.start, (s64)(chunk->raw.count-main_cursor.start)})).x;
+						vec2 cursor_left  = vec2(chunk_pos.x + x_offset,           chunk_pos.y + config.font_height);
+						vec2 cursor_right = vec2(chunk_pos.x + x_offset + x_width, chunk_pos.y + config.font_height);
+						render_line2(cursor_left, cursor_right, cursor_color);
+					}break;
+					case CursorShape_Rectangle:{
+						f32 x_width = CalcTextSize(str8_eat_one(str8{chunk->raw.str+main_cursor.start, (s64)(chunk->raw.count-main_cursor.start)})).x;
+						vec2 cursor_top_left  = vec2(chunk_pos.x + x_offset, chunk_pos.y);
+						render_quad2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
+					}break;
+					case CursorShape_FilledRectangle:{
+						str8 right_char = str8_eat_one(str8{chunk->raw.str+main_cursor.start, (s64)(chunk->raw.count-main_cursor.start)});
+						f32 x_width = CalcTextSize(right_char).x;
+						vec2 cursor_top_left = vec2(chunk_pos.x + x_offset, chunk_pos.y);
+						render_quad_filled2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
+						render_text2(config.font, right_char, cursor_top_left, text_scale, Color_Black);
+					}break;
+				}
 			}
         }
     }
