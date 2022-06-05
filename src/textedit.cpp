@@ -26,7 +26,7 @@ global_ ConfigMapItem ConfigMap[] = {
 	CMI("cursor_color", 		  ConfigValueType_Col,  &config.cursor_color),
 	CMI("cursor_pulse", 		  ConfigValueType_B32,  &config.cursor_pulse),
 	CMI("cursor_pulse_duration",  ConfigValueType_F32,  &config.cursor_pulse_duration),
-	CMI("cursor_shape",           ConfigValueType_Str8, &CursorShapeStrs[config.cursor_shape]), 
+	CMI("cursor_shape",           ConfigValueType_U32,  &config.cursor_shape), 
 
 	CMI("\n//// Buffer Style ////\n", ConfigValueType_PADSECTION, (void*)22),
 	CMI("buffer_color",           ConfigValueType_Col,  &config.buffer_color),
@@ -165,7 +165,7 @@ void init_editor(){
 	init_editor_commands();
 	
     //load_file(STR8(__FILE__));
-	load_file(STR8("src/test.txt"));
+	load_file(STR8("data/cfg/editor.cfg"));
 }
 
 
@@ -202,7 +202,41 @@ u64 move_cursor_right(Cursor* cursor){
 	return 0;
 }
 
-void insert_text(str8 text){
+u64 move_cursor_left_word(Cursor* cursor){
+	b32 skip_alnum = -1;
+	for(;;){
+		if(cursor->start > 0){
+			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
+			
+			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
+			cursor->start -= 1;
+			cursor->count  = 0;
+			
+			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+			if(cursor->start == 0 && cursor->chunk->node.prev != &root_chunk && TextChunkFromNode(cursor->chunk->node.prev)->newline) break;
+		}else if(cursor->chunk->node.prev != &root_chunk){
+			cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
+			cursor->start = cursor->chunk->raw.count;
+			
+			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
+			
+			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
+			cursor->start -= 1;
+			cursor->count  = 0;
+			
+			if(cursor->chunk->newline){ cursor->start += 1; break; }
+			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+		}else{
+			break;
+		}
+	}
+	return 0;
+}
+
+//TODO(sushi) support newlines
+void text_insert(str8 text){
 	Arena* edit_arena = *edit_arenas.last;
 	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 		TextChunk* curchunk = main_cursor.chunk;
@@ -253,7 +287,7 @@ void insert_text(str8 text){
 	main_cursor.chunk->raw.count += text.count;
 }
 
-void backspace_text(){
+void text_delete_left(){
 	Arena* edit_arena = *edit_arenas.last;
 	TextChunk* curchunk = main_cursor.chunk;
 	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
@@ -315,12 +349,13 @@ void backspace_text(){
 	
 }
 
-void delete_text(){
+void text_delete_right(){
 	Arena* edit_arena = *edit_arenas.last;
 	TextChunk* curchunk = main_cursor.chunk;
-	if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
+	if(main_cursor.start != 0 || main_cursor.chunk != current_edit_chunk){
 		if(main_cursor.start == curchunk->raw.count){//
-			//do nothing, because this can only happen at the very end of a file
+			main_cursor.chunk->newline = 0;
+			return;
 		}
 		else if(main_cursor.start == 0){ 
 			//copy old chunks memory into edit arena and repoint it
@@ -409,34 +444,35 @@ void save_buffer(){
 void update_editor(){
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
-	//TODO(sushi) this sucks do it better
 	persist Stopwatch repeat_hold = start_stopwatch();
 	persist Stopwatch repeat_throttle = start_stopwatch();
-	b32 can_repeat = peek_stopwatch(repeat_hold) > 500 && peek_stopwatch(repeat_throttle) > 50;
-	
+	b32 repeat = 0;
+	if(any_key_pressed() || any_key_released()){
+		reset_stopwatch(&repeat_hold);
+	}
+	if((peek_stopwatch(repeat_hold) > 500) && (peek_stopwatch(repeat_throttle) > 50)){
+		reset_stopwatch(&repeat_throttle);
+		repeat = 1;
+	}
 
 	//// text input ////
 	if(DeshInput->charCount){ //TODO(sushi) replace selection
 		//TODO(delle) handle multiple cursor input  
-        insert_text({DeshInput->charIn, (s64)DeshInput->charCount});
+        text_insert({DeshInput->charIn, (s64)DeshInput->charCount});
 	}
 	if(key_pressed(Key_TAB | InputMod_None)){
-		insert_text(str8l("\t"));
+		text_insert(str8l("\t"));
 	}
-	if(key_pressed(Key_ENTER | InputMod_None)){ insert_text(STR8("\n")); reset_stopwatch(&repeat_hold); }
-	if(key_down(Key_ENTER | InputMod_None)){ insert_text(STR8("\n")); reset_stopwatch(&repeat_hold); }
+
+	if(key_pressed(Key_ENTER | InputMod_None)){ text_insert(STR8("\n"));  }
 	
 	//// text deletion ////
+	if(key_pressed(Bind_DeleteLeft) || key_down(Bind_DeleteLeft) && repeat) { text_delete_left(); }
 	
-	if(key_pressed(Bind_DeleteLeft)){ backspace_text(); reset_stopwatch(&repeat_hold); }
-	if(key_down(Bind_DeleteLeft) && can_repeat){ backspace_text(); reset_stopwatch(&repeat_throttle); }
-	
-	if(key_pressed(Bind_DeleteRight)){ delete_text(); reset_stopwatch(&repeat_hold); }
-	if(key_down(Bind_DeleteRight) && can_repeat){ delete_text(); reset_stopwatch(&repeat_throttle); }
+	if(key_pressed(Bind_DeleteRight) || key_down(Bind_DeleteRight) && repeat) { text_delete_right(); }
 	
 	//// cursor movement ////
-	if(key_pressed(Bind_CursorLeft))           { move_cursor_left(&main_cursor); reset_stopwatch(&repeat_hold); }
-	if(key_down(Bind_CursorLeft) && can_repeat){ move_cursor_left(&main_cursor); reset_stopwatch(&repeat_throttle); }
+	if(key_pressed(Bind_CursorLeft) || key_down(Bind_CursorLeft) && repeat) {move_cursor_left(&main_cursor);}
 	
 	//// cursor movement ////
 	if(key_pressed(Bind_CursorWordLeft)){
@@ -474,8 +510,7 @@ void update_editor(){
 		
 	}
 	
-	if(key_pressed(Bind_CursorRight))           { move_cursor_right(&main_cursor); reset_stopwatch(&repeat_hold); }
-	if(key_down(Bind_CursorRight) && can_repeat){ move_cursor_right(&main_cursor); reset_stopwatch(&repeat_throttle); }
+	if(key_pressed(Bind_CursorRight)|| key_down(Bind_CursorRight) && repeat) { move_cursor_right(&main_cursor); }
 	
 	if(key_pressed(Bind_CursorWordRight)){
 		b32 skip_alnum = -1;
@@ -521,9 +556,9 @@ void update_editor(){
 		
 	}
 	
-	if(key_pressed(Bind_SaveBuffer)){
-		save_buffer();
-	}
+	if(key_pressed(Bind_SaveBuffer)){ save_buffer(); }
+
+	if(key_pressed(Bind_ReloadConfig)){ load_config(); }
 	
 	
 	//-////////////////////////////////////////////////////////////////////////////////////////////
