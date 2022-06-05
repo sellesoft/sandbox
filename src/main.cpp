@@ -39,6 +39,7 @@
 #include "types.h"
 #include "textedit.cpp"
 
+
 int main(){
 	//init deshi
 	Stopwatch deshi_watch = start_stopwatch();

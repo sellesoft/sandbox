@@ -7,6 +7,8 @@ cursor favors being at the end of a chunk than at the beginning
 
 Buffer memory is NOT contiguous and is stitched together when we save the file
 
+
+
 */
 
 Arena* static_arena;
@@ -137,9 +139,9 @@ void load_config(){
 		config.buffer_padding         = vec2{10.f,10.f};
 		config.tab_width              = 4;
 		config.word_wrap              = false;
-		config.show_symbol_whitespace = true;
-		config.show_symbol_eol        = true;
-		config.show_symbol_wordwrap   = true;
+		config.show_symbol_whitespace = false;
+		config.show_symbol_eol        = false;
+		config.show_symbol_wordwrap   = false;
 		config.font                   = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
 		config.font_height            = 11; 
 		config_save(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
@@ -168,71 +170,132 @@ void init_editor(){
 	load_file(STR8("data/cfg/editor.cfg"));
 }
 
+u64 move_cursor(Cursor* cursor, Bind bind){
+	u64 count = 0;
+	
+	switch(bind){
+		
+		case Bind_CursorLeft:{
+			if(cursor->start > 0){
+				while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
+					cursor->start -= 1;
+					count++;
+				} 
+				cursor->start -= 1;
+				count++;
+				cursor->count  = 0;
+			}else if(cursor->chunk->node.prev != &root_chunk){
+				cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
+				cursor->start = cursor->chunk->raw.count;
+				if(!cursor->chunk->newline){
+					while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
+						cursor->start -= 1; 
+						count++;
+					}
+					cursor->start -= 1;
+					count++;
+				}
+				cursor->count  = 0;
+			}
+		}break;
 
-//returns how many bytes the cursor moved by
-u64 move_cursor_left(Cursor* cursor){
-	if(cursor->start > 0){
-		u64 begin = cursor->start;
-		while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
-		cursor->start -= 1;
-		cursor->count  = 0;
-		return begin - cursor->start;
-	}else if(cursor->chunk->node.prev != &root_chunk){
-		cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
-		cursor->start = cursor->chunk->raw.count;
-		if(!cursor->chunk->newline) cursor->start -= 1;
-		cursor->count = 0;
-	}
-	return 0;
-}
+		case Bind_CursorWordLeft:{
+			b32 skip_alnum = -1;
+			for(;;){
+				if(cursor->start > 0){
+					if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
+					
+					while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
+						cursor->start -= 1;
+						count++;
+					}
+					count++;
+					cursor->start -= 1;
+					cursor->count  = 0;
+					
+					if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+					if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+					if(cursor->start == 0 && cursor->chunk->node.prev != &root_chunk && TextChunkFromNode(cursor->chunk->node.prev)->newline) break;
+				}else if(cursor->chunk->node.prev != &root_chunk){
+					cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
+					cursor->start = cursor->chunk->raw.count;
+					
+					if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
+					
+					while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
+						cursor->start -= 1;
+						count++;
+					} 
+					count++;
+					cursor->start -= 1;
+					cursor->count  = 0;
+					
+					if(cursor->chunk->newline){ cursor->start += 1; break; }
+					if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+					if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+				}else{
+					break;
+				}
+			}
+		}break;
 
-//returns how many bytes the cursor moved by
-u64 move_cursor_right(Cursor* cursor){
-	if(cursor->start < cursor->chunk->raw.count){
-		DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
-		cursor->start += dc.advance;
-		cursor->count  = 0;
-		return dc.advance;
-	}else if(cursor->chunk->node.next != &root_chunk){
-		TextChunk* prev_chunk = cursor->chunk;
-		cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
-		cursor->start = (prev_chunk->newline) ? 0 : 1;
-		cursor->count = 0;
-	}
-	return 0;
-}
+		case Bind_CursorRight:{
+			if(cursor->start < cursor->chunk->raw.count){
+				DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start,4);
+				cursor->start += dc.advance;
+				count += dc.advance;
+				cursor->count  = 0;
+			}else if(cursor->chunk->node.next != &root_chunk){
+				TextChunk* prev_chunk = cursor->chunk;
+				cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
+				if(!prev_chunk->newline){
+					DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
+					cursor->start = dc.advance;
+					count += dc.advance;
+				}else{
+					cursor->start = 0;
+				}
+				cursor->count = 0;
+			}
+		}break;
 
-u64 move_cursor_left_word(Cursor* cursor){
-	b32 skip_alnum = -1;
-	for(;;){
-		if(cursor->start > 0){
-			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-			
-			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
-			cursor->start -= 1;
-			cursor->count  = 0;
-			
-			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-			if(cursor->start == 0 && cursor->chunk->node.prev != &root_chunk && TextChunkFromNode(cursor->chunk->node.prev)->newline) break;
-		}else if(cursor->chunk->node.prev != &root_chunk){
-			cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
-			cursor->start = cursor->chunk->raw.count;
-			
-			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-			
-			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))) cursor->start -= 1;
-			cursor->start -= 1;
-			cursor->count  = 0;
-			
-			if(cursor->chunk->newline){ cursor->start += 1; break; }
-			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-		}else{
-			break;
-		}
+		case Bind_CursorWordRight:{
+			b32 skip_alnum = -1;
+			for(;;){
+				if(cursor->start < cursor->chunk->raw.count){
+					DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
+					if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
+					
+					cursor->start += dc.advance;
+					cursor->count  = 0;
+					count += dc.advance;
+					
+					if(cursor->start >= cursor->chunk->raw.count){
+						if(cursor->chunk->newline) break;
+					}else{
+						if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
+						if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
+					}
+				}else if(cursor->chunk->node.next != &root_chunk){
+					TextChunk* prev_chunk = cursor->chunk;
+					cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
+					cursor->start = 0;
+					cursor->count = 0;
+					
+					DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
+					if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
+					
+					if(prev_chunk->newline) break;
+					if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
+					if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
+				}else{
+					break;
+				}
+			}
+		}break;		
+		
 	}
-	return 0;
+	return count;
 }
 
 //TODO(sushi) support newlines
@@ -320,6 +383,7 @@ void text_delete_left(){
 			next->newline = curchunk->newline;
 			
 			curchunk->raw.count = main_cursor.start;
+	
 			
 			NodeInsertNext(&curchunk->node, &next->node);
 			
@@ -334,7 +398,7 @@ void text_delete_left(){
 			curchunk->newline = 0;
 		}
 	}
-	u64 bytes_moved = move_cursor_left(&main_cursor);
+	u64 bytes_moved = move_cursor(&main_cursor, Bind_CursorLeft);
 	edit_arena->cursor  -= bytes_moved;
 	edit_arena->used    -= bytes_moved;
 	curchunk->raw.count -= bytes_moved;
@@ -442,6 +506,7 @@ void save_buffer(){
 }
 
 void update_editor(){
+	//if(file->path == 0) DebugBreakpoint;
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
 	persist Stopwatch repeat_hold = start_stopwatch();
@@ -464,100 +529,23 @@ void update_editor(){
 		text_insert(str8l("\t"));
 	}
 
-	if(key_pressed(Key_ENTER | InputMod_None)){ text_insert(STR8("\n"));  }
+	//if(key_pressed(Key_ENTER | InputMod_None)){ text_insert(STR8("\n"));  }
 	
 	//// text deletion ////
-	if(key_pressed(Bind_DeleteLeft) || key_down(Bind_DeleteLeft) && repeat) { text_delete_left(); }
-	
+	if(key_pressed(Bind_DeleteLeft)  || key_down(Bind_DeleteLeft)  && repeat) { text_delete_left(); }
 	if(key_pressed(Bind_DeleteRight) || key_down(Bind_DeleteRight) && repeat) { text_delete_right(); }
 	
 	//// cursor movement ////
-	if(key_pressed(Bind_CursorLeft) || key_down(Bind_CursorLeft) && repeat) {move_cursor_left(&main_cursor);}
-	
-	//// cursor movement ////
-	if(key_pressed(Bind_CursorWordLeft)){
-		b32 skip_alnum = -1;
-		for(;;){
-			if(main_cursor.start > 0){
-				if(skip_alnum == -1) skip_alnum = isalnum(*(main_cursor.chunk->raw.str + main_cursor.start - 1));
-				
-				while(utf8_continuation_byte(*(main_cursor.chunk->raw.str + main_cursor.start - 1))) main_cursor.start -= 1;
-				main_cursor.start -= 1;
-				main_cursor.count  = 0;
-				
-				if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
-				if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
-				if(main_cursor.start == 0 && main_cursor.chunk->node.prev != &root_chunk && TextChunkFromNode(main_cursor.chunk->node.prev)->newline) break;
-			}else if(main_cursor.chunk->node.prev != &root_chunk){
-				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.prev);
-				main_cursor.start = main_cursor.chunk->raw.count;
-				
-				if(skip_alnum == -1) skip_alnum = isalnum(*(main_cursor.chunk->raw.str + main_cursor.start - 1));
-				
-				while(utf8_continuation_byte(*(main_cursor.chunk->raw.str + main_cursor.start - 1))) main_cursor.start -= 1;
-				main_cursor.start -= 1;
-				main_cursor.count  = 0;
-				
-				if(main_cursor.chunk->newline){ main_cursor.start += 1; break; }
-				if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
-				if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ main_cursor.start += 1; break; }
-			}else{
-				break;
-			}
-		}
-	}
-	if(key_pressed(Bind_CursorWordPartLeft)){
-		
-	}
-	
-	if(key_pressed(Bind_CursorRight)|| key_down(Bind_CursorRight) && repeat) { move_cursor_right(&main_cursor); }
-	
-	if(key_pressed(Bind_CursorWordRight)){
-		b32 skip_alnum = -1;
-		for(;;){
-			if(main_cursor.start < main_cursor.chunk->raw.count){
-				DecodedCodepoint dc = decoded_codepoint_from_utf8(main_cursor.chunk->raw.str+main_cursor.start, 4);
-				if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-				
-				main_cursor.start += dc.advance;
-				main_cursor.count  = 0;
-				
-				if(main_cursor.start >= main_cursor.chunk->raw.count){
-					if(main_cursor.chunk->newline) break;
-				}else{
-					if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))) break;
-					if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))) break;
-				}
-			}else if(main_cursor.chunk->node.next != &root_chunk){
-				TextChunk* prev_chunk = main_cursor.chunk;
-				main_cursor.chunk = TextChunkFromNode(main_cursor.chunk->node.next);
-				main_cursor.start = 0;
-				main_cursor.count = 0;
-				
-				DecodedCodepoint dc = decoded_codepoint_from_utf8(main_cursor.chunk->raw.str+main_cursor.start, 4);
-				if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-				
-				if(prev_chunk->newline) break;
-				if( skip_alnum && !isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ break; }
-				if(!skip_alnum &&  isalnum(*(main_cursor.chunk->raw.str + main_cursor.start))){ break; }
-			}else{
-				break;
-			}
-		}
-	}
-	if(key_pressed(Bind_CursorWordPartRight)){
-		
-	}
-	
-	if(key_pressed(Bind_CursorUp)){
-		
-	}
-	if(key_pressed(Bind_CursorDown)){
-		
-	}
-	
-	if(key_pressed(Bind_SaveBuffer)){ save_buffer(); }
+	if(key_pressed(Bind_CursorLeft)          || key_down(Bind_CursorLeft)          && repeat) { move_cursor(&main_cursor, Bind_CursorLeft);}
+	if(key_pressed(Bind_CursorWordLeft)      || key_down(Bind_CursorWordLeft)      && repeat) { move_cursor(&main_cursor, Bind_CursorWordLeft); }
+	if(key_pressed(Bind_CursorWordPartLeft)  || key_down(Bind_CursorWordPartLeft)  && repeat) { move_cursor(&main_cursor, Bind_CursorWordPartLeft); }
+	if(key_pressed(Bind_CursorRight)         || key_down(Bind_CursorRight)         && repeat) { move_cursor(&main_cursor, Bind_CursorRight); }
+	if(key_pressed(Bind_CursorWordRight)     || key_down(Bind_CursorWordRight)     && repeat) { move_cursor(&main_cursor, Bind_CursorWordRight); }
+	if(key_pressed(Bind_CursorWordPartRight) || key_down(Bind_CursorWordPartRight) && repeat) { move_cursor(&main_cursor, Bind_CursorWordPartRight); }
+	if(key_pressed(Bind_CursorUp)            || key_down(Bind_CursorUp)            && repeat) { move_cursor(&main_cursor, Bind_CursorUp); }
+	if(key_pressed(Bind_CursorDown)          || key_down(Bind_CursorDown)          && repeat) { move_cursor(&main_cursor, Bind_CursorDown); }
 
+	if(key_pressed(Bind_SaveBuffer)){ save_buffer(); }
 	if(key_pressed(Bind_ReloadConfig)){ load_config(); }
 	
 	
@@ -584,7 +572,11 @@ void update_editor(){
         //dont render anything if it goes beyond buffer width
         //this should probably not take into account right padding
         //possibly an option
-        if(visual_cursor.x > text_space.x) continue;
+        if(visual_cursor.x > text_space.x){ 
+			visual_cursor.x = config.buffer_margin.x + config.buffer_padding.x;
+			visual_cursor.y += size.y;
+			continue;
+		}
         //TODO(sushi) word wrapping
         if(config.word_wrap) NotImplemented;
         else{
