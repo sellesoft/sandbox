@@ -21,6 +21,9 @@ struct Config{
 	b32 show_symbol_whitespace; //spaces and tabs
 	b32 show_symbol_eol; //carraige return and newline
 	b32 show_symbol_wordwrap; //word wrap symbol
+
+	f32 repeat_hold;     //ms time to wait before allowing an input to repeat
+	f32 repeat_throttle; //ms time between repeating a held input
 	
     u32   font_height; //visual height of font when rendered
     Font* font;
@@ -31,7 +34,9 @@ struct TextChunk{
 	Node  node;
 	str8  raw;
 	u64   offset; //byte offset from beginning of file
-    //u64   count;  //codepoint count
+	//NOTE(sushi) this is only valid BEFORE any changes to the buffer occur and after rendering
+	//            so from the start of the frame until buffer modifying inputs are processed
+    u64   count;  //codepoint count, this is cached when the chunk is being rendered
 	color bg; 
 	color fg; 
 	b32   newline;
@@ -42,8 +47,11 @@ struct TextChunk{
 
 struct Cursor{
 	TextChunk* chunk;
-	u64 start; //byte index into chunk
-	u64 count; //byte selection size
+	u64 start;  //byte index into chunk
+	u64 line;   //line that the cursor is on
+	u64 column; //codepoint index into line
+	s64 count;  //byte selection size, signed for selections in either direction
+
 };
 
 enum{
