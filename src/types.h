@@ -29,6 +29,82 @@ struct Config{
     Font* font;
 };
 
+typedef KeyCode Bind; enum{
+    Bind_CursorLeft         = Key_LEFT | InputMod_None,
+	Bind_CursorWordLeft     = Key_LEFT | InputMod_AnyCtrl,
+	Bind_CursorWordPartLeft = Key_LEFT | InputMod_AnyAlt,
+    
+	Bind_CursorRight         = Key_RIGHT | InputMod_None,
+    Bind_CursorWordRight     = Key_RIGHT | InputMod_AnyCtrl,
+    Bind_CursorWordPartRight = Key_RIGHT | InputMod_AnyAlt,
+    
+	Bind_CursorUp    = Key_UP    | InputMod_None,
+    Bind_CursorDown  = Key_DOWN  | InputMod_None,
+	
+    Bind_CursorAnchor = Key_SPACE | InputMod_AnyCtrl,
+	
+    Bind_SelectLeft  = Key_LEFT  | InputMod_AnyShift,
+    Bind_SelectWordLeft  = Key_LEFT  | InputMod_AnyShift | InputMod_AnyCtrl,
+    Bind_SelectWordPartLeft  = Key_LEFT  | InputMod_AnyShift | InputMod_AnyAlt,
+
+    Bind_SelectRight = Key_RIGHT | InputMod_AnyShift,
+    Bind_SelectWordRight = Key_RIGHT | InputMod_AnyShift | InputMod_AnyCtrl,
+    Bind_SelectWordPartRight = Key_RIGHT | InputMod_AnyShift | InputMod_AnyAlt,
+
+    Bind_SelectUp    = Key_UP    | InputMod_AnyShift,
+    Bind_SelectDown  = Key_DOWN  | InputMod_AnyShift,
+	
+	Bind_DeleteLeft         = Key_BACKSPACE | InputMod_None,
+	Bind_DeleteWordLeft     = Key_BACKSPACE | InputMod_AnyCtrl,
+	Bind_DeleteWordPartLeft = Key_BACKSPACE | InputMod_AnyAlt,
+	
+	Bind_DeleteRight         = Key_DELETE | InputMod_None,
+	Bind_DeleteWordRight     = Key_DELETE | InputMod_AnyCtrl,
+	Bind_DeleteWordPartRight = Key_DELETE | InputMod_AnyAlt,
+	
+    Bind_SaveBuffer = Key_S | InputMod_AnyCtrl,
+
+    Bind_ReloadConfig = Key_F5 | InputMod_AnyCtrl,
+};
+
+struct KeyBinds{
+	KeyCode cursorLeft;
+	KeyCode cursorWordLeft;
+	KeyCode cursorWordPartLeft;
+    
+	KeyCode cursorRight;
+    KeyCode cursorWordRight;
+    KeyCode cursorWordPartRight;
+    
+	KeyCode cursorUp;
+    KeyCode cursorDown;
+	
+    KeyCode cursorAnchor;
+	
+    KeyCode selectLeft;
+    KeyCode selectWordLeft;
+    KeyCode selectWordPartLeft;
+
+    KeyCode selectRight;
+    KeyCode selectWordRight;
+    KeyCode selectWordPartRight;
+
+    KeyCode selectUp;
+    KeyCode selectDown;
+	
+	KeyCode deleteLeft;
+	KeyCode deleteWordLeft;
+	KeyCode deleteWordPartLeft;
+	
+	KeyCode deleteRight;
+	KeyCode deleteWordRight;
+	KeyCode deleteWordPartRight;
+	
+    KeyCode saveBuffer;
+
+    KeyCode reloadConfig;
+};
+
 
 struct TextChunk{
 	Node  node;
@@ -44,6 +120,11 @@ struct TextChunk{
 #define TextChunkFromNode(x) CastFromMember(TextChunk, node, x)
 #define NextTextChunk(x) TextChunkFromNode(x->node.next)
 #define PrevTextChunk(x) TextChunkFromNode(x->node.prev)
+
+struct Line{
+	Node node;
+
+};
 
 struct Cursor{
 	TextChunk* chunk;
@@ -68,36 +149,4 @@ global_ str8 CursorShapeStrs[] = {
 	STR8("Underline"),
 	STR8("Rectangle"),
 	STR8("FilledRectangle"),
-};
-
-typedef KeyCode Bind; enum{
-    Bind_CursorLeft         = Key_LEFT | InputMod_None,
-	Bind_CursorWordLeft     = Key_LEFT | InputMod_AnyCtrl,
-	Bind_CursorWordPartLeft = Key_LEFT | InputMod_AnyAlt,
-    
-	Bind_CursorRight         = Key_RIGHT | InputMod_None,
-    Bind_CursorWordRight     = Key_RIGHT | InputMod_AnyCtrl,
-    Bind_CursorWordPartRight = Key_RIGHT | InputMod_AnyAlt,
-    
-	Bind_CursorUp    = Key_UP    | InputMod_None,
-    Bind_CursorDown  = Key_DOWN  | InputMod_None,
-	
-    Bind_CursorAnchor = Key_SPACE | InputMod_AnyCtrl,
-	
-    Bind_SelectLeft  = Key_LEFT  | InputMod_AnyShift,
-    Bind_SelectRight = Key_RIGHT | InputMod_AnyShift,
-    Bind_SelectUp    = Key_UP    | InputMod_AnyShift,
-    Bind_SelectDown  = Key_DOWN  | InputMod_AnyShift,
-	
-	Bind_DeleteLeft         = Key_BACKSPACE | InputMod_None,
-	Bind_DeleteWordLeft     = Key_BACKSPACE | InputMod_AnyCtrl,
-	Bind_DeleteWordPartLeft = Key_BACKSPACE | InputMod_AnyAlt,
-	
-	Bind_DeleteRight         = Key_DELETE | InputMod_None,
-	Bind_DeleteWordRight     = Key_DELETE | InputMod_AnyCtrl,
-	Bind_DeleteWordPartRight = Key_DELETE | InputMod_AnyAlt,
-	
-    Bind_SaveBuffer = Key_S | InputMod_AnyCtrl,
-
-    Bind_ReloadConfig = Key_F5 | InputMod_AnyCtrl,
 };

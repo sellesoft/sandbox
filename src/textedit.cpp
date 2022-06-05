@@ -2,10 +2,8 @@
 Notes
 -----
 cursor is drawn to the left of the index it represents
-TextChunks will never stretch across lines
 cursor favors being at the end of a chunk than at the beginning
-
-Buffer memory is NOT contiguous and is stitched together when we save the file
+buffer memory is NOT contiguous and is stitched together when we save the file
 
 
 
@@ -26,41 +24,71 @@ array<Cursor> extra_cursors;
 
 
 Config config;
+KeyBinds binds;
 #define CMI(name, type, var) ConfigMapItem{STR8(name), (type), (var)}
 global_ ConfigMapItem ConfigMap[] = {
-	CMI("-----------------------------------", ConfigValueType_NONE, 0),
+	CMI("#---------------------------------#", ConfigValueType_NONE, 0),
 	CMI("////////// Buffer Config //////////", ConfigValueType_NONE, 0),
-	CMI("-----------------------------------", ConfigValueType_NONE, 0),
+	CMI("#---------------------------------#", ConfigValueType_NONE, 0),
 	CMI("this section contains options pertaining to the buffer, the window where text is edited", ConfigValueType_NONE, 0),
-	CMI("\n",                     ConfigValueType_PADSECTION,(void*)21),
-	CMI("cursor color", 		  ConfigValueType_Col,  &config.cursor_color),
-	CMI("cursor pulse", 		  ConfigValueType_B32,  &config.cursor_pulse),
-	CMI("cursor pulse duration",  ConfigValueType_F32,  &config.cursor_pulse_duration),
-	CMI("cursor shape",           ConfigValueType_U32,  &config.cursor_shape), 
-	CMI("\n",                     ConfigValueType_PADSECTION,(void*)12),
-	CMI("buffer color",           ConfigValueType_Col,  &config.buffer_color),
-	CMI("text color",             ConfigValueType_Col,  &config.text_color),
-	CMI("\n",                     ConfigValueType_PADSECTION,(void*)14),
-	CMI("buffer margin",          ConfigValueType_FV2,  &config.buffer_margin),
-	CMI("buffer padding",         ConfigValueType_FV2,  &config.buffer_padding),
-	CMI("\n",                     ConfigValueType_PADSECTION,(void*)9),
-	CMI("tab width",              ConfigValueType_U32,  &config.tab_width),
-	CMI("word wrap",              ConfigValueType_B32,  &config.word_wrap),
 	CMI("\n",                     ConfigValueType_PADSECTION,(void*)22),
-	CMI("show symbol whitespace", ConfigValueType_B32,  &config.show_symbol_whitespace),
-	CMI("show symbol eol",        ConfigValueType_B32,  &config.show_symbol_eol),
-	CMI("show symbol wordwrap",   ConfigValueType_B32,  &config.show_symbol_wordwrap),
-	CMI("\n",                     ConfigValueType_PADSECTION,(void*)11),
+	CMI("cursor_color", 		  ConfigValueType_Col,  &config.cursor_color),
+	CMI("cursor_pulse", 		  ConfigValueType_B32,  &config.cursor_pulse),
+	CMI("cursor_pulse_duration",  ConfigValueType_F32,  &config.cursor_pulse_duration),
+	CMI("cursor_shape",           ConfigValueType_U32,  &config.cursor_shape), 
+	CMI("\n",                     ConfigValueType_PADSECTION,(void*)13),
+	CMI("buffer_color",           ConfigValueType_Col,  &config.buffer_color),
+	CMI("text_color",             ConfigValueType_Col,  &config.text_color),
+	CMI("\n",                     ConfigValueType_PADSECTION,(void*)15),
+	CMI("buffer_margin",          ConfigValueType_FV2,  &config.buffer_margin),
+	CMI("buffer_padding",         ConfigValueType_FV2,  &config.buffer_padding),
+	CMI("\n",                     ConfigValueType_PADSECTION,(void*)10),
+	CMI("tab_width",              ConfigValueType_U32,  &config.tab_width),
+	CMI("word_wrap",              ConfigValueType_B32,  &config.word_wrap),
+	CMI("\n",                     ConfigValueType_PADSECTION,(void*)23),
+	CMI("show_symbol_whitespace", ConfigValueType_B32,  &config.show_symbol_whitespace),
+	CMI("show_symbol_eol",        ConfigValueType_B32,  &config.show_symbol_eol),
+	CMI("show_symbol_wordwrap",   ConfigValueType_B32,  &config.show_symbol_wordwrap),
+	CMI("\n",                     ConfigValueType_PADSECTION,(void*)12),
 	CMI("font",                   ConfigValueType_Font, &config.font),
-	CMI("font height",            ConfigValueType_U32,  &config.font_height),
+	CMI("font_height",            ConfigValueType_U32,  &config.font_height),
 	
-	CMI("----------------------------------", ConfigValueType_NONE, 0),
+	CMI("#--------------------------------#", ConfigValueType_NONE, 0),
 	CMI("////////// Input Config //////////", ConfigValueType_NONE, 0),
-	CMI("----------------------------------", ConfigValueType_NONE, 0),
+	CMI("#--------------------------------#", ConfigValueType_NONE, 0),
 	CMI("this section contains options pertaining to the behavoir of input and keybinds", ConfigValueType_NONE, 0),
-	CMI("\n",          ConfigValueType_PADSECTION, (void*)11),
-	CMI("repeat hold", ConfigValueType_F32, &config.repeat_hold),
-	CMI("repeat",      ConfigValueType_F32, &config.repeat_hold),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)15),
+	CMI("repeat_hold",            ConfigValueType_F32, &config.repeat_hold),
+	CMI("repeat_throttle",        ConfigValueType_F32, &config.repeat_throttle),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)22),
+	CMI("cursor_left",            ConfigValueType_KeyMod, &binds.cursorLeft),
+	CMI("cursor_word_left",       ConfigValueType_KeyMod, &binds.cursorWordLeft),
+	CMI("cursor_word_part_left",  ConfigValueType_KeyMod, &binds.cursorWordPartLeft),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)23),
+	CMI("cursor_right",           ConfigValueType_KeyMod, &binds.cursorRight),
+    CMI("cursor_word_right",      ConfigValueType_KeyMod, &binds.cursorWordRight),
+    CMI("cursor_word_part_right", ConfigValueType_KeyMod, &binds.cursorWordPartRight),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)12),
+	CMI("cursor_up",              ConfigValueType_KeyMod, &binds.cursorUp),
+    CMI("cursor_down",            ConfigValueType_KeyMod, &binds.cursorDown),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)14),
+    CMI("cursor_anchor",          ConfigValueType_KeyMod, &binds.cursorAnchor),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)15),
+    CMI("select_left",            ConfigValueType_KeyMod, &binds.selectLeft),
+    CMI("select_right",           ConfigValueType_KeyMod, &binds.selectRight),
+    CMI("select_up",              ConfigValueType_KeyMod, &binds.selectUp),
+    CMI("select_down",            ConfigValueType_KeyMod, &binds.selectDown),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)22),
+	CMI("delete_left",            ConfigValueType_KeyMod, &binds.deleteLeft),
+	CMI("delete_word_left",       ConfigValueType_KeyMod, &binds.deleteWordLeft),
+	CMI("delete_word_part_left",  ConfigValueType_KeyMod, &binds.deleteWordPartLeft),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)23),
+	CMI("delete_right",           ConfigValueType_KeyMod, &binds.deleteRight),
+	CMI("delete_word_right",      ConfigValueType_KeyMod, &binds.deleteWordRight),
+	CMI("delete_word_part_right", ConfigValueType_KeyMod, &binds.deleteWordPartRight),
+	CMI("\n",                     ConfigValueType_PADSECTION, (void*)14),
+    CMI("save_buffer",            ConfigValueType_KeyMod, &binds.saveBuffer),
+    CMI("reload_config",          ConfigValueType_KeyMod, &binds.reloadConfig),
 
 };
 #undef CMI
@@ -68,8 +96,79 @@ global_ ConfigMapItem ConfigMap[] = {
 
 File* file;
 
+
+
 //NOTE(delle) including this after the vars so it can access them
 #include "editor_commands.cpp"
+
+void load_config(){
+	if(!file_exists(STR8("data/cfg/editor.cfg"))){
+		config.cursor_color           = Color_White; 
+		config.cursor_pulse           = false;
+		config.cursor_pulse_duration  = 1000;
+		config.cursor_shape           = CursorShape_VerticalLine;
+		
+		config.buffer_color           = color( 12, 12, 12,255);
+		config.text_color             = color(192,192,192,255);
+		
+		config.buffer_margin          = vec2{10.f,10.f};
+		config.buffer_padding         = vec2{10.f,10.f};
+		
+		config.tab_width              = 4;
+		config.word_wrap              = false;
+		
+		config.show_symbol_whitespace = false;
+		config.show_symbol_eol        = false;
+		config.show_symbol_wordwrap   = false;
+		
+		config.repeat_hold            = 500;
+		config.repeat_throttle        = 25;
+		
+		config.font                   = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
+		config.font_height            = 11; 
+
+		binds.cursorLeft          = Key_LEFT | InputMod_None;
+		binds.cursorWordLeft      = Key_LEFT | InputMod_AnyCtrl;
+		binds.cursorWordPartLeft  = Key_LEFT | InputMod_AnyAlt;
+    
+		binds.cursorRight         = Key_RIGHT | InputMod_None;
+		binds.cursorWordRight     = Key_RIGHT | InputMod_AnyCtrl;
+		binds.cursorWordPartRight = Key_RIGHT | InputMod_AnyAlt;
+    
+		binds.cursorUp            = Key_UP    | InputMod_None;
+		binds.cursorDown          = Key_DOWN  | InputMod_None;
+	
+		binds.cursorAnchor        = Key_SPACE | InputMod_AnyCtrl;
+	
+		binds.selectLeft          = Key_LEFT  | InputMod_AnyShift;
+		binds.selectWordLeft      = Key_LEFT  | InputMod_AnyShift | InputMod_AnyCtrl;
+		binds.selectWordPartLeft  = Key_LEFT  | InputMod_AnyShift | InputMod_AnyAlt;
+
+		binds.selectRight         = Key_RIGHT | InputMod_AnyShift;
+		binds.selectWordRight     = Key_RIGHT | InputMod_AnyShift | InputMod_AnyCtrl;
+		binds.selectWordPartRight = Key_RIGHT | InputMod_AnyShift | InputMod_AnyAlt;
+
+		binds.selectUp            = Key_UP    | InputMod_AnyShift;
+		binds.selectDown          = Key_DOWN  | InputMod_AnyShift;
+	
+		binds.deleteLeft          = Key_BACKSPACE | InputMod_None;
+		binds.deleteWordLeft      = Key_BACKSPACE | InputMod_AnyCtrl;
+		binds.deleteWordPartLeft  = Key_BACKSPACE | InputMod_AnyAlt;
+	
+		binds.deleteRight         = Key_DELETE | InputMod_None;
+		binds.deleteWordRight     = Key_DELETE | InputMod_AnyCtrl;
+		binds.deleteWordPartRight = Key_DELETE | InputMod_AnyAlt;
+	
+		binds.saveBuffer          = Key_S | InputMod_AnyCtrl;
+
+		binds.reloadConfig        = Key_F5 | InputMod_AnyCtrl;
+
+		config_save(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
+	}
+	else{
+		config_load(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
+	}
+}
 
 vec2 CalcTextSize(str8 text){DPZoneScoped;
 	vec2 result = vec2{0, f32(config.font_height)};
@@ -147,34 +246,8 @@ void load_file(str8 filepath){
 	main_cursor.count = 0;
 }
 
-void load_config(){
-	if(!file_exists(STR8("data/cfg/editor.cfg"))){
-		config.cursor_color           = Color_White; 
-		config.cursor_pulse           = false;
-		config.cursor_pulse_duration  = 1000;
-		config.cursor_shape           = CursorShape_VerticalLine;
-		config.buffer_color           = color( 12, 12, 12,255);
-		config.text_color             = color(192,192,192,255);
-		config.buffer_margin          = vec2{10.f,10.f};
-		config.buffer_padding         = vec2{10.f,10.f};
-		config.tab_width              = 4;
-		config.word_wrap              = false;
-		config.show_symbol_whitespace = false;
-		config.show_symbol_eol        = false;
-		config.show_symbol_wordwrap   = false;
-		config.repeat_hold            = 500;
-		config.repeat_throttle        = 25;
-		config.font                   = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
-		config.font_height            = 11; 
-		config_save(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
-	}
-	else{
-		config_load(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
-	}
-}
 
 void init_editor(){
-
 	edit_arenas = array<Arena*>(deshi_allocator);
 	edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	extra_cursors = array<Cursor>(deshi_allocator);
@@ -219,216 +292,197 @@ u64 calc_line_length(TextChunk* chunk){
 //   3. the cursor is at the end of the file and tries to move right
 // 
 // this function also handles selection
-u64 move_cursor(Cursor* cursor, Bind bind){
+u64 move_cursor(Cursor* cursor, KeyCode bind){
 	u64 count = 0;
-	switch(bind){
-		
-		case Bind_SelectLeft:
-		case Bind_CursorLeft:{
+	if      (match_any(bind, binds.cursorLeft, binds.selectLeft)){////////////////////////////////////  Move/Select Left
+		if(cursor->start > 0){
+			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
+				cursor->start -= 1;
+				count++;
+			} 
+			cursor->start -= 1;
+			count++;
+			if(bind==binds.selectLeft) cursor->count += 1;
+			else                      cursor->count  = 0;
+		}else if(cursor->chunk->node.prev != &root_chunk){
+			cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
+			cursor->start = cursor->chunk->raw.count;
+			if(!cursor->chunk->newline){
+				while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
+					cursor->start -= 1; 
+					count++;
+				}
+				if(bind==binds.selectLeft) 
+					cursor->count += 1;
+				cursor->start -= 1;
+				cursor->column--;
+				count++;
+			}
+			else {
+				cursor->line--;
+			}
+			if(bind!=binds.selectLeft) 
+				cursor->count = 0;
+		}
+	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){//////////////////////// Move/Select Word Left
+		b32 skip_alnum = -1;
+		for(;;){
 			if(cursor->start > 0){
+				if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
+				
+				while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
+					cursor->start -= 1;
+					count++;
+				}
+				count++;
+				cursor->start -= 1;
+				cursor->count  = 0;
+				
+				if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+				if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+				if(cursor->start == 0 && cursor->chunk->node.prev != &root_chunk && TextChunkFromNode(cursor->chunk->node.prev)->newline) break;
+			}else if(cursor->chunk->node.prev != &root_chunk){
+				cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
+				cursor->start = cursor->chunk->raw.count;
+				
+				if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
+				
 				while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
 					cursor->start -= 1;
 					count++;
 				} 
-				cursor->start -= 1;
 				count++;
-				if(bind==Bind_SelectLeft) cursor->count += 1;
-				else                      cursor->count  = 0;
-			}else if(cursor->chunk->node.prev != &root_chunk){
-				cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
-				cursor->start = cursor->chunk->raw.count;
-				if(!cursor->chunk->newline){
-					while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
-						cursor->start -= 1; 
-						count++;
-					}
-					if(bind==Bind_SelectLeft) 
-						cursor->count += 1;
-					cursor->start -= 1;
-					cursor->column--;
-					count++;
-				}
-				else {
-					cursor->line--;
-				}
-				if(bind!=Bind_SelectLeft) 
-					cursor->count = 0;
-			}
-		}break;
-
-		case Bind_CursorWordLeft:{
-			b32 skip_alnum = -1;
-			for(;;){
-				if(cursor->start > 0){
-					if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-					
-					while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
-						cursor->start -= 1;
-						count++;
-					}
-					count++;
-					cursor->start -= 1;
-					cursor->count  = 0;
-					
-					if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-					if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-					if(cursor->start == 0 && cursor->chunk->node.prev != &root_chunk && TextChunkFromNode(cursor->chunk->node.prev)->newline) break;
-				}else if(cursor->chunk->node.prev != &root_chunk){
-					cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
-					cursor->start = cursor->chunk->raw.count;
-					
-					if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-					
-					while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
-						cursor->start -= 1;
-						count++;
-					} 
-					count++;
-					cursor->start -= 1;
-					cursor->count  = 0;
-					
-					if(cursor->chunk->newline){ cursor->start += 1; break; }
-					if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-					if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-				}else{
-					break;
-				}
-			}
-		}break;
-
-		case Bind_CursorRight:{
-			if(cursor->start < cursor->chunk->raw.count){
-				DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start,4);
-				cursor->start += dc.advance;
-				count += dc.advance;
+				cursor->start -= 1;
 				cursor->count  = 0;
+				
+				if(cursor->chunk->newline){ cursor->start += 1; break; }
+				if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+				if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
+			}else{
+				break;
+			}
+		}
+	}else if(match_any(bind, binds.cursorRight, binds.selectRight)){////////////////////////////////// Move/Select Right
+		if(cursor->start < cursor->chunk->raw.count){
+			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start,4);
+			cursor->start += dc.advance;
+			count += dc.advance;
+			cursor->count  = 0;
+		}else if(cursor->chunk->node.next != &root_chunk){
+			TextChunk* prev_chunk = cursor->chunk;
+			cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
+			if(!prev_chunk->newline){
+				DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);        
+				cursor->start = dc.advance;
+				count += dc.advance;
+			}else{
+				cursor->start = 0;
+			}
+			cursor->count = 0;
+		}
+	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){///////////////////// Move/Select Word Right 
+		b32 skip_alnum = -1;
+		for(;;){
+			if(cursor->start < cursor->chunk->raw.count){
+				DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
+				if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
+				
+				cursor->start += dc.advance;
+				cursor->count  = 0;
+				count += dc.advance;
+				
+				if(cursor->start >= cursor->chunk->raw.count){
+					if(cursor->chunk->newline) break;
+				}else{
+					if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
+					if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
+				}
 			}else if(cursor->chunk->node.next != &root_chunk){
 				TextChunk* prev_chunk = cursor->chunk;
 				cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
-				if(!prev_chunk->newline){
-					DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
-					cursor->start = dc.advance;
-					count += dc.advance;
-				}else{
-					cursor->start = 0;
-				}
+				cursor->start = 0;
 				cursor->count = 0;
+				
+				DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
+				if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
+				
+				if(prev_chunk->newline) break;
+				if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
+				if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
+			}else{
+				break;
 			}
-		}break;
-
-		case Bind_CursorWordRight:{
-			b32 skip_alnum = -1;
-			for(;;){
-				if(cursor->start < cursor->chunk->raw.count){
-					DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
-					if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-					
-					cursor->start += dc.advance;
-					cursor->count  = 0;
-					count += dc.advance;
-					
-					if(cursor->start >= cursor->chunk->raw.count){
-						if(cursor->chunk->newline) break;
-					}else{
-						if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
-						if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
+		}
+	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){/////////////////////////////////////////// Move/Select Up
+		if(cursor->chunk->node.prev == &root_chunk) return count;;
+		Cursor seek = *cursor;
+		u64 chars_moved = 0;
+		enum{ Finished, MoveLeftToPrevLine, MoveLeftToLineBegin, MoveRightToChar } state = MoveLeftToPrevLine;
+		while(state){
+			switch(state){
+				case MoveLeftToPrevLine:{ // move to the previous line and count how many chars it takes to get there
+					count += move_cursor(&seek, binds.cursorLeft);
+					if(seek.chunk != cursor->chunk && seek.chunk->newline) state = MoveLeftToLineBegin;
+					else chars_moved++;
+				}break;
+				case MoveLeftToLineBegin:{ // move to the beginning of the prev line so we can advance to column
+					if(seek.chunk->node.prev == &root_chunk || 
+						PrevTextChunk(seek.chunk)->newline){ 
+							state = MoveRightToChar; 
+							seek.start = 0; 
+					} 
+					else seek.chunk = PrevTextChunk(seek.chunk);
+				}break;
+				case MoveRightToChar:{ // advance to column
+					if(chars_moved--){ 
+						u64 moved = move_cursor(&seek, binds.cursorRight); 
+						if(!moved){ 
+							//if we reach the end of the line early out
+							state = Finished; 
+							seek.chunk = PrevTextChunk(seek.chunk);
+							seek.start = seek.chunk->raw.count;
+						} else count += moved;
+					} else state = Finished; 
+				}break;
+			}
+		}
+		*cursor = seek;
+	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){///////////////////////////////////// Move/Select Down
+		if(cursor->chunk->node.next == &root_chunk) return count;
+		Cursor seek = *cursor;
+		u64 chars_moved = 0;
+		enum{ Finished, MoveLeftToLineBegin, MoveRightToNextLine, MoveRightToChar } state = MoveLeftToLineBegin;
+		while(state){
+			switch(state){
+				case MoveLeftToLineBegin:{ // find what coulmn we're on 
+					u64 moved = move_cursor(&seek, binds.cursorLeft);
+					if(moved) { 
+						chars_moved++; 
+						count += moved; 
 					}
-				}else if(cursor->chunk->node.next != &root_chunk){
-					TextChunk* prev_chunk = cursor->chunk;
-					cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
-					cursor->start = 0;
-					cursor->count = 0;
-					
-					DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
-					if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-					
-					if(prev_chunk->newline) break;
-					if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
-					if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
-				}else{
-					break;
-				}
+					else {
+						state = MoveRightToNextLine; 
+						seek = *cursor; //we set the cursor back here because we know that it's closer than seek 
+					}
+				}break;
+				case MoveRightToNextLine:{ // proceed to next line
+					if(seek.chunk->newline) {state = MoveRightToChar; seek.start = 0;} 
+					seek.chunk = NextTextChunk(seek.chunk);
+				}break;
+				case MoveRightToChar:{
+					if(chars_moved--){ 
+						u64 moved = move_cursor(&seek, binds.cursorRight); 
+						if(!moved){ 
+							//if we reach the end of the line early out
+							state = Finished; 
+							seek.chunk = PrevTextChunk(seek.chunk);
+							seek.start = seek.chunk->raw.count;
+						} else count += moved;
+					} else state = Finished; 
+				}break;
 			}
-		}break;		
-		//oh my
-		//TODO(sushi) clean this up eventually
-		//TODO(sushi) latch the column the cursor wants to go to so it tries to stay at the same column with consecutive up/down inputs
-		//NOTE 
-		// 	THE COUNT THESE RETURN IS CURRENTLY WRONG
-		case Bind_CursorUp:{
-			if(cursor->chunk->node.prev == &root_chunk) break;
-			Cursor seek = *cursor;
-			u64 chars_moved = 0;
-			enum{ Finished, MoveLeftToPrevLine, MoveLeftToLineBegin, MoveRightToChar } state = MoveLeftToPrevLine;
-			while(state){
-				switch(state){
-					case MoveLeftToPrevLine:{ // move to the previous line and count how many chars it takes to get there
-						count += move_cursor(&seek, Bind_CursorLeft);
-						if(seek.chunk != cursor->chunk && seek.chunk->newline) state = MoveLeftToLineBegin;
-						else chars_moved++;
-					}break;
-					case MoveLeftToLineBegin:{ // move to the beginning of the prev line so we can advance to column
-						if(seek.chunk->node.prev == &root_chunk || 
-							PrevTextChunk(seek.chunk)->newline){ 
-								state = MoveRightToChar; 
-								seek.start = 0; 
-						} 
-						else seek.chunk = PrevTextChunk(seek.chunk);
-					}break;
-					case MoveRightToChar:{ // advance to column
-						if(chars_moved--){ 
-							u64 moved = move_cursor(&seek, Bind_CursorRight); 
-							if(!moved){ 
-								//if we reach the end of the line early out
-								state = Finished; 
-								seek.chunk = PrevTextChunk(seek.chunk);
-								seek.start = seek.chunk->raw.count;
-							} else count += moved;
-						} else state = Finished; 
-					}break;
-				}
-			}
-			*cursor = seek;
-		}break;
-
-		case Bind_CursorDown:{
-			if(cursor->chunk->node.next == &root_chunk) break;
-			Cursor seek = *cursor;
-			u64 chars_moved = 0;
-			enum{ Finished, MoveLeftToLineBegin, MoveRightToNextLine, MoveRightToChar } state = MoveLeftToLineBegin;
-			while(state){
-				switch(state){
-					case MoveLeftToLineBegin:{ // find what coulmn we're on 
-						u64 moved = move_cursor(&seek, Bind_CursorLeft);
-						if(moved) { 
-							chars_moved++; 
-							count += moved; 
-						}
-						else {
-							state = MoveRightToNextLine; 
-							seek = *cursor; //we set the cursor back here because we know that it's closer than seek 
-						}
-					}break;
-					case MoveRightToNextLine:{ // proceed to next line
-						if(seek.chunk->newline) {state = MoveRightToChar; seek.start = 0;} 
-						seek.chunk = NextTextChunk(seek.chunk);
-					}break;
-					case MoveRightToChar:{
-						if(chars_moved--){ 
-							u64 moved = move_cursor(&seek, Bind_CursorRight); 
-							if(!moved){ 
-								//if we reach the end of the line early out
-								state = Finished; 
-								seek.chunk = PrevTextChunk(seek.chunk);
-								seek.start = seek.chunk->raw.count;
-							} else count += moved;
-						} else state = Finished; 
-					}break;
-				}
-			}
-			*cursor = seek;
-		}break;
-		
+		}
+		*cursor = seek;
 	}
 	return count;
 }
@@ -553,7 +607,7 @@ void text_delete_left(){
 			curchunk->newline = 0;
 		}
 	}
-	u64 bytes_moved = move_cursor(&main_cursor, Bind_CursorLeft);
+	u64 bytes_moved = move_cursor(&main_cursor, binds.cursorLeft);
 	edit_arena->cursor  -= bytes_moved;
 	edit_arena->used    -= bytes_moved;
 	curchunk->raw.count -= bytes_moved;
@@ -748,14 +802,14 @@ void update_editor(){
 	#define CanDoInput(x) (key_pressed(x) || key_down(x) && repeat)
 
 	//// cursor movement ////
-	if(CanDoInput(Bind_CursorLeft))          { move_cursor(&main_cursor, Bind_CursorLeft);}
-	if(CanDoInput(Bind_CursorWordLeft))      { move_cursor(&main_cursor, Bind_CursorWordLeft); }
-	if(CanDoInput(Bind_CursorWordPartLeft))  { move_cursor(&main_cursor, Bind_CursorWordPartLeft); }
-	if(CanDoInput(Bind_CursorRight))         { move_cursor(&main_cursor, Bind_CursorRight); }
-	if(CanDoInput(Bind_CursorWordRight))     { move_cursor(&main_cursor, Bind_CursorWordRight); }
-	if(CanDoInput(Bind_CursorWordPartRight)) { move_cursor(&main_cursor, Bind_CursorWordPartRight); }
-	if(CanDoInput(Bind_CursorUp))            { move_cursor(&main_cursor, Bind_CursorUp); }
-	if(CanDoInput(Bind_CursorDown))          { move_cursor(&main_cursor, Bind_CursorDown); }
+	if(CanDoInput(binds.cursorLeft))          { move_cursor(&main_cursor, binds.cursorLeft);}
+	if(CanDoInput(binds.cursorWordLeft))      { move_cursor(&main_cursor, binds.cursorWordLeft); }
+	if(CanDoInput(binds.cursorWordPartLeft))  { move_cursor(&main_cursor, binds.cursorWordPartLeft); }
+	if(CanDoInput(binds.cursorRight))         { move_cursor(&main_cursor, binds.cursorRight); }
+	if(CanDoInput(binds.cursorWordRight))     { move_cursor(&main_cursor, binds.cursorWordRight); }
+	if(CanDoInput(binds.cursorWordPartRight)) { move_cursor(&main_cursor, binds.cursorWordPartRight); }
+	if(CanDoInput(binds.cursorUp))            { move_cursor(&main_cursor, binds.cursorUp); }
+	if(CanDoInput(binds.cursorDown))          { move_cursor(&main_cursor, binds.cursorDown); }
 
 	//// text input ////
 	if(DeshInput->charCount){ //TODO(sushi) replace selection
@@ -768,11 +822,11 @@ void update_editor(){
 	//if(key_pressed(Key_ENTER | InputMod_None)){ text_insert(STR8("\n"));  }
 	
 	//// text deletion ////
-	if(CanDoInput(Bind_DeleteLeft)) { text_delete_left(); }
-	if(CanDoInput(Bind_DeleteRight)) { text_delete_right(); }
+	if(CanDoInput(binds.deleteLeft)) { text_delete_left(); }
+	if(CanDoInput(binds.deleteRight)) { text_delete_right(); }
 	
-	if(key_pressed(Bind_SaveBuffer)){ save_buffer(); }
-	if(key_pressed(Bind_ReloadConfig)){ load_config(); }
+	if(key_pressed(binds.saveBuffer)){ save_buffer(); }
+	if(key_pressed(binds.reloadConfig)){ load_config(); }
 	
 	
 	//-////////////////////////////////////////////////////////////////////////////////////////////
