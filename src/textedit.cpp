@@ -32,6 +32,8 @@ array<Cursor> extra_cursors;
 
 //NOTE(sushi) add this to Buffer struct when that is added
 b32 buffer_CRLF;
+u32 line_end_char; //either \n or \r, so we dont have to keep checking what buffer_CRLF is everywhere
+u32 line_end_length; //either 1 or 2, so we dont have to keep checking what buffer_CRLF is everywhere
 
 Config config;
 KeyBinds binds;
@@ -111,7 +113,7 @@ File* file;
 //NOTE(delle) including this after the vars so it can access them
 #include "editor_commands.cpp"
 
-void load_config(){
+void load_config(){DPZoneScoped;
 	if(!file_exists(STR8("data/cfg/editor.cfg"))){
 		config.cursor_color           = Color_White; 
 		config.cursor_pulse           = false;
@@ -221,16 +223,16 @@ vec2 CalcTextSize(str8 text){DPZoneScoped;
 	return result;
 }
 
-TextChunk* new_chunk(){
+TextChunk* new_chunk(){DPZoneScoped;
 	return (TextChunk*)memalloc(sizeof(TextChunk));
 }
 
-Line* new_line(){
+Line* new_line(){DPZoneScoped;
 	return (Line*)memalloc(sizeof(Line));
 }
 
 //inserts line and updates all following lines's indexes
-void insert_line(Node* dest, Node* src){
+void insert_line(Node* dest, Node* src){DPZoneScoped;
 	NodeInsertNext(dest, src);
 	Line* destl = LineFromNode(dest);
 	Line* srcl = LineFromNode(src);
@@ -242,7 +244,7 @@ void insert_line(Node* dest, Node* src){
 
 //loads a file and creates one TextChunk encompassing the entire file
 //and caches line info
-void load_file(str8 filepath){
+void load_file(str8 filepath){DPZoneScoped;
 	file = file_init(filepath, FileAccess_ReadWrite);
 	if(!file){ Assert(false); return; }
 	
@@ -258,7 +260,15 @@ void load_file(str8 filepath){
 	str8 remaining = buffer;
     while(remaining){
 		str8 line = str8_eat_until(remaining, U'\n'); line.count++;
-		if(*(line.str+line.count-2)=='\r') buffer_CRLF = 1;
+		if(*(line.str+line.count-2)=='\r'){
+			buffer_CRLF = 1;
+			line_end_char = '\r';
+			line_end_length = 2;
+		}else{
+			buffer_CRLF = 0;
+			line_end_char = '\n';
+			line_end_length = 1;
+		}
 		str8_increment(&remaining, line.count);
 		
 		Line* l = new_line();
@@ -279,7 +289,7 @@ void load_file(str8 filepath){
 }
 
 
-void init_editor(){
+void init_editor(){DPZoneScoped;
 	edit_arenas = array<Arena*>(deshi_allocator);
 	edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	extra_cursors = array<Cursor>(deshi_allocator);
@@ -304,34 +314,51 @@ u64 calc_line_length(TextChunk* chunk){
 	return 0;
 }
 
-//returns the number of bytes the cursor moved
-u64 move_cursor(Cursor* cursor, KeyCode bind){
+u64 utf8_move_back(u8* start){DPZoneScoped;
 	u64 count = 0;
-	if(match_any(bind, binds.cursorRight, binds.selectRight)){
+	while(utf8_continuation_byte(*(start-1))){
+		start--; count++;
+	}
+	return count;
+}
+
+//returns the number of bytes the cursor moved
+u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
+	u64 count = 0;
+	if      (match_any(bind, binds.cursorRight, binds.selectRight)){////////////////////////////////// Move/Select Right
+		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		if(dc.codepoint == line_end_char){
+			dc.advance = line_end_length;
+			cursor->line_start = 0;
+			cursor->line = NextLine(cursor->line);
+		} else cursor->line_start += dc.advance;
 		if(cursor->chunk_start < cursor->chunk->raw.count){
-			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->chunk_start,4);
-			count += dc.advance;
-			if(dc.codepoint == (buffer_CRLF ? '\r' : '\n')){
-				count += (buffer_CRLF ? 2 : 1);
-				cursor->line_start = 0;
-				cursor->line = NextLine(cursor->line);
-			} else cursor->line_start += dc.advance;
 			cursor->chunk_start += dc.advance;
-			cursor->count  = 0;
 		}else if(!IsRootChunk(cursor->chunk->node.next)){
-			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->chunk_start,4);
-			count += dc.advance;
-			if(dc.codepoint == (buffer_CRLF ? '\r' : '\n')){
-				count += (buffer_CRLF ? 2 : 1);
-				cursor->line_start = 0;
-				cursor->line = NextLine(cursor->line);
-			} else cursor->line_start += dc.advance;
+			//TODO(sushi) confirm if this works when the chunk also ends at a newline
 			cursor->chunk = NextTextChunk(cursor->chunk);
 			cursor->chunk_start = 0;
-			cursor->count = 0;
 		}
+		cursor->count = 0;
+		count += dc.advance;
+	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left
+		if(!cursor->chunk->offset && !cursor->chunk_start) return 0;
+		count += utf8_move_back(cursor->chunk->raw.str+cursor->chunk_start);
+		count++;
+		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		if(!IsRootLine(cursor->line->node.prev) && dc.codepoint == '\n'){//we can only hit a \n from here
+			count = line_end_length;
+			cursor->line = PrevLine(cursor->line);
+			cursor->line_start = cursor->line->raw.count - line_end_length;
+		} else cursor->line_start -= count;
+		if(cursor->chunk_start > 0){
+			cursor->chunk_start -= count;
+		}else if(!IsRootChunk(cursor->chunk->node.prev)){
+			cursor->chunk = PrevTextChunk(cursor->chunk);
+			cursor->chunk_start = cursor->chunk->raw.count;
+		}	
+		cursor->count = 0;
 	}
-
 	// u64 count = 0;
 	// if      (match_any(bind, binds.cursorLeft, binds.selectLeft)){////////////////////////////////////  Move/Select Left
 	// 	if(cursor->start > 0){
@@ -548,7 +575,7 @@ void index_lines(){
 }
 
 //TODO(sushi) support newlines
-void text_insert(str8 text){
+void text_insert(str8 text){DPZoneScoped;
 	// Arena* edit_arena = *edit_arenas.last;
 	// if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 	// 	TextChunk* curchunk = main_cursor.chunk;
@@ -599,7 +626,7 @@ void text_insert(str8 text){
 	// main_cursor.chunk->raw.count += text.count;
 }
 
-void text_delete_left(){
+void text_delete_left(){DPZoneScoped;
 	// Arena* edit_arena = *edit_arenas.last;
 	// TextChunk* curchunk = main_cursor.chunk;
 	// if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){
@@ -662,7 +689,7 @@ void text_delete_left(){
 	
 }
 
-void text_delete_right(){
+void text_delete_right(){DPZoneScoped;
 	// Arena* edit_arena = *edit_arenas.last;
 	// TextChunk* curchunk = main_cursor.chunk;
 	// if(main_cursor.start != 0 || main_cursor.chunk != current_edit_chunk){
@@ -721,7 +748,7 @@ void text_delete_right(){
 
 //stitches together the edits into the static arena then flushes it to the file
 //TODO(sushi) optimize this by joining chunks 
-void save_buffer(){
+void save_buffer(){DPZoneScoped;
 	// //temp weak approximation of growth
 	// //this should be better tracked later in editing functions
 	// u64 growth = 0;
@@ -754,12 +781,12 @@ void save_buffer(){
 	// static_arena = stitched;
 }
 
-void draw_character(u32 character, vec2 scale, color col, vec2* cursor){
+void draw_character(u32 character, vec2 scale, color col, vec2* cursor){DPZoneScoped;
 	Vertex2         vp[4];
 	RenderTwodIndex ip[6];
-	if(character == U'\n'){
+	if(character == U'\n'){ //NOTE(sushi) \r is skipped outside of this function
 		if(config.show_symbol_eol){
-			cursor->x += 1;
+			cursor->x += 4;
 			if(buffer_CRLF){
 				vec2 slashr_size = CalcTextSize(str8l("\\r"));
 				render_quad_filled2(*cursor, slashr_size, config.text_color);
@@ -841,7 +868,7 @@ void draw_character(u32 character, vec2 scale, color col, vec2* cursor){
 	}
 }
 
-void update_editor(){
+void update_editor(){DPZoneScoped;
 	//if(file->path == 0) DebugBreakpoint;
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
@@ -921,8 +948,10 @@ void update_editor(){
 			while(text){
 				vec2 prevcur = visual_cursor;
 				DecodedCodepoint decoded = str8_advance(&text);
-				draw_character(decoded.codepoint, text_scale, config.text_color, &visual_cursor);			
-				if(main_cursor.chunk_start == advanced){
+				if(decoded.codepoint == '\r'){ decoded = str8_advance(&text); advanced++; }
+				draw_character(decoded.codepoint, text_scale, config.text_color, &visual_cursor);	
+				//--------------------------------------------------------------------------------------- Draw Cursor//
+				if(main_cursor.chunk_start == (decoded.codepoint == '\n' && buffer_CRLF ? advanced-1 : advanced)){
 					persist Stopwatch cursor_blink = start_stopwatch();
 					if(DeshInput->anyKeyDown) reset_stopwatch(&cursor_blink);
 					color cursor_color = config.cursor_color;
@@ -962,7 +991,7 @@ void update_editor(){
 				
 				
 				advanced += decoded.advance;
-				if(decoded.codepoint == '\n') line = NextLine(line);
+				if(decoded.codepoint == '\n') line = NextLine(line); 
 				if(visual_cursor.y > text_space.y){ break; }
 			} 
 			
@@ -980,8 +1009,10 @@ void update_editor(){
 			
 			//bottom line
 			render_line2(chunk_pos + size.yComp(), chunk_pos + size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
-#endif
-			
+#endif	
+			render_start_cmd2(5, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+			string fps = toStr(1000/DeshTime->deltaTime);
+			render_text2(config.font, {(u8*)fps.str,fps.count}, vec2::ZERO, vec2::ONE, Color_White);
 			
         }
     }

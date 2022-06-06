@@ -47,10 +47,10 @@ int main(){
 	platform_init();
 	logger_init();
 	window_create(str8l("textedit"));
-	console_init();
+	//console_init();
 	render_init();
 	Storage::Init();
-	UI::Init();
+	//UI::Init();
 	cmd_init();
 	window_show(DeshWindow);
 	render_use_default_camera();
@@ -61,8 +61,8 @@ int main(){
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		update_editor();
-		console_update();
-		UI::Update();
+	//	console_update();
+	//	UI::Update();
 		render_update();
 		logger_update();
 		memory_clear_temp();
