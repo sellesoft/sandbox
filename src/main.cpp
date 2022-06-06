@@ -31,11 +31,13 @@
 
 
 #include "ui2.h"
-#include "ui2.cpp"
+#if !DESHI_RELOADABLE_UI
+#  include "ui2.cpp"
+#endif
 
 
 void action(void* data){
-
+	
 }
 
 void log_sizes(){
@@ -50,7 +52,7 @@ void log_sizes(){
         "uiStyle:   ", sizeof(uiStyle), "\n",
         "upt:       ", sizeof(upt), "\n",
         "u64:       ", sizeof(u64), "\n"
-    );
+		);
 }
 
 int main(){
@@ -71,10 +73,10 @@ int main(){
     ui_init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
     log_sizes();
-
-    uiWindow* win = uiMakeWindow("test", vec2::ONE*300, vec2::ONE*300, 0);
+	
+    uiWindow* win = uiWindowM("test", vec2::ONE*300, vec2::ONE*300, 0);
 	u32 x = 1;
-
+	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		Log("", *(f32*)(&x));
@@ -84,13 +86,13 @@ int main(){
         {
             using namespace UI;
             Begin(STR8("debuggingUIwithUI"));{
-
+				
             }End();
         }
 		UI::Update();
 		render_update();
 		logger_update();
-
+		
 		memory_clear_temp();
 	}
 	

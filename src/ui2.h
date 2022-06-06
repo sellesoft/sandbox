@@ -1,3 +1,13 @@
+#pragma once
+#ifndef DESHI_UI2_H
+#define DESHI_UI2_H
+
+#include "kigu/color.h"
+#include "kigu/common.h"
+#include "kigu/node.h"
+#include "kigu/unicode.h"
+#include "math/vector.h"
+
 /*  NOTES
 
     Everything in this new system is a uiItem.
@@ -25,7 +35,11 @@
 
 */
 
-
+#if DESHI_RELOADABLE_UI
+#  define UI_FUNCTION __declspec(dllexport)
+#else
+#  define UI_FUNCTION external
+#endif
 
 typedef void (*Action)(void*);
 
@@ -52,6 +66,7 @@ enum uiItemType_{
     uiItemType_COUNT
 };typedef u32 uiItemType;
 
+struct Font;
 struct uiStyle{
     vec2i window_margins;
     vec2i item_spacing;
@@ -91,6 +106,8 @@ struct primcount{
     vec2i* sums;
 };
 
+struct Texture;
+struct Vertex2;
 struct uiDrawCmd{
     Texture* texture;
     Vertex2* vertices;
@@ -122,14 +139,14 @@ struct uiItem{
         };
         vec2i size;
     };
-
+	
     u64 draw_cmd_count;
     uiDrawCmd* drawcmds;
     
     uiStyle style; // style at time of making this item. eventually this should be optimized to not store the entire style
-
+	
     uiItem(){} // C++ is retarded
-
+	
     str8 file_created;
     upt  line_created;
 };
@@ -190,7 +207,7 @@ enum{
     pos_static=0,
     pos_relative,
     pos_fixed,
-   // pos_absolute, TODO(sushi) decide if this is useful to implement
+	// pos_absolute, TODO(sushi) decide if this is useful to implement
     pos_sticky,
 };
 
@@ -209,7 +226,7 @@ struct uiItemStyle{
     vec2i margin;        
     vec2i padding;       
     vec2  content_align; 
-
+	
 };
 
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
@@ -224,7 +241,7 @@ struct uiWindow{
         };
         vec2i cursor;
     };
-
+	
     uiWindow(){} //C++ is retarded
 };
 #define uiWindowFromNode(x) CastFromMember(uiWindow, item, CastFromMember(uiItem, node, x))
@@ -263,6 +280,7 @@ struct Context{
 }uiContext;
 
 //we cant grow the arena because it will move the memory, so we must chunk 
+struct Arena;
 struct ArenaList{
     Node node;   
     Arena* arena;
@@ -272,9 +290,11 @@ struct ArenaList{
 
 //@Functionality
 
-void ui_push_var(Type idx, f32 nu);
+UI_FUNCTION void ui_push_f32(Type idx, f32 nu);
+void ui_push_f32__stub(Type idx, f32 nu){}
 
-void ui_push_var(Type idx, vec2 nu);
+UI_FUNCTION void ui_push_vec2(Type idx, vec2 nu);
+void ui_push_vec2__stub(Type idx, vec2 nu){}
 
 // makes a ui window that stores ui items 
 // this cannot be a child of anything
@@ -282,14 +302,19 @@ void ui_push_var(Type idx, vec2 nu);
 // flags: a collection of uiWindowFlags to be applied to the window
 //  
 
-uiWindow* ui_make_window(str8 name, Flags flags, str8 file, upt line);
-uiWindow* ui_begin_window(str8 name, Flags flags, str8 file, upt line);
-uiWindow* ui_end_window();
-#define uiWindowM (name, pos, size, flags) ui_make_window(STR8(name),pos,size,flags,STR8(__FILE__),__LINE__)
+#define uiWindowM(name, pos, size, flags) ui_make_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
 #define uiWindowMF(name, pos, size) uiWindowM(name,pos,size,0)
-#define uiWindowB (name, pos, size, flags) ui_begin_window(STR8(name),pos,size,flags,,STR8(__FILE__),__LINE__)
+UI_FUNCTION uiWindow* ui_make_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line);
+uiWindow* ui_make_window__stub(str8 name, Flags flags, str8 file, upt line){return 0;}
+
+#define uiWindowB(name, pos, size, flags) ui_begin_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
 #define uiWindowBF(name, pos, size) uiWIndowB(name,pos,size,0)
+UI_FUNCTION uiWindow* ui_begin_window(str8 name, Flags flags, str8 file, upt line);
+uiWindow* ui_begin_window__stub(str8 name, Flags flags, str8 file, upt line){return 0;}
+
 #define uiWindowE() ui_end_window()
+UI_FUNCTION uiWindow* ui_end_window();
+uiWindow* ui_end_window__stub(){return 0;}
 
 
 // makes a child window inside another window
@@ -298,7 +323,8 @@ uiWindow* ui_end_window();
 //   name: name of the window
 //    pos: initial position of the window
 //   size: initial size of the window
-uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line);
+UI_FUNCTION uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line);
+uiWindow* ui_make_child_window__stub(uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line){return 0;}
 
 
 //      window: uiWindow to emplace the button in
@@ -307,12 +333,15 @@ uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2i size, Flags fl
 //              if 0 is passed, the button will just set it's clicked flag
 // action_data: data passed to the action function 
 //       flags: uiButtonFlags to be given to the button
-#define uiMakeButton(window, text, action, action_data, flags) ui_make_button(window, STR8(text), action, action_data, flags, STR8(__FILE__), __LINE__)
-uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line);
+#define uiMakeButton(window, text, action, action_data, flags) ui_make_button((window),STR8(text),(action),(action_data),(flags),STR8(__FILE__),__LINE__)
+UI_FUNCTION uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line);
+uiButton* ui_make_button__stub(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line){return 0;}
 
 //same as a div in HTML, just a section that items will place themselves in
 //TODO(sushi) void ui_make_section(vec2i pos, vec2i size);
 
-void ui_init();
+external void ui_init();
 
-void ui_update();
+external void ui_update();
+
+#endif //DESHI_UI2_H

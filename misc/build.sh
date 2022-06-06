@@ -134,7 +134,7 @@ for (( i=1; i<=$#; i++)); do
   if [ "${!i}" == "--v" ]; then
     build_verbose=1
   elif [ "${!i}" == "--d" ]; then
-	ECHO "" #### do nothing since this is default (bash has to have something inside an if)
+    echo "" #### do nothing since this is default (bash has to have something inside an if)
   elif [ "${!i}" == "--r" ]; then
     build_dir="$build_folder/release"
     build_release=1
@@ -209,6 +209,8 @@ fi
 defines_shared=""
 if [ $build_shared == 1 ]; then
   defines_shared="-DDESHI_RELOADABLE_UI=1"
+else
+  defines_shared="-DDESHI_RELOADABLE_UI=0"
 fi
 
 
@@ -309,20 +311,29 @@ if [ $builder_platform == "win32" ]; then
     ctime -begin $misc_folder/$app_name.ctm
   fi
 
-  rm *.pdb > /dev/null 2> /dev/null
-  echo Waiting for PDB > lock.tmp
+  #### delete previous debug info
+  if [ $build_shared == 1 ]; then
+    rm *.pdb > /dev/null 2> /dev/null
+    echo Waiting for PDB > lock.tmp
+  fi
 
   #### compile deshi          (generates deshi.obj)
   exe $build_compiler $deshi_sources $includes -c $compile_flags $defines -Fo"deshi.obj"
 
   #### compile deshi DLLs     (generates deshi.dll)
-  exe $build_compiler $dll_sources $includes -c $compile_flags $defines -Fodeshi_dlls.obj
-  exe $build_linker deshi.obj deshi_dlls.obj -DLL $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
-  rm lock.tmp
+  if [ $build_shared == 1 ]; then
+    exe $build_compiler $dll_sources $includes -c $compile_flags $defines -Fodeshi_dlls.obj
+    exe $build_linker deshi.obj deshi_dlls.obj -DLL $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+    rm lock.tmp
+  fi
 
   #### compile app            (generates app_name.exe)
   exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"
-  exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
+  if [ $build_shared == 1 ]; then
+    exe $build_linker deshi.obj deshi.dll $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
+  else
+    exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
+  fi
 
   if [ -e $misc_folder/ctime.exe ]; then
     ctime -end $misc_folder/$app_name.ctm
