@@ -574,9 +574,43 @@ void index_lines(){
 	platform_sleep(100);
 }
 
-//TODO(sushi) support newlines
+
 void text_insert(str8 text){DPZoneScoped;
-	// Arena* edit_arena = *edit_arenas.last;
+	Arena* edit_arena = *edit_arenas.last;
+	TextChunk* curchunk = main_cursor.chunk;
+
+	if(main_cursor.chunk_start != curchunk->raw.count || curchunk != current_edit_chunk){
+		if(main_cursor.chunk_start == curchunk->raw.count){
+			TextChunk* prev = new_chunk();
+			*prev = *curchunk;
+			NodeInsertPrev(&curchunk->node, &prev->node);
+		}else if(!main_cursor.chunk_start){
+			TextChunk* next = new_chunk();
+			*next = *curchunk;
+			NodeInsertNext(&curchunk->node, &next->node);			
+		}else{
+			TextChunk* prev = new_chunk();
+			TextChunk* next = new_chunk();
+			prev->raw = {curchunk->raw.str, (s64)main_cursor.chunk_start};
+			next->raw = {curchunk->raw.str + main_cursor.chunk_start, curchunk->raw.count - (s64)main_cursor.start};
+			NodeInsertPrev(&curchunk->node, &prev->node);
+			NodeInsertNext(&curchunk->node, &next->node);	
+		}
+	}
+	
+	
+	
+	
+	while(text){
+		DecodedCodepoint dc = str8_advance(&text);
+		if(dc.codepoint == '\b'){
+
+		}else if(dc.codepoint == 0x1b){}//do nothing on ESC
+		else{
+
+		}
+		
+	}
 	// if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 	// 	TextChunk* curchunk = main_cursor.chunk;
 	// 	if(main_cursor.start == 0){
@@ -897,17 +931,13 @@ void update_editor(){DPZoneScoped;
 	if(CanDoInput(binds.cursorDown))          { move_cursor(&main_cursor, binds.cursorDown); }
 
 	//// text input ////
-	if(DeshInput->charCount){ //TODO(sushi) replace selection
-		//TODO(delle) handle multiple cursor input  
+	if(DeshInput->charCount){ 
         text_insert({DeshInput->charIn, (s64)DeshInput->charCount});
-	}
-	if(key_pressed(Key_TAB | InputMod_None)){
-		text_insert(str8l("\t"));
 	}
 	//if(key_pressed(Key_ENTER | InputMod_None)){ text_insert(STR8("\n"));  }
 	
 	//// text deletion ////
-	if(CanDoInput(binds.deleteLeft)) { text_delete_left(); }
+	//need to manually support delete on windows
 	if(CanDoInput(binds.deleteRight)) { text_delete_right(); }
 	
 	if(key_pressed(binds.saveBuffer)){ save_buffer(); }
