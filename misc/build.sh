@@ -12,6 +12,8 @@
 #
 # Arguments:
 #   --v    Echo build commands to the console
+#   --date Echo date and time at start of script
+#   --time Time the script (this relies on GNU awk)
 #   --d    Build with    debug info and without optimization (default)
 #   --r    Build without debug info and with    optimization
 #   --s    Build certain modules as shared libraries for code implementation reloading
@@ -99,6 +101,7 @@ build_dir="$build_folder/debug"
 build_verbose=0
 build_release=0
 build_shared=0
+build_time=0
 build_platform=$builder_platform
 build_graphics="vulkan"
 build_compiler="$builder_compiler"
@@ -116,13 +119,13 @@ for (( i=1; i<=$#; i++)); do
   #### parse <command>
   if [ $i == 1 ]; then
     if [ "${!i}" == "compile" ]; then
-      build_cmd = "compile"
+      build_cmd="compile"
       CONTINUE
     elif [ "${!i}" == "link" ]; then
-      build_cmd = "link"
+      build_cmd="link"
       CONTINUE
     elif [ "${!i}" == "one" ]; then
-      build_cmd = "one"
+      build_cmd="one"
       skip_arg=1
       next_arg=$((i+1))
       build_cmd_one_file="${!next_arg}"
@@ -133,6 +136,11 @@ for (( i=1; i<=$#; i++)); do
   #### parse [arguments...]
   if [ "${!i}" == "--v" ]; then
     build_verbose=1
+  elif [ "${!i}" == "--date" ]; then
+    date +"%a, %h %d %Y, %H:%M:%S"
+    printf "\n"
+  elif [ "${!i}" == "--time" ]; then
+    build_time=1
   elif [ "${!i}" == "--d" ]; then
     echo "" #### do nothing since this is default (bash has to have something inside an if)
   elif [ "${!i}" == "--r" ]; then
@@ -305,8 +313,13 @@ exe(){
   fi
 }
 
+if [ $build_time == 1 ]; then
+  start=$(date +%s.%3N)
+fi
+
 pushd $build_dir > /dev/null
 if [ $builder_platform == "win32" ]; then
+  
   if [ -e $misc_folder/ctime.exe ]; then
     ctime -begin $misc_folder/$app_name.ctm
   fi
@@ -338,6 +351,7 @@ if [ $builder_platform == "win32" ]; then
   if [ -e $misc_folder/ctime.exe ]; then
     ctime -end $misc_folder/$app_name.ctm
   fi
+
 elif [ $builder_platform == "mac" ]; then
   echo "Execute commands not setup for platform: $builder_platform"
   exit 1
@@ -349,3 +363,12 @@ else
   exit 1
 fi
 popd > /dev/null
+
+if [ $build_time == 1 ]; then
+  end=$(date +%s.%3N)
+  time_took=$(awk "BEGIN {print $end - $start}")
+  printf "\nbuild took %f seconds" $time_took
+fi
+
+
+

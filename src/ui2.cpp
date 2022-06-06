@@ -261,6 +261,7 @@ TNode* ui_find_container(TNode* item){
     if(item->type == uiItemType_Window || 
        item->type == uiItemType_ChildWindow) return item;
     if(item->parent) return ui_find_container(item->parent);
+    return 0;
 }
 
 void ui_regen_item(uiItem* item){
