@@ -1,3 +1,32 @@
+/*  NOTES
+
+    Everything in this new system is a uiItem.
+
+    Retained UI is stored in arenas while immediate UI is temp allocated
+
+    Any time an item is modified or removed we find it's parent window and recalculate it entirely
+        this can probably be optimized
+    
+    For the reason above, initial generation of a uiItem and it's actual drawinfo generation
+        are in separate functions
+
+    UI macros always automatically apply the str8_lit macro to arguments that ask for text
+
+    uiWindow cursors never take into account styling such as padding (or well, not sure yet)
+
+    Everything in the interface is prefixed with "ui" (always lowercase)
+        type and macro names follow the prefix and are UpperCamelCase
+        function names have a _ after the prefix and are lower_snake_case
+
+    Everything in this system is designed to be as dynamic as possible to enable
+    minimal rewriting when it comes to tweaking code. Basically, there should be almost
+    no hardcoding of anything and everything that can be abstracted out to a single function
+    should be.
+
+*/
+
+
+
 typedef void (*Action)(void*);
 
 enum{
@@ -31,6 +60,8 @@ struct uiStyle{
     color colors[uiColor_COUNT];
     Font* font;
 };
+
+
 
 struct uiStyleColorMod{
     Type  col;
@@ -103,6 +134,84 @@ struct uiItem{
     upt  line_created;
 };
 
+
+/*
+    Item Style Documentation
+
+    uiItems may be passed a uiItemStyle object or a css-style string to determine
+    the style an item takes on. Following is docs about each property. Each property
+    lists it's valid vaules in both programmatic and string form followed by an example.
+
+
+*   positioning 
+    ---
+    Determines how a uiItem is positioned relative to it's parent.
+
+-   Example:
+        in code:
+            uiItemStyle style;
+            style.positioning = pos_fixed;
+        in string:
+            positioning: static
+
+-   Values:
+        pos_static    |  static
+            Default value.
+            The item will be positioned normally. Position values will do nothing.
+
+        pos_relative  |  relative
+            The position values will position the item relative to where it would have 
+            normally been placed. This does not remove the item from the flow.
+
+        pos_fixed     |  fixed
+            The item is positioned relative to the window it is in and does not move.
+
+        pos_sticky    |  sticy
+            The item is positioned just as it would be in relative, but if the item
+            were to go out of view by the user scrolling the item will stick to the edge
+
+
+*   top,left,bottom,right
+    ---
+    Determines where a uiItem is positioned according to it's 'positioning' value
+    
+-   Shorthands:
+        tl - a vec2i representing top and left
+        br - a vec2i representing bottom and right
+    
+-   Example:
+        in code:
+            uiItemStyle style;
+            style.top = 10;
+
+*/
+
+enum{
+    pos_static=0,
+    pos_relative,
+    pos_fixed,
+   // pos_absolute, TODO(sushi) decide if this is useful to implement
+    pos_sticky,
+};
+
+struct uiItemStyle{
+    Type  positioning;  
+    union{
+        struct{u32 top, left;};
+        vec2i tl;
+        struct{f32 ptop, pleft;};
+        vec2 ptl;
+    };
+    union{
+        struct{u32 bottom, right;};
+        vec2i br;
+    };
+    vec2i margin;        
+    vec2i padding;       
+    vec2  content_align; 
+
+};
+
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
 
 struct uiWindow{
@@ -167,8 +276,21 @@ void ui_push_var(Type idx, f32 nu);
 
 void ui_push_var(Type idx, vec2 nu);
 
-#define uiMakeWindow(name, pos, size, flags) ui_make_window(STR8(name),pos,size,flags,STR8(__FILE__),__LINE__)
-uiWindow* ui_make_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line);
+// makes a ui window that stores ui items 
+// this cannot be a child of anything
+//  name: Name for the window.
+// flags: a collection of uiWindowFlags to be applied to the window
+//  
+
+uiWindow* ui_make_window(str8 name, Flags flags, str8 file, upt line);
+uiWindow* ui_begin_window(str8 name, Flags flags, str8 file, upt line);
+uiWindow* ui_end_window();
+#define uiWindowM (name, pos, size, flags) ui_make_window(STR8(name),pos,size,flags,STR8(__FILE__),__LINE__)
+#define uiWindowMF(name, pos, size) uiWindowM(name,pos,size,0)
+#define uiWindowB (name, pos, size, flags) ui_begin_window(STR8(name),pos,size,flags,,STR8(__FILE__),__LINE__)
+#define uiWindowBF(name, pos, size) uiWIndowB(name,pos,size,0)
+#define uiWindowE() ui_end_window()
+
 
 // makes a child window inside another window
 //

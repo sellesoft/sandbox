@@ -27,34 +27,7 @@
 #include "core/file.h"
 #include "math/math.h"
 
-/*  NOTES
 
-    Everything in this new system is a uiItem.
-
-    (maybe) Make functions are used with retained UI while Begin is used with immediate UI
-
-    Retained UI is stored in arenas while immediate UI is temp allocated
-
-    Any time an item is modified or removed we find it's parent window and recalculate it entirely
-        this can probably be optimized
-    
-    For the reason above, initial generation of a uiItem and it's actual drawinfo generation
-        are in separate functions
-
-    UI macros always automatically apply the str8_lit macro to arguments that ask for text
-
-    uiWindow cursors never take into account styling such as padding (or well, not sure yet)
-
-    Everything in the interface is prefixed with "ui" (always lowercase)
-        type and macro names follow the prefix and are UpperCamelCase
-        function names have a _ after the prefix and are lower_snake_case
-
-    Everything in this system is designed to be as dynamic as possible to enable
-    minimal rewriting when it comes to tweaking code. Basically, there should be almost
-    no hardcoding of anything and everything that can be abstracted out to a single function
-    should be.
-
-*/
 
 
 #include "ui2.h"
@@ -100,10 +73,12 @@ int main(){
     log_sizes();
 
     uiWindow* win = uiMakeWindow("test", vec2::ONE*300, vec2::ONE*300, 0);
-
+	u32 x = 1;
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
+		Log("", *(f32*)(&x));
+		x++;
 		console_update();
         ui_update();
         {
