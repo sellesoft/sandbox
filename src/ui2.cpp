@@ -242,7 +242,7 @@ void ui_make_section(vec2i pos, vec2i size){
 	
 }
 
-void ui_init(Allocator* generic_allocator, Allocator* temp_allocator){
+void ui_init(){
     item_list = create_arena_list(0);
     drawcmd_list = create_arena_list(0);
     SetNextPos(-MAX_S32, -MAX_S32);
