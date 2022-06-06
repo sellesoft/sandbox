@@ -105,34 +105,37 @@ struct KeyBinds{
     KeyCode reloadConfig;
 };
 
+struct TextChunk;
+struct Line{
+	Node node;
+	str8 raw;
+	u64  index;
+	u64  count; //count of codepoints in line
+	//pointer to the first text chunk that occurs in the line
+	//NOTE(sushi) this chunk may not be aligned to the line
+	TextChunk* chunk; 
+};	
+#define LineFromNode(x) CastFromMember(Line, node, x)
+#define NextLine(x) LineFromNode((x)->node.next)
+#define PrevLine(x) LineFromNode((x)->node.prev)
 
 struct TextChunk{
 	Node  node;
 	str8  raw;
+	Line* line; //the line the text chunk starts in
 	u64   offset; //byte offset from beginning of file
-	//NOTE(sushi) this is only valid BEFORE any changes to the buffer occur and after rendering
-	//            so from the start of the frame until buffer modifying inputs are processed
-    u64   count;  //codepoint count, this is cached when the chunk is being rendered
-	color bg; 
-	color fg; 
-	b32   newline;
 };
 #define TextChunkFromNode(x) CastFromMember(TextChunk, node, x)
-#define NextTextChunk(x) TextChunkFromNode(x->node.next)
-#define PrevTextChunk(x) TextChunkFromNode(x->node.prev)
+#define NextTextChunk(x) TextChunkFromNode((x)->node.next)
+#define PrevTextChunk(x) TextChunkFromNode((x)->node.prev)
 
-struct Line{
-	Node node;
-
-};
 
 struct Cursor{
+	s64   count;  //selection size, signed for selections in either direction
+	Line* line;
+	u64   line_start; //byte offset
 	TextChunk* chunk;
-	u64 start;  //byte index into chunk
-	u64 line;   //line that the cursor is on
-	u64 column; //codepoint index into line
-	s64 count;  //byte selection size, signed for selections in either direction
-
+	u64   chunk_start; //byte offset
 };
 
 enum{
