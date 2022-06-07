@@ -71,13 +71,7 @@ int main(){
     ui_init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
     log_sizes();
-	
 
-	vec2 a = vec2{1.f,2.f};
-
-	vec2 b = vec2{3.f,2.f};
-
-	a+b;
 
     uiWindow* win = uiWindowM("test", vec2::ONE*300, vec2::ONE*300, 0);
 	u32 x = 1;

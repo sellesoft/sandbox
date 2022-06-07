@@ -5,12 +5,11 @@
 #include "core/render.h"
 #include "core/storage.h"
 
+
 array<uiStyleVarMod>   stack_var;
 array<uiStyleColorMod> stack_color;
 
 //@uiDrawCmd
-
-
 
 //@Item
 
