@@ -28,8 +28,6 @@
 #include "math/math.h"
 
 
-
-
 #include "ui2.h"
 #if !DESHI_RELOADABLE_UI
 #  include "ui2.cpp"
@@ -74,6 +72,13 @@ int main(){
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
     log_sizes();
 	
+
+	vec2 a = vec2{1.f,2.f};
+
+	vec2 b = vec2{3.f,2.f};
+
+	a+b;
+
     uiWindow* win = uiWindowM("test", vec2::ONE*300, vec2::ONE*300, 0);
 	u32 x = 1;
 	

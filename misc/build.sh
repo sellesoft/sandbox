@@ -12,7 +12,6 @@
 #
 # Arguments:
 #   --v    Echo build commands to the console
-#   --date Echo date and time at start of script
 #   --time Time the script (this relies on GNU awk)
 #   --d    Build with    debug info and without optimization (default)
 #   --r    Build without debug info and with    optimization
@@ -25,6 +24,8 @@
 #_____________________________________________________________________________________________________
 #                                           Constants
 #_____________________________________________________________________________________________________
+date +"%a, %h %d %Y, %H:%M:%S"
+printf "\n"
 #### Specify paths ####
 misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
 root_folder="$misc_folder/.."
@@ -136,9 +137,6 @@ for (( i=1; i<=$#; i++)); do
   #### parse [arguments...]
   if [ "${!i}" == "--v" ]; then
     build_verbose=1
-  elif [ "${!i}" == "--date" ]; then
-    date +"%a, %h %d %Y, %H:%M:%S"
-    printf "\n"
   elif [ "${!i}" == "--time" ]; then
     build_time=1
   elif [ "${!i}" == "--d" ]; then
@@ -307,7 +305,9 @@ fi
 #### function to echo and execute commands if verbose flag is set
 exe(){
   if [ $build_verbose == 1 ]; then
+    printf "\n"
     echo "\$ $@"; "$@";
+    printf "\n"
   else
     "$@";
   fi

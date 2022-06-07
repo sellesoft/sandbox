@@ -36,12 +36,18 @@
 */
 
 #if DESHI_RELOADABLE_UI
-#  define UI_FUNCTION __declspec(dllexport)
+//#  define UI_FUNCTION __declspec(dllexport)
+//ref: http://www.codinglabs.net/tutorial_CppRuntimeCodeReload.aspx
+#  define UI_FUNC(rettype, name, ...) \
+    __declspec(dllexport) rettype name(__VA_ARGS__);\
+    rettype GLUE(name,__stub)(__VA_ARGS__){return (rettype)0;}
 #else
-#  define UI_FUNCTION external
+#  define UI_FUNC(rettype, name, ...) external rettype name(__VA_ARGS__)
 #endif
 
 typedef void (*Action)(void*);
+
+
 
 enum{
     uiColor_Text,
@@ -290,11 +296,9 @@ struct ArenaList{
 
 //@Functionality
 
-UI_FUNCTION void ui_push_f32(Type idx, f32 nu);
-void ui_push_f32__stub(Type idx, f32 nu){}
+UI_FUNC(void, ui_push_f32, Type idx, f32 nu);
 
-UI_FUNCTION void ui_push_vec2(Type idx, vec2 nu);
-void ui_push_vec2__stub(Type idx, vec2 nu){}
+UI_FUNC(void, ui_push_vec2, Type idx, vec2 nu);
 
 // makes a ui window that stores ui items 
 // this cannot be a child of anything
@@ -304,17 +308,11 @@ void ui_push_vec2__stub(Type idx, vec2 nu){}
 
 #define uiWindowM(name, pos, size, flags) ui_make_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
 #define uiWindowMF(name, pos, size) uiWindowM(name,pos,size,0)
-UI_FUNCTION uiWindow* ui_make_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line);
-uiWindow* ui_make_window__stub(str8 name, Flags flags, str8 file, upt line){return 0;}
-
 #define uiWindowB(name, pos, size, flags) ui_begin_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
 #define uiWindowBF(name, pos, size) uiWIndowB(name,pos,size,0)
-UI_FUNCTION uiWindow* ui_begin_window(str8 name, Flags flags, str8 file, upt line);
-uiWindow* ui_begin_window__stub(str8 name, Flags flags, str8 file, upt line){return 0;}
-
+UI_FUNC(uiWindow*, ui_make_window, str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line);
 #define uiWindowE() ui_end_window()
-UI_FUNCTION uiWindow* ui_end_window();
-uiWindow* ui_end_window__stub(){return 0;}
+UI_FUNC(uiWindow*, ui_end_window);
 
 
 // makes a child window inside another window
@@ -323,8 +321,7 @@ uiWindow* ui_end_window__stub(){return 0;}
 //   name: name of the window
 //    pos: initial position of the window
 //   size: initial size of the window
-UI_FUNCTION uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line);
-uiWindow* ui_make_child_window__stub(uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line){return 0;}
+UI_FUNC(uiWindow*, ui_make_child_window, uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line);
 
 
 //      window: uiWindow to emplace the button in
@@ -334,8 +331,7 @@ uiWindow* ui_make_child_window__stub(uiWindow* window, str8 name, vec2i size, Fl
 // action_data: data passed to the action function 
 //       flags: uiButtonFlags to be given to the button
 #define uiMakeButton(window, text, action, action_data, flags) ui_make_button((window),STR8(text),(action),(action_data),(flags),STR8(__FILE__),__LINE__)
-UI_FUNCTION uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line);
-uiButton* ui_make_button__stub(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line){return 0;}
+UI_FUNC(uiButton*, ui_make_button, uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line);
 
 //same as a div in HTML, just a section that items will place themselves in
 //TODO(sushi) void ui_make_section(vec2i pos, vec2i size);
