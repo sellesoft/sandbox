@@ -5,8 +5,10 @@
 #include "core/render.h"
 #include "core/storage.h"
 
-array<uiStyleVarMod>   stack_var;
-array<uiStyleColorMod> stack_color;
+#define item_arena g_ui->item_list->arena
+#define drawcmd_arena g_ui->drawcmd_list->arena
+#define SetNextPos(x,y) g_ui->nextPos = {x,y}
+#define SetNextSize(x,y) g_ui->nextSize = {x,y}
 
 //@uiDrawCmd
 
@@ -18,21 +20,9 @@ array<uiStyleColorMod> stack_color;
 //@Window
 
 
-ArenaList* item_list;
-ArenaList* drawcmd_list;
-#define item_arena item_list->arena
-#define drawcmd_arena drawcmd_list->arena
-
-ArenaList* create_arena_list(ArenaList* old){
-    ArenaList* nual = (ArenaList*)memalloc(sizeof(ArenaList));
-    if(old) NodeInsertNext(&old->node, &nual->node);
-    nual->arena = memory_create_arena(Megabytes(1));
-    return nual;
-}
-
 void* arena_add(Arena* arena, upt size){
     if(arena->size < arena->used+size) 
-        item_list = create_arena_list(item_list);
+        g_ui->item_list = create_arena_list(g_ui->item_list);
     u8* cursor = arena->cursor;
     arena->cursor += size;
     arena->used += size;
@@ -41,7 +31,7 @@ void* arena_add(Arena* arena, upt size){
 
 void drawcmd_alloc(uiDrawCmd* drawcmd, vec2i counts){
     if(drawcmd_arena->size < drawcmd_arena->used + counts.x * sizeof(Vertex2) + counts.y * sizeof(u32))
-        drawcmd_list = create_arena_list(drawcmd_list);
+        g_ui->drawcmd_list = create_arena_list(g_ui->drawcmd_list);
     drawcmd->vertices = (Vertex2*)drawcmd_arena->cursor;
     drawcmd->indicies = (u32*)drawcmd_arena->cursor + (u32)counts.x * sizeof(Vertex2);
     drawcmd->texture = 0;
@@ -55,7 +45,7 @@ void drawcmd_alloc(uiDrawCmd* drawcmd, vec2i counts){
 //@Helpers
 
 vec2i ui_decide_item_pos(uiWindow* window){
-    vec2i pos = window->cursor + uiContext.style.window_margins;
+    vec2i pos = window->cursor + g_ui->style.window_margins;
     return pos;
 }
 
@@ -82,7 +72,7 @@ vec2i ui_get_item_screenpos(uiItem* item){
     vec2i spsum = vec2i::ZERO;
     while(1){
         if(node->type == uiItemType_Window){
-            if(node->parent == &uiContext.base){
+            if(node->parent == &g_ui->base){
                 return spsum;
             }
         }
@@ -146,8 +136,8 @@ void ui_gen_window(uiItem* win){
 	
     uiDrawCmd* di = win->drawcmds;
 	
-    render_make_filledrect(di->vertices, di->indicies, {0,0}, win->spos, win->size, uiContext.style.colors[uiColor_WindowBg]);
-    render_make_rect(di->vertices, di->indicies, counter.sums[0], win->spos, win->size, 3, uiContext.style.colors[uiColor_WindowBorder]);
+    render_make_filledrect(di->vertices, di->indicies, {0,0}, win->spos, win->size, g_ui->style.colors[uiColor_WindowBg]);
+    render_make_rect(di->vertices, di->indicies, counter.sums[0], win->spos, win->size, 3, g_ui->style.colors[uiColor_WindowBorder]);
 }
 
 uiWindow* ui_begin_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line){
@@ -161,7 +151,7 @@ uiWindow* ui_begin_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 fi
 //  size: initial size of the window
 // flags: collection of uiWindowFlags to apply to the window
 uiWindow* ui_make_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line){
-    uiBeginItem(uiWindow, win, &uiContext.base, uiItemType_Window, flags, 1, file, line);
+    uiBeginItem(uiWindow, win, &g_ui->base, uiItemType_Window, flags, 1, file, line);
     //win->item.spos = win->item.lpos = pos; why doesnt this work?
     win->item.spos = pos;
     win->item.lpos = pos;
@@ -213,13 +203,13 @@ void ui_gen_button(uiItem* item){
     render_make_filledrect(di[0].vertices, di[0].indicies, {0,0}, 
 						   item->spos, 
 						   item->size,
-						   uiContext.style.colors[uiColor_WindowBg]
+						   g_ui->style.colors[uiColor_WindowBg]
 						   );
     
     render_make_rect(di[0].vertices, di[0].indicies, counter.sums[0], 
 					 item->spos, 
 					 item->size, 3, 
-					 uiContext.style.colors[uiColor_WindowBorder]
+					 g_ui->style.colors[uiColor_WindowBorder]
 					 );
 }
 
@@ -244,79 +234,4 @@ uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Fla
 //same as a div in HTML, just a section that items will place themselves in
 void ui_make_section(vec2i pos, vec2i size){
 	
-}
-
-void ui_init(){
-    item_list = create_arena_list(0);
-    drawcmd_list = create_arena_list(0);
-    SetNextPos(-MAX_S32, -MAX_S32);
-    SetNextSize(-MAX_S32, -MAX_S32);
-    uiStyle* style = &uiContext.style;
-    style->colors[uiColor_WindowBg]     = color(14,14,14);
-    style->colors[uiColor_WindowBorder] = color(170,170,170);
-    style->colors[uiColor_Text] = Color_White;
-	
-    style->font = Storage::CreateFontFromFileBDF(str8l("gohufont-11.bdf")).second;
-}
-
-//finds the container of an item eg. a window, child window, or section
-//probably
-TNode* ui_find_container(TNode* item){
-    if(item->type == uiItemType_Window || 
-       item->type == uiItemType_ChildWindow) return item;
-    if(item->parent) return ui_find_container(item->parent);
-    return 0;
-}
-
-void ui_regen_item(uiItem* item){
-    switch(item->node.type){
-        case uiItemType_Window: ui_gen_window(item); break;
-        case uiItemType_Button: ui_gen_button(item); break;
-    }
-    for_node(item->node.first_child) ui_regen_item(uiItemFromNode(it));
-}
-void ui_recur(TNode* node, vec2i parent_offset){
-    //do updates of each item type
-    switch(node->type){
-        case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
-            {//dragging
-                vec2i mp_cur = vec2i(DeshInput->mouseX, DeshInput->mouseY); 
-                persist b32 dragging = false;
-                persist vec2i mp_offset;
-                if(key_pressed(Mouse_LEFT) && Math::PointInRectangle(mp_cur, item->item.spos, item->item.size)){
-                    mp_offset = item->item.spos - mp_cur;
-                    dragging = true;
-                }
-                if(key_released(Mouse_LEFT)) dragging = false;
-				
-                if(dragging){
-                    item->item.spos = input_mouse_position() + mp_offset;
-                    ui_regen_item(&item->item);
-                }
-            }
-        }break;
-        case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);
-            
-        }break;
-    }
-	
-    //render item
-    uiItem* item = uiItemFromNode(node);
-    forI(item->draw_cmd_count){
-        render_set_active_surface_idx(0);
-        render_start_cmd2(5, item->drawcmds[i].texture, item->spos, item->size);
-        render_add_vertices2(5, item->drawcmds[i].vertices, item->drawcmds[i].counts.x, item->drawcmds[i].indicies, item->drawcmds[i].counts.y);
-    }
-    
-    if(node->child_count){
-        for_node(node->first_child){
-            ui_recur(it, item->spos);
-        }
-    }
-}
-
-void ui_update(){
-    if(uiContext.base.child_count){
-        ui_recur(uiContext.base.first_child, vec2::ZERO);
-    }
 }

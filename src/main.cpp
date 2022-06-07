@@ -28,6 +28,7 @@
 #include "math/math.h"
 
 
+#define DESHI_IMPLEMENTATION_UI2
 #include "ui2.h"
 #if !DESHI_RELOADABLE_UI
 #  include "ui2.cpp"
@@ -72,13 +73,13 @@ int main(){
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
     log_sizes();
 	
-
+	
 	vec2 a = vec2{1.f,2.f};
-
+	
 	vec2 b = vec2{3.f,2.f};
-
+	
 	a+b;
-
+	
     uiWindow* win = uiWindowM("test", vec2::ONE*300, vec2::ONE*300, 0);
 	u32 x = 1;
 	
@@ -93,6 +94,10 @@ int main(){
             Begin(STR8("debuggingUIwithUI"));{
 				
             }End();
+			
+			if(key_pressed(Key_F5 | InputMod_AnyAlt)){
+				ui_reload_functions();
+			}
         }
 		UI::Update();
 		render_update();

@@ -24,8 +24,6 @@
 #_____________________________________________________________________________________________________
 #                                           Constants
 #_____________________________________________________________________________________________________
-date +"%a, %h %d %Y, %H:%M:%S"
-printf "\n"
 #### Specify paths ####
 misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
 root_folder="$misc_folder/.."
@@ -278,9 +276,13 @@ if [ $build_linker == "link" ]; then
   #### NOTE(delle): -incremental:no disables incremental linking (relink all files)
   link_flags="$link_flags -nologo -opt:ref -incremental:no"
 
+  if [ $build_release == 0 ]; then
+    link_flags="$link_flags -debug:full"
+  fi
+
   for ((i=0; i<${#lib_paths[@]}; i++)); do
     lib_path=${lib_paths[i]}
-    link_libs="$link_libs /LIBPATH:$lib_path"
+    link_libs="$link_libs -libpath:$lib_path"
   done
 
   for ((i=0; i<${#libs[@]}; i++)); do
@@ -305,7 +307,6 @@ fi
 #### function to echo and execute commands if verbose flag is set
 exe(){
   if [ $build_verbose == 1 ]; then
-    printf "\n"
     echo "\$ $@"; "$@";
     printf "\n"
   else
@@ -313,16 +314,24 @@ exe(){
   fi
 }
 
+#### function to copy a file (arg0: source, arg1: destination)
+copy_file(){
+  if [ $builder_platform == "win32" ]; then
+    copy $1 $2
+  else
+    cp $1 $2
+  fi
+}
+
 if [ $build_time == 1 ]; then
-  start=$(date +%s.%3N)
+ start=$(date +%s.%3N)
 fi
 
+date +"%a, %h %d %Y, %H:%M:%S"
 pushd $build_dir > /dev/null
 if [ $builder_platform == "win32" ]; then
-  
-  if [ -e $misc_folder/ctime.exe ]; then
-    ctime -begin $misc_folder/$app_name.ctm
-  fi
+  if [ -e $misc_folder/ctime.exe ]; then ctime -begin $misc_folder/$app_name.ctm; fi
+  echo ---------------------------------
 
   #### delete previous debug info
   if [ $build_shared == 1 ]; then
@@ -336,22 +345,17 @@ if [ $builder_platform == "win32" ]; then
   #### compile deshi DLLs     (generates deshi.dll)
   if [ $build_shared == 1 ]; then
     exe $build_compiler $dll_sources $includes -c $compile_flags $defines -Fodeshi_dlls.obj
-    exe $build_linker deshi.obj deshi_dlls.obj -DLL $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+    exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
     rm lock.tmp
+    copy_file deshi.dll $root_folder/deshi.dll
   fi
 
   #### compile app            (generates app_name.exe)
   exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"
-  if [ $build_shared == 1 ]; then
-    exe $build_linker deshi.obj deshi.lib $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
-  else
-    exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
-  fi
-
-  if [ -e $misc_folder/ctime.exe ]; then
-    ctime -end $misc_folder/$app_name.ctm
-  fi
-
+  exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
+  
+  echo ---------------------------------
+  if [ -e $misc_folder/ctime.exe ]; then ctime -end $misc_folder/$app_name.ctm; fi
 elif [ $builder_platform == "mac" ]; then
   echo "Execute commands not setup for platform: $builder_platform"
   exit 1
