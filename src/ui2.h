@@ -311,6 +311,7 @@ UI_FUNC(void, ui_push_vec2, Type idx, vec2 nu);
 #define uiWindowB(name, pos, size, flags) ui_begin_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
 #define uiWindowBF(name, pos, size) uiWIndowB(name,pos,size,0)
 UI_FUNC(uiWindow*, ui_make_window, str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line);
+
 #define uiWindowE() ui_end_window()
 UI_FUNC(uiWindow*, ui_end_window);
 
@@ -336,8 +337,8 @@ UI_FUNC(uiButton*, ui_make_button, uiWindow* window, Action action, void* action
 //same as a div in HTML, just a section that items will place themselves in
 //TODO(sushi) void ui_make_section(vec2i pos, vec2i size);
 
-external void ui_init();
+UI_FUNC(void, ui_init);
 
-external void ui_update();
+UI_FUNC(void, ui_update);
 
 #endif //DESHI_UI2_H

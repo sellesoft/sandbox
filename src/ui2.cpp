@@ -5,13 +5,6 @@
 #include "core/render.h"
 #include "core/storage.h"
 
-#ifdef DESHI_RELOADABLE_UI
-# define UI_API __declspec(dllexport)
-#else
-# define UI_API 
-#endif
-
-
 array<uiStyleVarMod>   stack_var;
 array<uiStyleColorMod> stack_color;
 
@@ -157,7 +150,7 @@ void ui_gen_window(uiItem* win){
     render_make_rect(di->vertices, di->indicies, counter.sums[0], win->spos, win->size, 3, uiContext.style.colors[uiColor_WindowBorder]);
 }
 
-UI_API uiWindow* ui_begin_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line){
+uiWindow* ui_begin_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line){
     return 0;
 }
 

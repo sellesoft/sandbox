@@ -343,7 +343,7 @@ if [ $builder_platform == "win32" ]; then
   #### compile app            (generates app_name.exe)
   exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"
   if [ $build_shared == 1 ]; then
-    exe $build_linker deshi.obj deshi.dll $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
+    exe $build_linker deshi.obj deshi.lib $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
   else
     exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
   fi
