@@ -27,13 +27,12 @@
 #include "core/file.h"
 #include "math/math.h"
 
-
-#define DESHI_IMPLEMENTATION_UI2
 #include "ui2.h"
 #if !DESHI_RELOADABLE_UI
 #  include "ui2.cpp"
 #endif
 
+local uiContext deshi_ui{}; uiContext* g_ui = &deshi_ui;
 
 void action(void* data){
 	
@@ -69,15 +68,44 @@ int main(){
 	window_show(DeshWindow);
     render_use_default_camera();
 	DeshThreadManager->init();
-    ui_init();
+	
+	{ //load UI funcs
+#if DESHI_RELOADABLE_UI
+		g_ui->module = platform_load_module(STR8("deshi.dll"));
+		if(g_ui->module){
+			g_ui->push_f32          = platform_get_module_function(g_ui->module, "ui_push_f32", ui_push_f32);
+			g_ui->push_vec2         = platform_get_module_function(g_ui->module, "ui_push_vec2", ui_push_vec2);
+			g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
+			g_ui->begin_window      = platform_get_module_function(g_ui->module, "ui_begin_window", ui_begin_window);
+			g_ui->end_window        = platform_get_module_function(g_ui->module, "ui_end_window", ui_end_window);
+			g_ui->make_child_window = platform_get_module_function(g_ui->module, "ui_make_child_window", ui_make_child_window);
+			g_ui->make_button       = platform_get_module_function(g_ui->module, "ui_make_button", ui_make_button);
+			g_ui->init              = platform_get_module_function(g_ui->module, "ui_init", ui_init);
+			g_ui->update            = platform_get_module_function(g_ui->module, "ui_update", ui_update);
+			g_ui->module_valid = (g_ui->push_f32 && g_ui->push_vec2 && g_ui->make_window && g_ui->begin_window && g_ui->end_window
+								  && g_ui->make_child_window && g_ui->make_button && g_ui->init && g_ui->update);
+		}
+		if(!g_ui->module_valid){
+			g_ui->push_f32          = ui_push_f32__stub;
+			g_ui->push_vec2         = ui_push_vec2__stub;
+			g_ui->make_window       = ui_make_window__stub;
+			g_ui->begin_window      = ui_begin_window__stub;
+			g_ui->end_window        = ui_end_window__stub;
+			g_ui->make_child_window = ui_make_child_window__stub;
+			g_ui->make_button       = ui_make_button__stub;
+			g_ui->init              = ui_init__stub;
+			g_ui->update            = ui_udpate__stub;
+		}
+#endif //#if DESHI_RELOADABLE_UI
+	}
+	uiInit();
+	
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
     log_sizes();
 	
 	
 	vec2 a = vec2{1.f,2.f};
-	
 	vec2 b = vec2{3.f,2.f};
-	
 	a+b;
 	
     uiWindow* win = uiWindowM("test", vec2::ONE*300, vec2::ONE*300, 0);
@@ -88,16 +116,51 @@ int main(){
 		Log("", *(f32*)(&x));
 		x++;
 		console_update();
-        ui_update();
+		
+#if DESHI_RELOADABLE_UI
+		if(key_pressed(Key_F5 | InputMod_AnyAlt)){
+			//unload the module
+			g_ui->module_valid = false;
+			if(g_ui->module){
+				platform_free_module(g_ui->module);
+				g_ui->module = 0;
+			}
+			
+			//load the module
+			g_ui->module = platform_load_module(STR8("deshi.dll"));
+			if(g_ui->module){
+				g_ui->push_f32          = platform_get_module_function(g_ui->module, "ui_push_f32", ui_push_f32);
+				g_ui->push_vec2         = platform_get_module_function(g_ui->module, "ui_push_vec2", ui_push_vec2);
+				g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
+				g_ui->begin_window      = platform_get_module_function(g_ui->module, "ui_begin_window", ui_begin_window);
+				g_ui->end_window        = platform_get_module_function(g_ui->module, "ui_end_window", ui_end_window);
+				g_ui->make_child_window = platform_get_module_function(g_ui->module, "ui_make_child_window", ui_make_child_window);
+				g_ui->make_button       = platform_get_module_function(g_ui->module, "ui_make_button", ui_make_button);
+				g_ui->init              = platform_get_module_function(g_ui->module, "ui_init", ui_init);
+				g_ui->update            = platform_get_module_function(g_ui->module, "ui_update", ui_update);
+				g_ui->module_valid = (g_ui->push_f32 && g_ui->push_vec2 && g_ui->make_window && g_ui->begin_window && g_ui->end_window
+									  && g_ui->make_child_window && g_ui->make_button && g_ui->init && g_ui->update);
+			}
+			if(!g_ui->module_valid){
+				g_ui->push_f32          = ui_push_f32__stub;
+				g_ui->push_vec2         = ui_push_vec2__stub;
+				g_ui->make_window       = ui_make_window__stub;
+				g_ui->begin_window      = ui_begin_window__stub;
+				g_ui->end_window        = ui_end_window__stub;
+				g_ui->make_child_window = ui_make_child_window__stub;
+				g_ui->make_button       = ui_make_button__stub;
+				g_ui->init              = ui_init__stub;
+				g_ui->update            = ui_udpate__stub;
+			}
+		}
+#endif //#if DESHI_RELOADABLE_UI
+		
+		uiUpdate();
         {
             using namespace UI;
             Begin(STR8("debuggingUIwithUI"));{
 				
             }End();
-			
-			if(key_pressed(Key_F5 | InputMod_AnyAlt)){
-				ui_reload_functions();
-			}
         }
 		UI::Update();
 		render_update();

@@ -334,10 +334,8 @@ if [ $builder_platform == "win32" ]; then
   echo ---------------------------------
 
   #### delete previous debug info
-  if [ $build_shared == 1 ]; then
-    rm *.pdb > /dev/null 2> /dev/null
-    echo Waiting for PDB > lock.tmp
-  fi
+  rm *.pdb > /dev/null 2> /dev/null
+  #echo Waiting for PDB > lock.tmp
 
   #### compile deshi          (generates deshi.obj)
   exe $build_compiler $deshi_sources $includes -c $compile_flags $defines -Fo"deshi.obj"
@@ -345,15 +343,21 @@ if [ $builder_platform == "win32" ]; then
   #### compile deshi DLLs     (generates deshi.dll)
   if [ $build_shared == 1 ]; then
     exe $build_compiler $dll_sources $includes -c $compile_flags $defines -Fodeshi_dlls.obj
-    exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
-    rm lock.tmp
-    copy_file deshi.dll $root_folder/deshi.dll
+    #exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+    #rm lock.tmp
+    #copy_file deshi.dll $root_folder/deshi.dll
   fi
 
   #### compile app            (generates app_name.exe)
   exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"
   exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
-  
+
+  #### just for testing: create the dll here so it can reference app_name.obj (because g_ui is in app main.cpp instead of deshi.cpp)
+  if [ $build_shared == 1 ]; then
+    exe $build_linker deshi.obj deshi_dlls.obj $app_name.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+    copy_file deshi.dll $root_folder/deshi.dll
+  fi
+
   echo ---------------------------------
   if [ -e $misc_folder/ctime.exe ]; then ctime -end $misc_folder/$app_name.ctm; fi
 elif [ $builder_platform == "mac" ]; then

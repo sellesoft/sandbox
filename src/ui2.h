@@ -32,8 +32,6 @@ Index
 @ui_text
 @ui_section
 @ui_context
-@ui_shared_vars
-@ui_shared_funcs
 
 TODOs
 -----
@@ -362,6 +360,20 @@ struct uiText{
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_context
+UI_FUNC_API(void, ui_init);
+#if DESHI_RELOADABLE_UI
+#  define uiInit() g_ui->init()
+#else
+#  define uiInit() ui_init()
+#endif
+
+UI_FUNC_API(void, ui_update);
+#if DESHI_RELOADABLE_UI
+#  define uiUpdate() g_ui->update()
+#else
+#  define uiUpdate() ui_update()
+#endif
+
 //we cant grow the arena because it will move the memory, so we must chunk 
 struct Arena;
 struct ArenaList{
@@ -375,13 +387,15 @@ struct uiContext{
 	//// functions ////
 	void* module;
 	b32   module_valid;
-	ui_push_f32__sig          push_f32;
-	ui_push_vec2__sig         push_vec2;
-	ui_make_window__sig       make_window;
-	ui_begin_window__sig      begin_window;
-	ui_end_window__sig        end_window;
-	ui_make_child_window__sig make_child_window;
-	ui_make_button__sig       make_button;
+	ui_push_f32__sig*          push_f32;
+	ui_push_vec2__sig*         push_vec2;
+	ui_make_window__sig*       make_window;
+	ui_begin_window__sig*      begin_window;
+	ui_end_window__sig*        end_window;
+	ui_make_child_window__sig* make_child_window;
+	ui_make_button__sig*       make_button;
+	ui_init__sig*             init;
+	ui_update__sig*           update;
 #endif //#if DESHI_RELOADABLE_UI
 	
 	//// state ////
@@ -401,166 +415,4 @@ struct uiContext{
 //global UI pointer
 extern uiContext* g_ui;
 
-external void ui_init();
-
-external void ui_update();
-
-#if DESHI_RELOADABLE_UI
-external void ui_reload_functions();
-#endif //#if DESHI_RELOADABLE_UI
-
 #endif //DESHI_UI2_H
-//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#ifdef DESHI_IMPLEMENTATION_UI2 //TODO rename this define to DESHI_IMPLEMENTATION when we move this to deshi
-#include "core/input.h"
-#include "core/platform.h"
-
-//-////////////////////////////////////////////////////////////////////////////////////////////////
-// @ui_shared_vars
-local uiContext deshi_ui{};
-uiContext* g_ui = &deshi_ui;
-
-
-//-////////////////////////////////////////////////////////////////////////////////////////////////
-// @ui_shared_funcs
-ArenaList* create_arena_list(ArenaList* old){
-    ArenaList* nual = (ArenaList*)memalloc(sizeof(ArenaList));
-    if(old) NodeInsertNext(&old->node, &nual->node);
-    nual->arena = memory_create_arena(Megabytes(1));
-    return nual;
-}
-
-void ui_init(){
-#if DESHI_RELOADABLE_UI
-	g_ui->module = platform_load_module(STR8("deshi.dll"));
-	if(g_ui->module){
-		g_ui->push_f32          = platform_get_module_function(g_ui->module, "ui_push_f32", ui_push_f32);
-		g_ui->push_vec2         = platform_get_module_function(g_ui->module, "ui_push_vec2", ui_push_vec2);
-		g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
-		g_ui->begin_window      = platform_get_module_function(g_ui->module, "ui_begin_window", ui_begin_window);
-		g_ui->end_window        = platform_get_module_function(g_ui->module, "ui_end_window", ui_end_window);
-		g_ui->make_child_window = platform_get_module_function(g_ui->module, "ui_make_child_window", ui_make_child_window);
-		g_ui->make_button       = platform_get_module_function(g_ui->module, "ui_make_button", ui_make_button);
-		g_ui->module_valid = (g_ui->push_f32 && g_ui->push_vec2 && g_ui->make_window && g_ui->begin_window && g_ui->end_window && g_ui->make_child_window && g_ui->make_button);
-	}
-	if(!g_ui->module_valid){
-		g_ui->push_f32          = ui_push_f32__stub;
-		g_ui->push_vec2         = ui_push_vec2__stub;
-		g_ui->make_window       = ui_make_window__stub;
-		g_ui->begin_window      = ui_begin_window__stub;
-		g_ui->end_window        = ui_end_window__stub;
-		g_ui->make_child_window = ui_make_child_window__stub;
-		g_ui->make_button       = ui_make_button__stub;
-	}
-#endif //#if DESHI_RELOADABLE_UI
-	
-	g_ui->item_list    = create_arena_list(0);
-    g_ui->drawcmd_list = create_arena_list(0);
-    
-	g_ui->nextPos  = {-MAX_S32,-MAX_S32};
-	g_ui->nextSize = {-MAX_S32,-MAX_S32};
-	
-    g_ui->style.colors[uiColor_WindowBg]     = color(14,14,14);
-    g_ui->style.colors[uiColor_WindowBorder] = color(170,170,170);
-    g_ui->style.colors[uiColor_Text]         = Color_White;
-    g_ui->style.font = Storage::CreateFontFromFileBDF(str8l("gohufont-11.bdf")).second;
-}
-
-//finds the container of an item eg. a window, child window, or section
-//probably
-TNode* ui_find_container(TNode* item){
-    if(item->type == uiItemType_Window || 
-       item->type == uiItemType_ChildWindow) return item;
-    if(item->parent) return ui_find_container(item->parent);
-    return 0;
-}
-
-void ui_regen_item(uiItem* item){
-    switch(item->node.type){
-        case uiItemType_Window: ui_gen_window(item); break;
-        case uiItemType_Button: ui_gen_button(item); break;
-    }
-    for_node(item->node.first_child) ui_regen_item(uiItemFromNode(it));
-}
-
-void ui_recur(TNode* node, vec2i parent_offset){
-    //do updates of each item type
-    switch(node->type){
-        case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
-            {//dragging
-                vec2i mp_cur = vec2i(DeshInput->mouseX, DeshInput->mouseY); 
-                persist b32 dragging = false;
-                persist vec2i mp_offset;
-                if(key_pressed(Mouse_LEFT) && Math::PointInRectangle(mp_cur, item->item.spos, item->item.size)){
-                    mp_offset = item->item.spos - mp_cur;
-                    dragging = true;
-                }
-                if(key_released(Mouse_LEFT)) dragging = false;
-				
-                if(dragging){
-                    item->item.spos = input_mouse_position() + mp_offset;
-                    ui_regen_item(&item->item);
-                }
-            }
-        }break;
-        case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);
-            
-        }break;
-    }
-	
-    //render item
-    uiItem* item = uiItemFromNode(node);
-    forI(item->draw_cmd_count){
-        render_set_active_surface_idx(0);
-        render_start_cmd2(5, item->drawcmds[i].texture, item->spos, item->size);
-        render_add_vertices2(5, item->drawcmds[i].vertices, item->drawcmds[i].counts.x, item->drawcmds[i].indicies, item->drawcmds[i].counts.y);
-    }
-    
-    if(node->child_count){
-        for_node(node->first_child){
-            ui_recur(it, item->spos);
-        }
-    }
-}
-
-void ui_update(){
-    if(g_ui->base.child_count){
-        ui_recur(g_ui->base.first_child, vec2::ZERO);
-    }
-}
-
-#if DESHI_RELOADABLE_UI
-void ui_reload_functions(){
-	//unload the module
-	g_ui->module_valid = false;
-	if(g_ui->module){
-		platform_free_module(g_ui->module);
-		g_ui->module = 0;
-	}
-	
-	//load the module
-	g_ui->module = platform_load_module(STR8("deshi.dll"));
-	if(g_ui->module){
-		g_ui->push_f32          = platform_get_module_function(g_ui->module, "ui_push_f32", ui_push_f32);
-		g_ui->push_vec2         = platform_get_module_function(g_ui->module, "ui_push_vec2", ui_push_vec2);
-		g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
-		g_ui->begin_window      = platform_get_module_function(g_ui->module, "ui_begin_window", ui_begin_window);
-		g_ui->end_window        = platform_get_module_function(g_ui->module, "ui_end_window", ui_end_window);
-		g_ui->make_child_window = platform_get_module_function(g_ui->module, "ui_make_child_window", ui_make_child_window);
-		g_ui->make_button       = platform_get_module_function(g_ui->module, "ui_make_button", ui_make_button);
-		g_ui->module_valid = (g_ui->push_f32 && g_ui->push_vec2 && g_ui->make_window && g_ui->begin_window && g_ui->end_window && g_ui->make_child_window && g_ui->make_button);
-	}
-	if(!g_ui->module_valid){
-		g_ui->push_f32          = ui_push_f32__stub;
-		g_ui->push_vec2         = ui_push_vec2__stub;
-		g_ui->make_window       = ui_make_window__stub;
-		g_ui->begin_window      = ui_begin_window__stub;
-		g_ui->end_window        = ui_end_window__stub;
-		g_ui->make_child_window = ui_make_child_window__stub;
-		g_ui->make_button       = ui_make_button__stub;
-	}
-}
-#endif //#if DESHI_RELOADABLE_UI
-
-
-#endif //#idef DESHI_IMPLEMENTATION_UI2
