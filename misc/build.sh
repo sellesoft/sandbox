@@ -247,7 +247,7 @@ if [ $build_compiler == "cl" ]; then
   compile_flags="$compile_flags -W1 -wd4100 -wd4189 -wd4201 -wd4311 -wd4706"
 
   if [ $build_release == 0 ]; then
-    compile_flags="$compile_flags -Z7 -Od"
+    compile_flags="$compile_flags -Zi -Od -Fd$app_name"
   else
     compile_flags="$compile_flags -O2"
   fi
@@ -277,6 +277,10 @@ if [ $build_linker == "link" ]; then
   #### NOTE(delle): -opt:ref eliminates functions and data that are never used
   #### NOTE(delle): -incremental:no disables incremental linking (relink all files)
   link_flags="$link_flags -nologo -opt:ref -incremental:no"
+
+  if [ $build_release == 0 ]; then
+    link_flags="$link_flags -DEBUG"
+  fi
 
   for ((i=0; i<${#lib_paths[@]}; i++)); do
     lib_path=${lib_paths[i]}
@@ -336,7 +340,7 @@ if [ $builder_platform == "win32" ]; then
   #### compile deshi DLLs     (generates deshi.dll)
   if [ $build_shared == 1 ]; then
     exe $build_compiler $dll_sources $includes -c $compile_flags $defines -Fodeshi_dlls.obj
-    exe $build_linker deshi.obj deshi_dlls.obj -DLL $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+    exe $build_linker deshi.obj deshi_dlls.obj -DLL $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls.pdb
     rm lock.tmp
   fi
 
