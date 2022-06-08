@@ -418,36 +418,13 @@ struct uiStyle{
     Font* font;
     u32 font_height;
     color background_color;
-    Texture* backgound_image;
+    Texture* background_image;
     Type border_style;
     color border_color;
 
     void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(this)); }
 
-} ui_initial_style {
-/*          positioning */ pos_static,
-/*                 left */ 0,
-/*                  top */ 0,
-/*                right */ MAX_S32,
-/*               bottom */ MAX_S32,
-/*                width */ -1,
-/*               height */ -1,
-/*          margin_left */ 0,
-/*           margin_top */ 0,
-/*         margin_right */ MAX_S32,
-/*        margin_bottom */ MAX_S32,
-/*         padding_left */ 0,
-/*          padding_top */ 0,
-/*        padding_right */ MAX_S32,
-/*       padding_bottom */ MAX_S32,
-/*        content_align */ vec2{0,0},
-/*                 font */ Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second,
-/*          font_height */ 11,
-/*     background_color */ color{0,0,0,0},
-/*     background_image */ 0,
-/*         border_style */ border_none,
-/*         border_color */ color{180,180,180,255},
-};
+} ui_initial_style{0};
 
 struct uiItem{
     TNode node;

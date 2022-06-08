@@ -245,7 +245,7 @@ if [ $build_compiler == "cl" ]; then
   compile_flags="$compile_flags -W1 -wd4100 -wd4189 -wd4201 -wd4311 -wd4706"
 
   if [ $build_release == 0 ]; then
-    compile_flags="$compile_flags -Z7 -Od"
+    compile_flags="$compile_flags -Zi -Od -Fd$app_name"
   else
     compile_flags="$compile_flags -O2"
   fi

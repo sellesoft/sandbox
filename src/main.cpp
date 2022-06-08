@@ -68,6 +68,43 @@ int main(){
 	window_show(DeshWindow);
     render_use_default_camera();
 	DeshThreadManager->init();
+
+	uiStyle style{};
+
+	forI(sizeof(uiStyle)){
+		*(((u8*)&style)+1) = rand() % 255; 
+	}
+
+	u64 hash = 0xff00ff00ff << 
+		style.positioning >>   
+    	style.left |
+		style.top * 
+    	style.right +
+		style.bottom ^ 
+    	style.width <<
+		style.height >>
+    	style.margin_left *
+		style.margin_top ^
+    	style.margin_bottom &
+		style.margin_right | 
+    	style.padding_left <<
+		style.padding_top &
+    	style.padding_bottom |
+		style.padding_right ^ 
+   (u64)style.font >>
+    	style.font_height ^
+    	style.background_color.r <<
+    	style.background_color.g << 
+    	style.background_color.b << 
+    	style.background_color.a << 
+   (u64)style.background_image >> 
+    	style.border_style << 
+    	style.border_color.r >>
+    	style.border_color.g >>
+    	style.border_color.b >>
+    	style.border_color.a;
+
+
 	
 	{ //load UI funcs
 #if DESHI_RELOADABLE_UI
@@ -107,6 +144,7 @@ int main(){
 #if DESHI_RELOADABLE_UI
 		if(key_pressed(Key_F5 | InputMod_AnyAlt)){
 			//unload the module
+
 			g_ui->module_valid = false;
 			if(g_ui->module){
 				platform_free_module(g_ui->module);
