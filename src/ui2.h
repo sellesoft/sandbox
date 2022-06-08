@@ -35,7 +35,7 @@ Index
 
 TODOs
 -----
-move ui2 to deshi so DLLs can work
+move ui2 to deshi
 */
 
 /*
@@ -322,22 +322,23 @@ move ui2 to deshi so DLLs can work
 #include "kigu/unicode.h"
 #include "math/vector.h"
 
-
 #if DESHI_RELOADABLE_UI
-//#  define UI_FUNCTION __declspec(dllexport)
-//ref: http://www.codinglabs.net/tutorial_CppRuntimeCodeReload.aspx
-#  define UI_FUNC_API(sig__return_type, sig__name, ...) \
-    __declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
-    typedef sig__return_type GLUE(sig__name,__sig)(__VA_ARGS__); \
-    sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;}
-
+#  if DESHI_DLL
+#    define UI_FUNC_API(sig__return_type, sig__name, ...) \
+__declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
+typedef sig__return_type GLUE(sig__name,__sig)(__VA_ARGS__); \
+sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__);
+#  else
+#    define UI_FUNC_API(sig__return_type, sig__name, ...) \
+__declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
+typedef sig__return_type GLUE(sig__name,__sig)(__VA_ARGS__); \
+sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;}
+#  endif
 #  define UI_DEF(x) GLUE(g_ui->, x)
 #else
 #  define UI_FUNC_API(sig__return_type, sig__name, ...) external sig__return_type sig__name(__VA_ARGS__)
 #  define UI_DEF(x) GLUE(ui_, x) 
 #endif
-
-
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
@@ -375,10 +376,10 @@ enum{
     pos_sticky,
     pos_draggable_relative,
     pos_draggable_fixed,
-
+	
     border_none = 0,
     border_solid,
-
+	
     size_auto = -1,
     size_fill = -2,
 };
@@ -421,10 +422,11 @@ struct uiStyle{
     Texture* background_image;
     Type border_style;
     color border_color;
-
+	
     void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(this)); }
-
-} ui_initial_style{0};
+	
+};
+extern uiStyle* ui_initial_style;
 
 struct uiItem{
     TNode node;
@@ -457,10 +459,10 @@ struct uiItem{
 	
     u64 draw_cmd_count;
     uiDrawCmd* drawcmds;
-
+	
     str8 file_created;
     upt  line_created;
-
+	
     void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(this));}
 };
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
@@ -541,11 +543,7 @@ struct uiButton{
 // action_data: data passed to the action function 
 //       flags: uiButtonFlags to be given to the button
 UI_FUNC_API(uiButton*, ui_make_button, uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line);
-#if DESHI_RELOADABLE_UI
-#  define uiMakeButton(window, text, action, action_data, flags) g_ui->make_button((window),STR8(text),(action),(action_data),(flags),STR8(__FILE__),__LINE__)
-#else
-#  define uiMakeButton(window, text, action, action_data, flags) ui_make_button((window),STR8(text),(action),(action_data),(flags),STR8(__FILE__),__LINE__)
-#endif
+#define uiMakeButton(window, text, action, action_data, flags) UI_DEF(make_button((window),STR8(text),(action),(action_data),(flags),STR8(__FILE__),__LINE__))
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
@@ -588,8 +586,8 @@ struct uiContext{
 	ui_end_window__sig*        end_window;
 	ui_make_child_window__sig* make_child_window;
 	ui_make_button__sig*       make_button;
-	ui_init__sig*             init;
-	ui_update__sig*           update;
+	ui_init__sig*              init;
+	ui_update__sig*            update;
 #endif //#if DESHI_RELOADABLE_UI
 	
 	//// state ////

@@ -96,7 +96,7 @@ uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){
 }
 
 void ui_end_item(){
-
+	
 }
 
 
@@ -152,7 +152,7 @@ uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt li
     //name->item.line_created = line;                                                           
     //name->item.style = ui_initial_style;                                                      
     //insert_last(parent, &name->item.node);                                                    
-//
+	//
     //
     ////win->item.spos = win->item.lpos = pos; why doesnt this work?
     //win->name   = name;
@@ -221,7 +221,7 @@ void ui_gen_button(uiItem* item){
 }
 
 void ui_gen_item(uiItem* item){
-
+	
 }
 
 //      window: uiWindow to emplace the button in
@@ -256,33 +256,33 @@ void ui_init(){
     g_ui->drawcmd_list = create_arena_list(0);
     
     g_ui->base = uiItem{0};
-    g_ui->base.style = ui_initial_style;
+    g_ui->base.style = *ui_initial_style;
     g_ui->base.node.type = uiItemType_Section;
     g_ui->base.file_created = STR8(__FILE__);
     g_ui->base.line_created = __LINE__;
-
-    ui_initial_style.     positioning = pos_static;
-    ui_initial_style.            left = 0;
-    ui_initial_style.             top = 0;
-    ui_initial_style.           right = MAX_S32;
-    ui_initial_style.          bottom = MAX_S32;
-    ui_initial_style.           width = -1;
-    ui_initial_style.          height = -1;
-    ui_initial_style.     margin_left = 0;
-    ui_initial_style.      margin_top = 0;
-    ui_initial_style.    margin_right = MAX_S32;
-    ui_initial_style.   margin_bottom = MAX_S32;
-    ui_initial_style.    padding_left = 0;
-    ui_initial_style.     padding_top = 0;
-    ui_initial_style.   padding_right = MAX_S32;
-    ui_initial_style.  padding_bottom = MAX_S32;
-    ui_initial_style.   content_align = vec2{0,0};
-    ui_initial_style.            font = 0, //we cant initialize this here because memory hasnt been initialized yet
-    ui_initial_style.     font_height = 11;
-    ui_initial_style.background_color = color{0,0,0,0};
-    ui_initial_style.background_image = 0;
-    ui_initial_style.    border_style = border_none;
-    ui_initial_style.    border_color = color{180,180,180,255};
+	
+    ui_initial_style->     positioning = pos_static;
+    ui_initial_style->            left = 0;
+    ui_initial_style->             top = 0;
+    ui_initial_style->           right = MAX_S32;
+    ui_initial_style->          bottom = MAX_S32;
+    ui_initial_style->           width = -1;
+    ui_initial_style->          height = -1;
+    ui_initial_style->     margin_left = 0;
+    ui_initial_style->      margin_top = 0;
+    ui_initial_style->    margin_right = MAX_S32;
+    ui_initial_style->   margin_bottom = MAX_S32;
+    ui_initial_style->    padding_left = 0;
+    ui_initial_style->     padding_top = 0;
+    ui_initial_style->   padding_right = MAX_S32;
+    ui_initial_style->  padding_bottom = MAX_S32;
+    ui_initial_style->   content_align = vec2{0,0};
+    ui_initial_style->            font = 0, //we cant initialize this here because memory hasnt been initialized yet
+    ui_initial_style->     font_height = 11;
+    ui_initial_style->background_color = color{0,0,0,0};
+    ui_initial_style->background_image = 0;
+    ui_initial_style->    border_style = border_none;
+    ui_initial_style->    border_color = color{180,180,180,255};
 }
 
 //finds the container of an item eg. a window, child window, or section
@@ -327,11 +327,11 @@ void ui_recur(TNode* node, vec2i parent_offset){
         }
     }
     //do updates of each item type
-
+	
     switch(node->type){
         case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
             {//dragging
-               
+				
             }
         }break;
         case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);

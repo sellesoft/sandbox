@@ -314,15 +314,6 @@ exe(){
   fi
 }
 
-#### function to copy a file (arg0: source, arg1: destination)
-copy_file(){
-  if [ $builder_platform == "win32" ]; then
-    copy $1 $2
-  else
-    cp $1 $2
-  fi
-}
-
 if [ $build_time == 1 ]; then
  start=$(date +%s.%3N)
 fi
@@ -344,10 +335,10 @@ if [ $builder_platform == "win32" ]; then
 
   #### compile deshi DLLs     (generates deshi.dll)
   if [ $build_shared == 1 ]; then
-    exe $build_compiler $dll_sources $includes -c $compile_flags $defines -Fodeshi_dlls.obj
+    exe $build_compiler $dll_sources $includes -c $compile_flags $defines -DDESHI_DLL -Fodeshi_dlls.obj
     #exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
     #rm lock.tmp
-    #copy_file deshi.dll $root_folder/deshi.dll
+    #cp deshi.dll $root_folder/deshi.dll
   fi
 
   #### compile app            (generates app_name.exe)
@@ -357,7 +348,7 @@ if [ $builder_platform == "win32" ]; then
   #### just for testing: create the dll here so it can reference app_name.obj (because g_ui is in app main.cpp instead of deshi.cpp)
   if [ $build_shared == 1 ]; then
     exe $build_linker deshi.obj deshi_dlls.obj $app_name.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
-    copy_file deshi.dll $root_folder/deshi.dll
+    cp deshi.dll $root_folder/deshi.dll
   fi
 
   echo ---------------------------------
