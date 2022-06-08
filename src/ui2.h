@@ -40,6 +40,280 @@ TODOs
 move ui2 to deshi so DLLs can work
 */
 
+/*
+    Item Style Documentation
+
+    uiItems may be passed a uiStyle object or a css-style string to determine
+    the style an item takes on. Following is docs about each property. Each property
+    lists it's valid vaules in both programmatic and string form followed by an example.
+
+    //TODO(sushi) eventually convert this to HTML or markdown for easier viewing
+
+------------------------------------------------------------------------------------------------------------
+*   positioning 
+    ---
+    Determines how a uiItem is positioned relative to it's parent.
+
+-   Inherited: no
+
+-   Example:
+        in code:
+            uiStyle style;
+            style.positioning = pos_fixed;
+        in string:
+            positioning: static;
+
+-   Values:
+        pos_static  |  static
+            Default value.
+            The item will be positioned normally. Position values will do nothing.
+
+        pos_relative  |  relative
+            The position values will position the item relative to where it would have 
+            normally been placed. This does not remove the item from the flow.
+
+        pos_fixed  |  fixed
+            The item is positioned relative to the window it is in and does not move.
+
+        pos_sticky  |  sticy
+            The item is positioned just as it would be in relative, but if the item
+            were to go out of view by the user scrolling the item will stick to the edge
+
+        pos_draggable_relative | draggable_relative
+            The item is positioned the same as relative, but its position may be changed
+            by dragging it with the mouse
+
+        pos_draggable_fixed | draggable_fixed
+            The item is positioned the same as fixed, but its position may be changed by 
+            dragging it with the mouse
+        
+
+------------------------------------------------------------------------------------------------------------
+*   top,left,bottom,right
+    ---
+    Determines where a uiItem is positioned according to it's 'positioning' value. Percents are only supported
+    in string styling, by suffixing the literal with a %. Note that if bottom or right are used, they overrule
+    top or left respectively.
+
+-   Inherited: no
+
+-   Defaults:
+        top and left default to 0, while bottom and right default to MAX_U32, indicating to use top or left instead.
+
+-   Shorthands:
+        tl - a vec2i representing the x and y coords of the top left corner of the item
+        br - a vec2i representing the x and y coords of the bottom right corner of the item
+    
+-   Example:
+        in code:
+            uiStyle style;
+            style.positioning = pos_relative; 
+            style.top = 10; //sets the item's position to be 10 pixels below 
+        in string:
+            positioning: static;
+            top: 10; 
+            ////
+            positioning: relative;
+            lt: 10% 15%; //sets the item's left edge to be 10% of its parents width from its parent left edge and 15% of its parent's height from its parent's top edge
+
+------------------------------------------------------------------------------------------------------------
+*   size, width, height
+    Determines the size of the item.
+
+-   Inherited: no
+
+-   Special:
+        There are 2 special values for sizing an item. Negative values are invalid for sizing are so some are
+        reserved to indicate to the renderer how to size the item.
+
+        -1: equivalent to auto
+            this tells the renderer to automatically size the item based on its content.
+            an enum 'size_auto' is specified
+        
+        -2: fill remaining space
+            this tells the renderer to automatically fill the parent's remaining space after
+            its initial size is determined by its content
+            an enum 'size_fill' is specified
+
+-   Defaults:
+        width and height both default to -1. See above for why.
+
+-   Example:
+        in code:
+            uiStyle style;
+            style.width = size_fill; //will fill remaining width of parent
+            style.height = 20; //height 20 pixels
+        in string:
+            width: auto; //size based on content
+            height: 20%; //size 20% of parent's width
+            width: fill; //fills remaining width of parent.
+
+
+------------------------------------------------------------------------------------------------------------
+*   margin, margin_top, margin_bottom, margin_left, margin_right
+    ---
+    Determines the spacing between a child's edges and its parents edges. Percents are only supported in
+    string styling. Note that if bottom or right are used, they overrule top or left respectively.
+
+     ┌----------------------------┑
+     |     |─────────────────────────── margin_top
+     |    ┌------------------┑    |
+     |━━━━|                  |    |
+     |  | |    child item    |    |
+     |  | |                  |    |
+     |  | |                  |    |
+     |  | |                  |    |
+     |  | └------------------┙    |
+     |  |                         |
+     └--|-------------------------┙
+        |
+       margin_left
+
+-   Inherited: no
+
+-   Defaults:
+        margin_top and margin_left default to 0, while margin_bottom and margin_right default to MAX_U32
+
+-   Shorthands:
+        margin sets margin_left and margin_top
+
+-   Example:
+        in code:
+            uiStyle style;
+            style.margin_top = 10;
+        in string:
+            margin: 10px 10%;
+
+------------------------------------------------------------------------------------------------------------
+*   padding, padding_top, padding_bottom, padding_left, padding_right
+    ---
+    Determines the spacing between an item's edges and its content's edges. Percents are only supported in
+    string styling. The value is interpretted as a 
+
+     ┌----------------------------┑
+     |                            |
+     |    ┌------------------┑    |
+     |    |    |─────────────────────────── padding_top
+     |    |----text in item  |    |
+     |    | |                |    |
+     |    | |                |    |
+     |    | |                |    |
+     |    └-|----------------┙    |
+     |      |                     |
+     └------|---------------------┙
+            |
+            padding_left
+
+-   Inherited: no
+
+-   Defaults:
+        padding_top and padding_left default to 0, while padding_bottom and padding_right default to MAX_U32
+
+-   Shorthands:
+        padding sets padding_left and padding_top
+
+-   Example:
+        in code:
+            uiStyle style;
+            style.padding_left = 10;
+            style.padding_bottom = 15;
+        in string:
+            padding: 20; //sets both padding_left and padding_top to 20 pixels;
+
+------------------------------------------------------------------------------------------------------------
+*   content_align
+    ---
+    Determines how to align an item's contents. This only works when positioning is set to static, otherwise its
+    value will be ignored. This value is a vec2 whose valid values range from 0 to 1.
+
+-   Inherited: no
+
+-   Defaults:
+        Defaults to {0,0}
+
+-   Example:
+        in code:
+            uiStyle style;
+            style.content_align = vec2{0.5,0.5}; //aligns the item's content to be centered over x and y
+        in string:
+            content_align: 0.5 0; //aligns the item's content to be centered over x and top aligned over y
+        visual:
+            {0, 0.5}
+            ┌----------------------------┑
+            |                            |
+            |┌------------------┑        |
+            ||                  |        |
+            ||                  |        |
+            ||                  |        |
+            ||                  |        |
+            ||                  |        |
+            |└------------------┙        |
+            |                            |
+            └----------------------------┙
+
+            {1, 1}
+            ┌----------------------------┑
+            |                            |
+            |                            |
+            |        ┌------------------┑|
+            |        |                  ||
+            |        |                  ||
+            |        |                  ||
+            |        |                  ||
+            |        |                  ||
+            |        └------------------┙|
+            └----------------------------┙
+
+------------------------------------------------------------------------------------------------------------
+*   font
+    Determines the font to use when rendering text. In code this takes a Font* while in string this takes the
+    name of a font file stored in data/fonts.
+
+-   Inherited: yes
+
+-   Defaults:
+        By default the font used is gohudont-11.bdf which should ship with deshi.
+
+-   Example:
+        in code:
+            uiStyle style;
+            style.font = Storage::CreateFontFromFile("Terminus.ttf").second;
+        in string:
+            font: Terminus.ttf;
+
+------------------------------------------------------------------------------------------------------------
+*   font_height
+    Determines the visible height in pixels of rendered text. Note that this does not have to be the same height
+    the font was loaded at, though it may not render as pretty if it isnt.
+
+-   Inherited: yes
+
+-   Defaults:
+        Defaults to 11, the height of the default loaded font.
+
+-   Example:
+        in code:
+            uiStyle style; 
+            style.font_height = 200;
+        in string:
+            font_height: 200;
+------------------------------------------------------------------------------------------------------------
+*   background_color
+    Determines the background color of a uiItem. Note that this property does not apply to all items.
+
+-   Inherited: no
+
+-   Defaults:
+        Defaults to (14,14,14,255)
+
+------------------------------------------------------------------------------------------------------------
+*   border_style
+    Determines the style of border a uiItem has
+
+
+*/
+
+
 #pragma once
 #ifndef DESHI_UI2_H
 #define DESHI_UI2_H
@@ -55,71 +329,23 @@ move ui2 to deshi so DLLs can work
 //#  define UI_FUNCTION __declspec(dllexport)
 //ref: http://www.codinglabs.net/tutorial_CppRuntimeCodeReload.aspx
 #  define UI_FUNC_API(sig__return_type, sig__name, ...) \
-__declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
-typedef sig__return_type GLUE(sig__name,__sig)(__VA_ARGS__); \
-sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;}
+    __declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
+    typedef sig__return_type GLUE(sig__name,__sig)(__VA_ARGS__); \
+    sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;}
+
+#  define UI_DEF(x) GLUE(g_ui->, x)
 #else
 #  define UI_FUNC_API(sig__return_type, sig__name, ...) external sig__return_type sig__name(__VA_ARGS__)
+#  define UI_DEF(x) GLUE(ui_, x) 
 #endif
 
 
-//-////////////////////////////////////////////////////////////////////////////////////////////////
-// @ui_style
-enum{
-    uiColor_Text,
-    uiColor_Separator,
-    uiColor_WindowBg,
-    uiColor_WindowBorder,
-    uiColor_COUNT
-};
-
-enum{
-    uiStyle_WindowMargins,
-    uiStyle_ItemSpacing,
-    uiStyle_WindowBorderSize,
-    uiStyle_ButtonBorderSize,
-};
-
-struct Font;
-struct uiStyle{
-    vec2i window_margins;
-    vec2i item_spacing;
-    f32   window_border_size;
-    f32   button_border_size;
-    color colors[uiColor_COUNT];
-    Font* font;
-};
-
-struct uiStyleColorMod{
-    Type  col;
-    color old;
-};
-
-struct uiStyleVarMod{
-    Type var;
-    f32 old[2];
-};
-
-struct uiStyleVarType{
-    u32 count;
-    u32 offset;
-};
-
-local const uiStyleVarType uiStyleTypes[] = {
-    {2, offsetof(uiStyle, window_margins)},
-    {2, offsetof(uiStyle, item_spacing)},
-    {1, offsetof(uiStyle, window_border_size)},
-    {1, offsetof(uiStyle, button_border_size)},
-};
-
-UI_FUNC_API(void, ui_push_f32, Type idx, f32 nu);
-
-UI_FUNC_API(void, ui_push_vec2, Type idx, vec2 nu);
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_item
 enum uiItemType_{
+    uiItemType_Section,
     uiItemType_Window, 
     uiItemType_ChildWindow,
     uiItemType_Button,
@@ -142,9 +368,94 @@ struct uiDrawCmd{
     vec2i    counts;
 };
 
+enum{
+    pos_static=0,
+    pos_relative,
+    pos_fixed,
+	// pos_absolute, TODO(sushi) decide if this is useful to implement
+    pos_sticky,
+    pos_draggable_relative,
+    pos_draggable_fixed,
+
+    border_none = 0,
+    border_solid,
+
+    size_auto = -1,
+    size_fill = -2,
+};
+
+struct Font;
+struct uiStyle{
+    Type positioning;  
+    union{
+        struct{s32 left, top;};
+        vec2i tl;
+    };
+    union{
+        struct{s32 right, bottom;};
+        vec2i br;
+    };
+    union{
+        struct{s32 width, height;};
+        vec2i size;
+    };
+    union{
+        struct{s32 margin_left, margin_top;};
+        vec2i margintl;
+    };
+    union{
+        struct{s32 margin_bottom, margin_right;};
+        vec2i marginbr;        
+    };
+    union{
+        struct{s32 padding_left, padding_top;};
+        vec2i paddingtl;
+    };
+    union{
+        struct{s32 padding_bottom, padding_right;};
+        vec2i paddingbr;        
+    };
+    vec2 content_align; 
+    Font* font;
+    u32 font_height;
+    color background_color;
+    Texture* backgound_image;
+    Type border_style;
+    color border_color;
+
+    void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(this)); }
+
+} ui_initial_style {
+/*          positioning */ pos_static,
+/*                 left */ 0,
+/*                  top */ 0,
+/*                right */ MAX_U32,
+/*               bottom */ MAX_U32,
+/*                width */ 0,
+/*               height */ 0,
+/*          margin_left */ 0,
+/*           margin_top */ 0,
+/*         margin_right */ MAX_U32,
+/*        margin_bottom */ MAX_U32,
+/*         padding_left */ 0,
+/*          padding_top */ 0,
+/*        padding_right */ MAX_U32,
+/*       padding_bottom */ MAX_U32,
+/*        content_align */ vec2{0,0},
+/*                 font */ Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second,
+/*          font_height */ 11,
+/*     background_color */ color{0,0,0,0},
+/*     background_image */ 0,
+/*         border_style */ border_none,
+/*         border_color */ color{180,180,180,255},
+};
+
 struct uiItem{
     TNode node;
     Flags flags;
+    uiStyle style;
+    //the following position and size vars are internal and unrelated to actually determining 
+    //the item's position and size at creation. uiStyle is used for that.
     union{
         struct{ // position relative to parent
             s32 lx; 
@@ -169,92 +480,14 @@ struct uiItem{
 	
     u64 draw_cmd_count;
     uiDrawCmd* drawcmds;
-    
-    uiStyle style; // style at time of making this item. eventually this should be optimized to not store the entire style
-	
-    uiItem(){} // C++ is retarded
-	
+
     str8 file_created;
     upt  line_created;
-};
+
+    void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(this));}
+} base;
 
 
-/*
-    Item Style Documentation
-
-    uiItems may be passed a uiItemStyle object or a css-style string to determine
-    the style an item takes on. Following is docs about each property. Each property
-    lists it's valid vaules in both programmatic and string form followed by an example.
-
-
-*   positioning 
-    ---
-    Determines how a uiItem is positioned relative to it's parent.
-
--   Example:
-        in code:
-            uiItemStyle style;
-            style.positioning = pos_fixed;
-        in string:
-            positioning: static
-
--   Values:
-        pos_static    |  static
-            Default value.
-            The item will be positioned normally. Position values will do nothing.
-
-        pos_relative  |  relative
-            The position values will position the item relative to where it would have 
-            normally been placed. This does not remove the item from the flow.
-
-        pos_fixed     |  fixed
-            The item is positioned relative to the window it is in and does not move.
-
-        pos_sticky    |  sticy
-            The item is positioned just as it would be in relative, but if the item
-            were to go out of view by the user scrolling the item will stick to the edge
-
-
-*   top,left,bottom,right
-    ---
-    Determines where a uiItem is positioned according to it's 'positioning' value
-    
--   Shorthands:
-        tl - a vec2i representing top and left
-        br - a vec2i representing bottom and right
-    
--   Example:
-        in code:
-            uiItemStyle style;
-            style.top = 10;
-
-*/
-
-enum{
-    pos_static=0,
-    pos_relative,
-    pos_fixed,
-	// pos_absolute, TODO(sushi) decide if this is useful to implement
-    pos_sticky,
-};
-
-struct uiItemStyle{
-    Type  positioning;  
-    union{
-        struct{u32 top, left;};
-        vec2i tl;
-        struct{f32 ptop, pleft;};
-        vec2 ptl;
-    };
-    union{
-        struct{u32 bottom, right;};
-        vec2i br;
-    };
-    vec2i margin;        
-    vec2i padding;       
-    vec2  content_align; 
-	
-};
 
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
 
@@ -271,39 +504,19 @@ struct uiWindow{
         };
         vec2i cursor;
     };
-	
-    uiWindow(){} //C++ is retarded
 };
 #define uiWindowFromNode(x) CastFromMember(uiWindow, item, CastFromMember(uiItem, node, x))
 
-// makes a ui window that stores ui items 
-// this cannot be a child of anything
-//  name: Name for the window.
-// flags: a collection of uiWindowFlags to be applied to the window
-//  
+// makes a uiItem that by default can be dragged and has a border
+UI_FUNC_API(uiWindow*, ui_make_window, str8 name, Flags flags, str8 file, upt line);
+#define uiWindowM(name, flags, style) UI_DEF(make_window(STR8(name),(flags),STR8(__FILE__),__LINE__))
 
-UI_FUNC_API(uiWindow*, ui_make_window, str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line);
-#if DESHI_RELOADABLE_UI
-#  define uiWindowM(name, pos, size, flags) g_ui->make_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
-#else
-#  define uiWindowM(name, pos, size, flags) ui_make_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
-#endif
-#define uiWindowMF(name, pos, size) uiWindowM(name,pos,size,0)
-
-UI_FUNC_API(uiWindow*, ui_begin_window, str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line);
-#if DESHI_RELOADABLE_UI
-#  define uiWindowB(name, pos, size, flags) g_ui->begin_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
-#else
-#  define uiWindowB(name, pos, size, flags) ui_begin_window(STR8(name),(pos),(size),(flags),STR8(__FILE__),__LINE__)
-#endif
-#define uiWindowBF(name, pos, size) uiWIndowB(name,pos,size,0)
+UI_FUNC_API(uiWindow*, ui_begin_window, str8 name, Flags flags, uiStyle style, str8 file, upt line);
+#define uiWindowB(name,  flags)        UI_DEF(begin_window(STR8(name),(flags),(style),STR8(__FILE__),__LINE__))
+#define uiWindowBS(name, flags, style) UI_DEF(begin_window(STR8(name),(flags),(style),STR8(__FILE__),__LINE__))
 
 UI_FUNC_API(uiWindow*, ui_end_window);
-#if DESHI_RELOADABLE_UI
-#  define uiWindowE() g_ui->end_window()
-#else
-#  define uiWindowE() ui_end_window()
-#endif
+#define uiWindowE() UI_DEF(window_end())
 
 
 // makes a child window inside another window
@@ -375,8 +588,7 @@ struct uiContext{
 	//// functions ////
 	void* module;
 	b32   module_valid;
-	ui_push_f32__sig          push_f32;
-	ui_push_vec2__sig         push_vec2;
+    ui_update__sig            update;
 	ui_make_window__sig       make_window;
 	ui_begin_window__sig      begin_window;
 	ui_end_window__sig        end_window;
@@ -385,17 +597,13 @@ struct uiContext{
 #endif //#if DESHI_RELOADABLE_UI
 	
 	//// state ////
-    vec2i nextPos;  // default: -MAx_F32, -MAX_F32; MAX_F32 does nothing
-    vec2i nextSize; // default: -MAx_F32, -MAX_F32; MAX_F32 in either indiciates to stretch item to the edge of the window in that direction
-    TNode base;
-    uiWindow* curwin; //current working window in immediate contexts 
-    uiStyle style;
+    uiItem base;
+    uiItem* curitem;
 	
 	//// memory ////
 	ArenaList* item_list;
 	ArenaList* drawcmd_list;
-	array<uiStyleVarMod>   stack_var;
-	array<uiStyleColorMod> stack_color;
+    array<uiItem*> item_stack; //TODO(sushi) eventually put this in it's own arena since we can do a stack more efficiently in it
 };
 
 //global UI pointer
@@ -403,7 +611,8 @@ extern uiContext* g_ui;
 
 external void ui_init();
 
-external void ui_update();
+UI_FUNC_API(void, ui_update);
+#define uiUpdate UI_DEF(update())
 
 #if DESHI_RELOADABLE_UI
 external void ui_reload_functions();
@@ -421,7 +630,8 @@ local uiContext deshi_ui{};
 uiContext* g_ui = &deshi_ui;
 
 
-//-////////////////////////////////////////////////////////////////////////////////////////////////
+//-//////////////////////////////////
+//////////////////////////////////////////////////////////////
 // @ui_shared_funcs
 ArenaList* create_arena_list(ArenaList* old){
     ArenaList* nual = (ArenaList*)memalloc(sizeof(ArenaList));
@@ -434,9 +644,8 @@ void ui_init(){
 #if DESHI_RELOADABLE_UI
 	g_ui->module = platform_load_module(STR8("deshi.dll"));
 	if(g_ui->module){
-		g_ui->push_f32          = platform_get_module_function(g_ui->module, "ui_push_f32", ui_push_f32);
-		g_ui->push_vec2         = platform_get_module_function(g_ui->module, "ui_push_vec2", ui_push_vec2);
-		g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
+		g_ui->update            = platform_get_module_function(g_ui->module, "ui_update", ui_update);
+        g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
 		g_ui->begin_window      = platform_get_module_function(g_ui->module, "ui_begin_window", ui_begin_window);
 		g_ui->end_window        = platform_get_module_function(g_ui->module, "ui_end_window", ui_end_window);
 		g_ui->make_child_window = platform_get_module_function(g_ui->module, "ui_make_child_window", ui_make_child_window);
@@ -444,8 +653,6 @@ void ui_init(){
 		g_ui->module_valid = (g_ui->push_f32 && g_ui->push_vec2 && g_ui->make_window && g_ui->begin_window && g_ui->end_window && g_ui->make_child_window && g_ui->make_button);
 	}
 	if(!g_ui->module_valid){
-		g_ui->push_f32          = ui_push_f32__stub;
-		g_ui->push_vec2         = ui_push_vec2__stub;
 		g_ui->make_window       = ui_make_window__stub;
 		g_ui->begin_window      = ui_begin_window__stub;
 		g_ui->end_window        = ui_end_window__stub;
@@ -456,78 +663,18 @@ void ui_init(){
 	
 	g_ui->item_list    = create_arena_list(0);
     g_ui->drawcmd_list = create_arena_list(0);
+
+    //initialize base item
+    g_ui->base = uiItem{0};
+    g_ui->base.style = ui_initial_style;
+    g_ui->base.node = TNode{0};
+    g_ui->base.node.type = uiItemType_Section;
+    g_ui->base.node.flags = 0;
+        
     
-	g_ui->nextPos  = {-MAX_S32,-MAX_S32};
-	g_ui->nextSize = {-MAX_S32,-MAX_S32};
-	
-    g_ui->style.colors[uiColor_WindowBg]     = color(14,14,14);
-    g_ui->style.colors[uiColor_WindowBorder] = color(170,170,170);
-    g_ui->style.colors[uiColor_Text]         = Color_White;
-    g_ui->style.font = Storage::CreateFontFromFileBDF(str8l("gohufont-11.bdf")).second;
 }
 
-//finds the container of an item eg. a window, child window, or section
-//probably
-TNode* ui_find_container(TNode* item){
-    if(item->type == uiItemType_Window || 
-       item->type == uiItemType_ChildWindow) return item;
-    if(item->parent) return ui_find_container(item->parent);
-    return 0;
-}
 
-void ui_regen_item(uiItem* item){
-    switch(item->node.type){
-        case uiItemType_Window: ui_gen_window(item); break;
-        case uiItemType_Button: ui_gen_button(item); break;
-    }
-    for_node(item->node.first_child) ui_regen_item(uiItemFromNode(it));
-}
-
-void ui_recur(TNode* node, vec2i parent_offset){
-    //do updates of each item type
-    switch(node->type){
-        case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
-            {//dragging
-                vec2i mp_cur = vec2i(DeshInput->mouseX, DeshInput->mouseY); 
-                persist b32 dragging = false;
-                persist vec2i mp_offset;
-                if(key_pressed(Mouse_LEFT) && Math::PointInRectangle(mp_cur, item->item.spos, item->item.size)){
-                    mp_offset = item->item.spos - mp_cur;
-                    dragging = true;
-                }
-                if(key_released(Mouse_LEFT)) dragging = false;
-				
-                if(dragging){
-                    item->item.spos = input_mouse_position() + mp_offset;
-                    ui_regen_item(&item->item);
-                }
-            }
-        }break;
-        case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);
-            
-        }break;
-    }
-	
-    //render item
-    uiItem* item = uiItemFromNode(node);
-    forI(item->draw_cmd_count){
-        render_set_active_surface_idx(0);
-        render_start_cmd2(5, item->drawcmds[i].texture, item->spos, item->size);
-        render_add_vertices2(5, item->drawcmds[i].vertices, item->drawcmds[i].counts.x, item->drawcmds[i].indicies, item->drawcmds[i].counts.y);
-    }
-    
-    if(node->child_count){
-        for_node(node->first_child){
-            ui_recur(it, item->spos);
-        }
-    }
-}
-
-void ui_update(){
-    if(g_ui->base.child_count){
-        ui_recur(g_ui->base.first_child, vec2::ZERO);
-    }
-}
 
 #if DESHI_RELOADABLE_UI
 void ui_reload_functions(){
@@ -551,8 +698,6 @@ void ui_reload_functions(){
 		g_ui->module_valid = (g_ui->push_f32 && g_ui->push_vec2 && g_ui->make_window && g_ui->begin_window && g_ui->end_window && g_ui->make_child_window && g_ui->make_button);
 	}
 	if(!g_ui->module_valid){
-		g_ui->push_f32          = ui_push_f32__stub;
-		g_ui->push_vec2         = ui_push_vec2__stub;
 		g_ui->make_window       = ui_make_window__stub;
 		g_ui->begin_window      = ui_begin_window__stub;
 		g_ui->end_window        = ui_end_window__stub;

@@ -82,13 +82,6 @@ vec2i ui_get_item_screenpos(uiItem* item){
 
 //initializes a uiItem of some type
 // used at the beginning of all uiItem functions
-// list of things this does:
-//  1. Allocates the uiItem that we are making to the item_arena PLUS the uiDrawInfoCounter arrays
-//  2. Fills out the uiDrawInfoCounter struct
-//  3. Sets the item's type
-//  4. Allocates the drawcmds array to the drawcmd_arena and sets the drawcmd_count var
-//  5. Logs on what line in what file the item was created at
-//  6. Adds the Item to the specified parent
 #define uiBeginItem(T, name, parent, item_type, flags, n_drawcmds, file, line)            \
 T* name = (T*)arena_add(item_arena, sizeof(T));                                           \
 name->item.node.type = item_type;                                                         \
@@ -97,17 +90,12 @@ name->item.drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_d
 name->item.draw_cmd_count = n_drawcmds;                                                   \
 name->item.file_created = file;                                                           \
 name->item.line_created = line;                                                           \
+name->item.style = ui_initial_style;                                                      \
 insert_last(parent, &name->item.node);                                                    \
 
+
+
 //@Functionality
-
-void ui_push_f32(Type idx, f32 nu){
-	
-}
-
-void ui_push_vec2(Type idx, vec2 nu){
-	
-}
 
 //item size, number of uiDrawCmds, followed by the number of primitives per drawCmd 
 void* ui_alloc_item(upt item_size, upt n_drawcmds, ...){
@@ -124,7 +112,7 @@ void* ui_alloc_item(upt item_size, upt n_drawcmds, ...){
     //    drawcmd->counter.sums = (vec2i*)(drawcmd+1)+n;
     //    drawcmd = (uiDrawCmd*)(drawcmd->counter.sums + n); 
     //}
-    return 0;
+    //return 0;
 }
 
 FORCE_INLINE
@@ -140,9 +128,6 @@ void ui_gen_window(uiItem* win){
     render_make_rect(di->vertices, di->indicies, counter.sums[0], win->spos, win->size, 3, g_ui->style.colors[uiColor_WindowBorder]);
 }
 
-uiWindow* ui_begin_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line){
-    return 0;
-}
 
 // makes a window to place items in
 //
@@ -150,25 +135,30 @@ uiWindow* ui_begin_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 fi
 //   pos: initial position of the window
 //  size: initial size of the window
 // flags: collection of uiWindowFlags to apply to the window
-uiWindow* ui_make_window(str8 name, vec2i pos, vec2i size, Flags flags, str8 file, upt line){
+uiWindow* ui_make_window(str8 name, Flags flags, uiStyle style, str8 file, upt line){
     uiBeginItem(uiWindow, win, &g_ui->base, uiItemType_Window, flags, 1, file, line);
     //win->item.spos = win->item.lpos = pos; why doesnt this work?
-    win->item.spos = pos;
-    win->item.lpos = pos;
-    win->item.size = size;
-    win->name      = name;
-    win->cursor    = vec2i::ZERO;
+    win->name   = name;
+    win->cursor = vec2i::ZERO;
 	
-    primcount counter = ui_count_primitives(2,
-											render_make_filledrect_counts(),
-											render_make_rect_counts()
-											);
+    primcount counter = 
+        ui_count_primitives(2,
+            render_make_filledrect_counts(),
+            render_make_rect_counts()
+            );
 	
     drawcmd_alloc(win->item.drawcmds, counter.sums[1]);
     ui_gen_window(&win->item);
 	
     return win;
 }
+
+uiWindow* ui_begin_window(str8 name, Flags flags, uiStyle style, str8 file, upt line){
+    ui_make_window(name, flags, style, file, line);
+    
+    return 0;
+}
+
 
 // makes a child window inside another window
 //
@@ -234,4 +224,76 @@ uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Fla
 //same as a div in HTML, just a section that items will place themselves in
 void ui_make_section(vec2i pos, vec2i size){
 	
+}
+
+//finds the container of an item eg. a window, child window, or section
+//probably
+TNode* ui_find_container(TNode* item){
+    if(item->type == uiItemType_Window || 
+       item->type == uiItemType_ChildWindow) return item;
+    if(item->parent) return ui_find_container(item->parent);
+    return 0;
+}
+
+void ui_regen_item(uiItem* item){
+    switch(item->node.type){
+        case uiItemType_Window: ui_gen_window(item); break;
+        case uiItemType_Button: ui_gen_button(item); break;
+    }
+    for_node(item->node.first_child) ui_regen_item(uiItemFromNode(it));
+}
+
+void ui_recur(TNode* node, vec2i parent_offset){
+    uiItem* item = uiItemFromNode(node);
+    
+    //dragging an item
+    //it doesnt matter whether its fixed or relative here
+    //that only matters in scrolling
+    if(item->style.positioning = pos_draggable_fixed || 
+       item->style.positioning == pos_draggable_relative){
+        vec2i mp_cur = vec2i(DeshInput->mouseX, DeshInput->mouseY); 
+        persist b32 dragging = false;
+        persist vec2i mp_offset;
+        if(key_pressed(Mouse_LEFT) && Math::PointInRectangle(mp_cur, item->spos, item->size)){
+            mp_offset = item->spos - mp_cur;
+            dragging = true;
+        }
+        if(key_released(Mouse_LEFT)) dragging = false;
+        
+        if(dragging){
+            item->spos = input_mouse_position() + mp_offset;
+            ui_regen_item(&item);
+        }
+    }
+    //do updates of each item type
+
+    switch(node->type){
+        case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
+            {//dragging
+               
+            }
+        }break;
+        case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);
+            
+        }break;
+    }
+	
+    //render item
+    forI(item->draw_cmd_count){
+        render_set_active_surface_idx(0);
+        render_start_cmd2(5, item->drawcmds[i].texture, item->spos, item->size);
+        render_add_vertices2(5, item->drawcmds[i].vertices, item->drawcmds[i].counts.x, item->drawcmds[i].indicies, item->drawcmds[i].counts.y);
+    }
+    
+    if(node->child_count){
+        for_node(node->first_child){
+            ui_recur(it, item->spos);
+        }
+    }
+}
+
+void ui_update(){
+    if(g_ui->base.node.child_count){
+        ui_recur(g_ui->base.node.first_child, vec2::ZERO);
+    }
 }
