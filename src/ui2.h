@@ -343,6 +343,7 @@ move ui2 to deshi so DLLs can work
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_item
 enum uiItemType_{
+    uiItemType_Item = 0, //a normal item, doesnt have any special data associated with it
     uiItemType_Section,
     uiItemType_Window, 
     uiItemType_ChildWindow,
@@ -427,18 +428,18 @@ struct uiStyle{
 /*          positioning */ pos_static,
 /*                 left */ 0,
 /*                  top */ 0,
-/*                right */ MAX_U32,
-/*               bottom */ MAX_U32,
-/*                width */ 0,
-/*               height */ 0,
+/*                right */ MAX_S32,
+/*               bottom */ MAX_S32,
+/*                width */ -1,
+/*               height */ -1,
 /*          margin_left */ 0,
 /*           margin_top */ 0,
-/*         margin_right */ MAX_U32,
-/*        margin_bottom */ MAX_U32,
+/*         margin_right */ MAX_S32,
+/*        margin_bottom */ MAX_S32,
 /*         padding_left */ 0,
 /*          padding_top */ 0,
-/*        padding_right */ MAX_U32,
-/*       padding_bottom */ MAX_U32,
+/*        padding_right */ MAX_S32,
+/*       padding_bottom */ MAX_S32,
 /*        content_align */ vec2{0,0},
 /*                 font */ Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second,
 /*          font_height */ 11,
@@ -452,6 +453,7 @@ struct uiItem{
     TNode node;
     Flags flags;
     uiStyle style;
+    str8 id;
     //the following position and size vars are internal and unrelated to actually determining 
     //the item's position and size at creation. uiStyle is used for that.
     union{
@@ -484,8 +486,21 @@ struct uiItem{
 
     void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(this));}
 };
-
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
+
+UI_FUNC_API(uiItem*, ui_make_item, str8 id, uiStyle* style, str8 file, upt line);
+#define uiItemM() UI_DEF(make_item({0}, 0,STR8(__FILE__),__LINE__)))
+#define uiItemMS(style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__)))
+#define uiItemMSI(id, style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__))
+
+UI_FUNC_API(uiItem*, ui_begin_item, str8 id, uiStyle* style, str8 file, upt line);
+#define uiItemB() UI_DEF(begin_item(0,STR8(__FILE__),__LINE__)))
+#define uiItemBS(style) UI_DEF(begin_item(0,STR8(__FILE__),__LINE__)))
+#define uiItemBSI(id,style) UI_DEF(begin_item(0,STR8(__FILE__),__LINE__)))
+
+UI_FUNC_API(void, ui_end_item);
+#define uiItemE() UI_DEF(end_item())
+
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_window
@@ -503,14 +518,16 @@ struct uiWindow{
 #define uiWindowFromNode(x) CastFromMember(uiWindow, item, CastFromMember(uiItem, node, x))
 
 // makes a uiItem that by default can be dragged and has a border
-UI_FUNC_API(uiWindow*, ui_make_window, str8 name, Flags flags, str8 file, upt line);
-#define uiWindowM(name, flags, style) UI_DEF(make_window(STR8(name),(flags),STR8(__FILE__),__LINE__))
+// eventually make flags for automatically having a title bar and buttons, etc. 
+UI_FUNC_API(uiItem*, ui_make_window, str8 name, Flags flags, uiStyle* style, str8 file, upt line);
+#define uiWindowM(name, flags)         UI_DEF(make_window(STR8(name),(flags),STR8(__FILE__),__LINE__))
+#define uiWindowMS(name, flags, style) UI_DEF(make_window(STR8(name),(flags),STR8(__FILE__),__LINE__))
 
-UI_FUNC_API(uiWindow*, ui_begin_window, str8 name, Flags flags, uiStyle style, str8 file, upt line);
-#define uiWindowB(name,  flags)        UI_DEF(begin_window(STR8(name),(flags),(style),STR8(__FILE__),__LINE__))
+UI_FUNC_API(uiItem*, ui_begin_window, str8 name, Flags flags, uiStyle* style, str8 file, upt line);
+#define uiWindowB(name,  flags)        UI_DEF(begin_window(STR8(name),(flags),0,STR8(__FILE__),__LINE__))
 #define uiWindowBS(name, flags, style) UI_DEF(begin_window(STR8(name),(flags),(style),STR8(__FILE__),__LINE__))
 
-UI_FUNC_API(uiWindow*, ui_end_window);
+UI_FUNC_API(uiItem*, ui_end_window);
 #define uiWindowE() UI_DEF(window_end())
 
 
@@ -605,6 +622,7 @@ struct uiContext{
 	//// memory ////
 	ArenaList* item_list;
 	ArenaList* drawcmd_list;
+    array<uiItem*> update_this_frame;
     array<uiItem*> item_stack; //TODO(sushi) eventually put this in it's own arena since we can do a stack more efficiently in it
 };
 

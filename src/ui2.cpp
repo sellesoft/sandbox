@@ -7,8 +7,6 @@
 
 #define item_arena g_ui->item_list->arena
 #define drawcmd_arena g_ui->drawcmd_list->arena
-#define SetNextPos(x,y) g_ui->nextPos = {x,y}
-#define SetNextSize(x,y) g_ui->nextSize = {x,y}
 
 //@uiDrawCmd
 
@@ -51,10 +49,6 @@ void drawcmd_alloc(uiDrawCmd* drawcmd, vec2i counts){
 
 //@Helpers
 
-vec2i ui_decide_item_pos(uiWindow* window){
-    vec2i pos = window->cursor + g_ui->style.window_margins;
-    return pos;
-}
 
 //counts the amount of primitives 
 primcount ui_count_primitives(u32 n_primitives, ...){
@@ -73,20 +67,6 @@ primcount ui_count_primitives(u32 n_primitives, ...){
     return pc;
 }
 
-//walks up the tree until it finds the top most window containing the item and returns it's screen position
-vec2i ui_get_item_screenpos(uiItem* item){
-    TNode* node = &item->node;
-    vec2i spsum = vec2i::ZERO;
-    while(1){
-        if(node->type == uiItemType_Window){
-            if(node->parent == &g_ui->base){
-                return spsum;
-            }
-        }
-		
-    }
-}
-
 //initializes a uiItem of some type
 // used at the beginning of all uiItem functions
 #define uiBeginItem(T, name, parent, item_type, flags, n_drawcmds, file, line)            \
@@ -103,6 +83,22 @@ insert_last(parent, &name->item.node);                                          
 
 
 //@Functionality
+uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){
+    uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
+    item->file_created = file;
+    item->line_created = line;
+    //TODO(sushi) if an item has an id put it in a map
+    return item;
+}
+
+uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){
+    return 0;
+}
+
+void ui_end_item(){
+
+}
+
 
 //item size, number of uiDrawCmds, followed by the number of primitives per drawCmd 
 void* ui_alloc_item(upt item_size, upt n_drawcmds, ...){
@@ -119,20 +115,20 @@ void* ui_alloc_item(upt item_size, upt n_drawcmds, ...){
     //    drawcmd->counter.sums = (vec2i*)(drawcmd+1)+n;
     //    drawcmd = (uiDrawCmd*)(drawcmd->counter.sums + n); 
     //}
-    //return 0;
+    return 0;
 }
 
 FORCE_INLINE
 void ui_gen_window(uiItem* win){
-    primcount counter = ui_count_primitives(2,
-											render_make_filledrect_counts(),
-											render_make_rect_counts()
-											);
-	
-    uiDrawCmd* di = win->drawcmds;
-	
-    render_make_filledrect(di->vertices, di->indicies, {0,0}, win->spos, win->size, g_ui->style.colors[uiColor_WindowBg]);
-    render_make_rect(di->vertices, di->indicies, counter.sums[0], win->spos, win->size, 3, g_ui->style.colors[uiColor_WindowBorder]);
+    //primcount counter = ui_count_primitives(2,
+	//										render_make_filledrect_counts(),
+	//										render_make_rect_counts()
+	//										);
+	//
+    //uiDrawCmd* di = win->drawcmds;
+	//
+    //render_make_filledrect(di->vertices, di->indicies, {0,0}, win->spos, win->size, g_ui->style.colors[uiColor_WindowBg]);
+    //render_make_rect(di->vertices, di->indicies, counter.sums[0], win->spos, win->size, 3, g_ui->style.colors[uiColor_WindowBorder]);
 }
 
 
@@ -142,25 +138,39 @@ void ui_gen_window(uiItem* win){
 //   pos: initial position of the window
 //  size: initial size of the window
 // flags: collection of uiWindowFlags to apply to the window
-uiWindow* ui_make_window(str8 name, Flags flags, uiStyle style, str8 file, upt line){
-    uiBeginItem(uiWindow, win, &g_ui->base, uiItemType_Window, flags, 1, file, line);
-    //win->item.spos = win->item.lpos = pos; why doesnt this work?
-    win->name   = name;
-    win->cursor = vec2i::ZERO;
+uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){
+    //uiBeginItem(uiWindow, win, &g_ui->base, uiItemType_Window, flags, 1, file, line);
+    uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
+    item->node.type = uiItemType_Window;
+    
+    //T* name =                                            
+    //name->item.node.type = item_type;                                                         
+    //name->item.flags = flags;                                                                 
+    //name->item.drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*n_drawcmds); 
+    //name->item.draw_cmd_count = n_drawcmds;                                                   
+    //name->item.file_created = file;                                                           
+    //name->item.line_created = line;                                                           
+    //name->item.style = ui_initial_style;                                                      
+    //insert_last(parent, &name->item.node);                                                    
+//
+    //
+    ////win->item.spos = win->item.lpos = pos; why doesnt this work?
+    //win->name   = name;
+    //win->cursor = vec2i::ZERO;
+	//
+    //primcount counter = 
+    //    ui_count_primitives(2,
+    //        render_make_filledrect_counts(),
+    //        render_make_rect_counts()
+    //        );
+	//
+    //drawcmd_alloc(win->item.drawcmds, counter.sums[1]);
+    //ui_gen_window(&win->item);
 	
-    primcount counter = 
-        ui_count_primitives(2,
-            render_make_filledrect_counts(),
-            render_make_rect_counts()
-            );
-	
-    drawcmd_alloc(win->item.drawcmds, counter.sums[1]);
-    ui_gen_window(&win->item);
-	
-    return win;
+    return 0;
 }
 
-uiWindow* ui_begin_window(str8 name, Flags flags, uiStyle style, str8 file, upt line){
+uiItem* ui_begin_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){
     ui_make_window(name, flags, style, file, line);
     
     return 0;
@@ -189,25 +199,29 @@ uiWindow* ui_make_child_window(uiWindow* window, str8 name, vec2i size, Flags fl
 
 FORCE_INLINE
 void ui_gen_button(uiItem* item){
-    primcount counter = //NOTE(sushi) this can probably be cached on the item at creation time, but the fact that it uses arrays makes that tedious, so probably implement it later
-        ui_count_primitives(3,
-							render_make_filledrect_counts(),
-							render_make_rect_counts()
-							);
-    uiDrawCmd* di = item->drawcmds;
-    drawcmd_alloc(di, counter.sums[1]);
+    //primcount counter = //NOTE(sushi) this can probably be cached on the item at creation time, but the fact that it uses arrays makes that tedious, so probably implement it later
+    //    ui_count_primitives(3,
+	//						render_make_filledrect_counts(),
+	//						render_make_rect_counts()
+	//						);
+    //uiDrawCmd* di = item->drawcmds;
+    //drawcmd_alloc(di, counter.sums[1]);
+    //
+    //render_make_filledrect(di[0].vertices, di[0].indicies, {0,0}, 
+	//					   item->spos, 
+	//					   item->size,
+	//					   g_ui->style.colors[uiColor_WindowBg]
+	//					   );
     
-    render_make_filledrect(di[0].vertices, di[0].indicies, {0,0}, 
-						   item->spos, 
-						   item->size,
-						   g_ui->style.colors[uiColor_WindowBg]
-						   );
-    
-    render_make_rect(di[0].vertices, di[0].indicies, counter.sums[0], 
-					 item->spos, 
-					 item->size, 3, 
-					 g_ui->style.colors[uiColor_WindowBorder]
-					 );
+    //render_make_rect(di[0].vertices, di[0].indicies, counter.sums[0], 
+	//				 item->spos, 
+	//				 item->size, 3, 
+	//				 item->style.colors
+	//				 );
+}
+
+void ui_gen_item(uiItem* item){
+
 }
 
 //      window: uiWindow to emplace the button in
@@ -217,15 +231,16 @@ void ui_gen_button(uiItem* item){
 // action_data: data passed to the action function 
 //       flags: uiButtonFlags to be given to the button
 uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line){
-    uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, flags, 1, file, line);
-    button->item.lpos   = ui_decide_item_pos(window);
-    button->item.spos   = button->item.lpos + window->item.spos;
-    button->action      = action;
-    button->action_data = action_data;
-	
-    //ui_gen_button(button->item);
-    
-    return button;
+    //uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, flags, 1, file, line);
+    //button->item.lpos   = ui_decide_item_pos(window);
+    //button->item.spos   = button->item.lpos + window->item.spos;
+    //button->action      = action;
+    //button->action_data = action_data;
+	//
+    ////ui_gen_button(button->item);
+    //
+    //return button;
+    return 0;
 }
 
 //same as a div in HTML, just a section that items will place themselves in
@@ -240,13 +255,11 @@ void ui_init(){
 	g_ui->item_list    = create_arena_list(0);
     g_ui->drawcmd_list = create_arena_list(0);
     
-	g_ui->nextPos  = {-MAX_S32,-MAX_S32};
-	g_ui->nextSize = {-MAX_S32,-MAX_S32};
-	
-    g_ui->style.colors[uiColor_WindowBg]     = color(14,14,14);
-    g_ui->style.colors[uiColor_WindowBorder] = color(170,170,170);
-    g_ui->style.colors[uiColor_Text]         = Color_White;
-    g_ui->style.font = Storage::CreateFontFromFileBDF(str8l("gohufont-11.bdf")).second;
+    g_ui->base = uiItem{0};
+    g_ui->base.style = ui_initial_style;
+    g_ui->base.node.type = uiItemType_Section;
+    g_ui->base.file_created = STR8(__FILE__);
+    g_ui->base.line_created = __LINE__;
 }
 
 //finds the container of an item eg. a window, child window, or section
@@ -267,6 +280,8 @@ void ui_regen_item(uiItem* item){
 }
 
 void ui_recur(TNode* node, vec2i parent_offset){
+    
+    
     uiItem* item = uiItemFromNode(node);
     
     //dragging an item
@@ -285,7 +300,7 @@ void ui_recur(TNode* node, vec2i parent_offset){
         
         if(dragging){
             item->spos = input_mouse_position() + mp_offset;
-            ui_regen_item(&item);
+            ui_regen_item(item);
         }
     }
     //do updates of each item type
