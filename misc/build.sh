@@ -328,6 +328,8 @@ if [ $build_time == 1 ]; then
 fi
 
 date +"%a, %h %d %Y, %H:%M:%S"
+if [ ! -e $build_folder ]; then mkdir $build_folder; fi
+if [ ! -e $build_dir ]; then mkdir $build_dir; fi
 pushd $build_dir > /dev/null
 if [ $builder_platform == "win32" ]; then
   if [ -e $misc_folder/ctime.exe ]; then ctime -begin $misc_folder/$app_name.ctm; fi
