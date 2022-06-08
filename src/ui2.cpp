@@ -20,6 +20,13 @@
 //@Window
 
 
+ArenaList* create_arena_list(ArenaList* old){
+    ArenaList* nual = (ArenaList*)memalloc(sizeof(ArenaList));
+    if(old) NodeInsertNext(&old->node, &nual->node);
+    nual->arena = memory_create_arena(Megabytes(1));
+    return nual;
+}
+
 void* arena_add(Arena* arena, upt size){
     if(arena->size < arena->used+size) 
         g_ui->item_list = create_arena_list(g_ui->item_list);
@@ -224,6 +231,22 @@ uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Fla
 //same as a div in HTML, just a section that items will place themselves in
 void ui_make_section(vec2i pos, vec2i size){
 	
+}
+
+
+//-////////////////////////////////////////////////////////////////////////////////////////////////
+// @ui_context
+void ui_init(){
+	g_ui->item_list    = create_arena_list(0);
+    g_ui->drawcmd_list = create_arena_list(0);
+    
+	g_ui->nextPos  = {-MAX_S32,-MAX_S32};
+	g_ui->nextSize = {-MAX_S32,-MAX_S32};
+	
+    g_ui->style.colors[uiColor_WindowBg]     = color(14,14,14);
+    g_ui->style.colors[uiColor_WindowBorder] = color(170,170,170);
+    g_ui->style.colors[uiColor_Text]         = Color_White;
+    g_ui->style.font = Storage::CreateFontFromFileBDF(str8l("gohufont-11.bdf")).second;
 }
 
 //finds the container of an item eg. a window, child window, or section
