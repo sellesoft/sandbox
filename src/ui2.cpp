@@ -8,6 +8,16 @@
 #define item_arena g_ui->item_list->arena
 #define drawcmd_arena g_ui->drawcmd_list->arena
 
+void push_item(uiItem* item){
+    g_ui->item_stack.add(item);
+}
+
+uiItem* pop_item(){
+    uiItem* ret = *g_ui->item_stack.last;
+    g_ui->item_stack.pop();
+    return ret;
+}
+
 //@uiDrawCmd
 
 
@@ -34,15 +44,15 @@ void* arena_add(Arena* arena, upt size){
     return cursor;
 }
 
-void drawcmd_alloc(uiDrawCmd* drawcmd, vec2i counts){
-    if(drawcmd_arena->size < drawcmd_arena->used + counts.x * sizeof(Vertex2) + counts.y * sizeof(u32))
+void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){
+    if(drawcmd_arena->size < drawcmd_arena->used + counts.vertices * sizeof(Vertex2) + counts.indices * sizeof(u32))
         g_ui->drawcmd_list = create_arena_list(g_ui->drawcmd_list);
     drawcmd->vertices = (Vertex2*)drawcmd_arena->cursor;
-    drawcmd->indicies = (u32*)drawcmd_arena->cursor + (u32)counts.x * sizeof(Vertex2);
+    drawcmd->indices = (u32*)drawcmd_arena->cursor + counts.vertices * sizeof(Vertex2);
     drawcmd->texture = 0;
     drawcmd->counts = counts;
-    drawcmd_arena->cursor += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
-    drawcmd_arena->used += (u32)counts.x * sizeof(Vertex2) + (u32)counts.y * sizeof(u32);
+    drawcmd_arena->cursor += counts.vertices * sizeof(Vertex2) + counts.indices * sizeof(u32);
+    drawcmd_arena->used += counts.vertices * sizeof(Vertex2) + counts.indices * sizeof(u32);
 }
 
 //@Functions
@@ -52,19 +62,20 @@ void drawcmd_alloc(uiDrawCmd* drawcmd, vec2i counts){
 
 //counts the amount of primitives 
 primcount ui_count_primitives(u32 n_primitives, ...){
-    primcount pc;
-    pc.counts = (vec2i*)memtalloc(n_primitives*sizeof(vec2i));
-    pc.sums = (vec2i*)memtalloc(n_primitives*sizeof(vec2i));
-    vec2i sum;
-    va_list args;
-    va_start(args, n_primitives);
-    forI(n_primitives){
-        vec2i v = vec2(va_arg(args, vec2));
-        sum+=v;
-        pc.sums[i] = sum;
-        pc.counts[i] = v;
-    }
-    return pc;
+    //primcount pc;
+    //pc.counts = (vec2i*)memtalloc(n_primitives*sizeof(vec2i));
+    //pc.sums = (vec2i*)memtalloc(n_primitives*sizeof(vec2i));
+    //RenderDrawCounts sum;
+    //va_list args;
+    //va_start(args, n_primitives);
+    //forI(n_primitives){
+    //    RenderDrawCounts v = va_arg(args, RenderDrawCounts);
+    //    sum+=v;
+    //    pc.sums[i] = sum;
+    //    pc.counts[i] = v;
+    //}
+    //return pc;
+    return primcount{0};
 }
 
 //initializes a uiItem of some type
@@ -80,23 +91,55 @@ name->item.line_created = line;                                                 
 name->item.style = ui_initial_style;                                                      \
 insert_last(parent, &name->item.node);                                                    \
 
-
-
 //@Functionality
+void ui_gen_item(uiItem* item){
+    uiDrawCmd* dc = item->drawcmds;
+    RenderDrawCounts counts = {0};
+    if(item->style.background_color.a){
+        counts+=render_make_filledrect(dc->vertices, dc->indices, counts, item->spos, item->size, item->style.background_color);
+    }
+    switch(item->style.border_style){
+        case border_none:{}break;
+        case border_solid:{
+            render_make_rect(dc->vertices, dc->indices, counts, item->spos, item->size, 2, item->style.border_color);
+        }break;
+    }
+}
+
+
 uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){
+    uiItem* curitem = *g_ui->item_stack.last;
     uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
+    insert_last(&curitem->node, &item->node);
+    
+    if(style) memcpy(&item->style, style, sizeof(uiStyle));
+    else      memcpy(&item->style, ui_initial_style, sizeof(uiStyle));
+    
+    //TODO(sushi) if an item has an id put it in a map
+    item->id = id;
     item->file_created = file;
     item->line_created = line;
-    //TODO(sushi) if an item has an id put it in a map
+
+    item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*2); 
+
+    RenderDrawCounts counts = //reserve enough room for a background and border 
+        render_make_filledrect_counts() +
+        render_make_rect_counts();
+
+    item->draw_cmd_count = 1;
+    drawcmd_alloc(item->drawcmds, counts);
+    g_ui->update_this_frame.add(item);
     return item;
 }
 
 uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){
-    return 0;
+    uiItem* item = ui_make_item(id, style, file, line);
+    push_item(item);
+    return item;
 }
 
 void ui_end_item(){
-	
+    pop_item();
 }
 
 
@@ -220,9 +263,7 @@ void ui_gen_button(uiItem* item){
 	//				 );
 }
 
-void ui_gen_item(uiItem* item){
-	
-}
+
 
 //      window: uiWindow to emplace the button in
 //        text: text to be displayed in the button
@@ -243,6 +284,14 @@ uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Fla
     return 0;
 }
 
+void ui_gen_text(uiItem* item){
+
+}
+
+uiItem* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){
+    return 0;
+}
+
 //same as a div in HTML, just a section that items will place themselves in
 void ui_make_section(vec2i pos, vec2i size){
 	
@@ -255,12 +304,6 @@ void ui_init(){
 	g_ui->item_list    = create_arena_list(0);
     g_ui->drawcmd_list = create_arena_list(0);
     
-    g_ui->base = uiItem{0};
-    g_ui->base.style = *ui_initial_style;
-    g_ui->base.node.type = uiItemType_Section;
-    g_ui->base.file_created = STR8(__FILE__);
-    g_ui->base.line_created = __LINE__;
-	
     ui_initial_style->     positioning = pos_static;
     ui_initial_style->            left = 0;
     ui_initial_style->             top = 0;
@@ -283,6 +326,20 @@ void ui_init(){
     ui_initial_style->background_image = 0;
     ui_initial_style->    border_style = border_none;
     ui_initial_style->    border_color = color{180,180,180,255};
+    ui_initial_style->      text_color = color{255,255,255,255};
+
+
+    g_ui->base = uiItem{0};
+    g_ui->base.style = *ui_initial_style;
+    g_ui->base.node.type = uiItemType_Section;
+    g_ui->base.file_created = STR8(__FILE__);
+    g_ui->base.line_created = __LINE__;
+    g_ui->base.style.width = DeshWindow->width;
+    g_ui->base.style.height = DeshWindow->height;
+    g_ui->base.id = STR8("base");
+    g_ui->base.style_hash = hash<uiStyle>()(&g_ui->base.style);
+
+    push_item(&g_ui->base);
 }
 
 //finds the container of an item eg. a window, child window, or section
@@ -302,10 +359,94 @@ void ui_regen_item(uiItem* item){
     for_node(item->node.first_child) ui_regen_item(uiItemFromNode(it));
 }
 
-void ui_recur(TNode* node, vec2i parent_offset){
-    
-    
+struct DrawContext{
+    vec2i bbx;
+    u64   drawcmd_count;
+    uiDrawCmd* drawCmds;
+};
+
+//pass 0 for child on first call
+TNode* ui_find_static_sized_parent(TNode* node, TNode* child){
     uiItem* item = uiItemFromNode(node);
+    if(!child) return ui_find_static_sized_parent(item->node.parent, &item->node);
+    if(item->style.width != size_auto && item->style.height != size_auto){
+        return &item->node;
+    }else{
+        return ui_find_static_sized_parent(item->node.parent, &item->node);
+    }
+}
+
+void redraw_item_branch(uiItem* item){
+    switch(item->node.type){
+        case uiItemType_Item: ui_gen_item(item); break;
+        case uiItemType_Text: ui_gen_text(item); break;
+        default: Assert(!"unhandled uiItem type"); break;
+    }
+    
+    for_node(item->node.first_child){
+        redraw_item_branch(uiItemFromNode(it));
+    }
+}
+
+//reevaluates an entire brach of items
+DrawContext reeval_item_branch(uiItem* item){
+    DrawContext drawContext;
+
+    if(item->style.height != size_auto) item->height = item->style.height;
+    if(item->style.width != size_auto) item->width = item->style.width;
+
+    vec2i cursor = item->style.paddingtl;
+    for_node(item->node.first_child){
+        uiItem* child = uiItemFromNode(it);
+        DrawContext ret = reeval_item_branch(child);    
+        vec2i cursorloc = cursor;
+        switch(child->style.positioning){
+            case pos_static:{
+                child->lpos =  
+                    child->style.margintl +
+                    item->scroll +
+                    cursor;
+            }break;
+        }
+        if(item->style.width == size_auto){
+            item->width = Max(item->width, child->spos.x + ret.bbx.x);
+        }
+        if(item->style.height == size_auto){
+            item->height = Max(item->height, child->spos.y + ret.bbx.y);
+        }
+    }
+
+
+    //Log("", item->id, " pos: ", item->spos);
+    drawContext.bbx.x = item->width;
+    drawContext.bbx.y = item->height;
+
+    return drawContext;
+}
+
+DrawContext ui_recur(TNode* node){
+    uiItem* item = uiItemFromNode(node);
+    uiItem* parent = uiItemFromNode(node->parent);
+
+    DrawContext drawContext;
+    DrawContext childrenDrawContext;
+    //depth first walk
+    //for_node(node->first_child){
+    //    DrawContext ret = ui_recur(it);
+    //}
+   
+
+    //check if an item's style was modified, if so reevaluate the item,
+    //its children, and every child of its parents until a manually sized parent is found
+    u32 nuhash = hash<uiStyle>()(&item->style);
+    if(nuhash!=item->style_hash){
+        item->style_hash = nuhash; 
+        uiItem* sspar = uiItemFromNode(ui_find_static_sized_parent(&item->node, 0));
+        reeval_item_branch(sspar);
+        redraw_item_branch(sspar);
+    } 
+
+
     
     //dragging an item
     //it doesnt matter whether its fixed or relative here
@@ -343,18 +484,27 @@ void ui_recur(TNode* node, vec2i parent_offset){
     forI(item->draw_cmd_count){
         render_set_active_surface_idx(0);
         render_start_cmd2(5, item->drawcmds[i].texture, item->spos, item->size);
-        render_add_vertices2(5, item->drawcmds[i].vertices, item->drawcmds[i].counts.x, item->drawcmds[i].indicies, item->drawcmds[i].counts.y);
+        render_add_vertices2(5, 
+            item->drawcmds[i].vertices, 
+            item->drawcmds[i].counts.vertices, 
+            item->drawcmds[i].indices, 
+            item->drawcmds[i].counts.indices
+        );
     }
     
     if(node->child_count){
         for_node(node->first_child){
-            ui_recur(it, item->spos);
+            ui_recur(it);
         }
     }
+
+    return drawContext;
 }
 
 void ui_update(){
+    g_ui->base.style.width = DeshWindow->width;
+    g_ui->base.style.height = DeshWindow->height;
     if(g_ui->base.node.child_count){
-        ui_recur(g_ui->base.node.first_child, vec2::ZERO);
+        ui_recur(g_ui->base.node.first_child);
     }
 }

@@ -64,11 +64,12 @@ int main(){
 	console_init();
 	render_init();
 	Storage::Init();
-	UI::Init();
+	//UI::Init();
 	cmd_init();
 	window_show(DeshWindow);
     render_use_default_camera();
 	DeshThreadManager->init();
+
 	
 	{ //load UI funcs
 #if DESHI_RELOADABLE_UI
@@ -98,7 +99,22 @@ int main(){
 	uiInit();
 	
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
-	
+
+	uiItem* mod = 0;
+	uiStyle style{};
+	style.padding_top = 10;
+	uiItemBS(&style)->id = STR8("item0");{
+		uiStyle style{};
+		style.width = 20;
+		style.height = 50;
+		style.background_color = Color_DarkCyan;
+		style.margin_top = 10;
+		(mod=uiItemBS(&style))->id = STR8("item1");{
+			
+		}uiItemE();
+	}uiItemE();
+
+
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 #if DESHI_RELOADABLE_UI
@@ -135,15 +151,15 @@ int main(){
 			}
 		}
 #endif //#if DESHI_RELOADABLE_UI
-		
+		mod->style.margin_top = BoundTimeOsc(0, 50);
 		uiUpdate();
         {
             using namespace UI;
-            Begin(STR8("debuggingUIwithUI"));{
+            //Begin(STR8("debuggingUIwithUI"));{
 				
-            }End();
+            //}End();
         }
-		UI::Update();
+		//UI::Update();
 		render_update();
 		logger_update();
 		

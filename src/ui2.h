@@ -96,7 +96,7 @@ move ui2 to deshi
 -   Inherited: no
 
 -   Defaults:
-        top and left default to 0, while bottom and right default to MAX_U32, indicating to use top or left instead.
+        top and left default to 0, while bottom and right default to MAX_S32, indicating to use top or left instead.
 
 -   Shorthands:
         tl - a vec2i representing the x and y coords of the top left corner of the item
@@ -170,7 +170,8 @@ move ui2 to deshi
 -   Inherited: no
 
 -   Defaults:
-        margin_top and margin_left default to 0, while margin_bottom and margin_right default to MAX_U32
+        margin_top and margin_left default to 0, while margin_bottom and margin_right default to MAX_S32
+        MAXP_S32 just indicates to the renderer that it should use the same value as the other side
 
 -   Shorthands:
         margin sets margin_left and margin_top
@@ -205,7 +206,8 @@ move ui2 to deshi
 -   Inherited: no
 
 -   Defaults:
-        padding_top and padding_left default to 0, while padding_bottom and padding_right default to MAX_U32
+        padding_top and padding_left default to 0, while padding_bottom and padding_right default to MAX_S32
+        MAX_S32 just indicates to the renderer that it should use the same value as the other side
 
 -   Shorthands:
         padding sets padding_left and padding_top
@@ -264,6 +266,7 @@ move ui2 to deshi
 
 ------------------------------------------------------------------------------------------------------------
 *   font
+    ---
     Determines the font to use when rendering text. In code this takes a Font* while in string this takes the
     name of a font file stored in data/fonts.
 
@@ -281,6 +284,7 @@ move ui2 to deshi
 
 ------------------------------------------------------------------------------------------------------------
 *   font_height
+    ---
     Determines the visible height in pixels of rendered text. Note that this does not have to be the same height
     the font was loaded at, though it may not render as pretty if it isnt.
 
@@ -297,6 +301,7 @@ move ui2 to deshi
             font_height: 200;
 ------------------------------------------------------------------------------------------------------------
 *   background_color
+    ---
     Determines the background color of a uiItem. Note that this property does not apply to all items.
 
 -   Inherited: no
@@ -306,7 +311,16 @@ move ui2 to deshi
 
 ------------------------------------------------------------------------------------------------------------
 *   border_style
+    ---
     Determines the style of border a uiItem has
+
+    //TODO(sushi) border_style docs
+
+------------------------------------------------------------------------------------------------------------
+*   text_color
+    ---
+    Determines the color of text
+
 
 
 */
@@ -364,8 +378,8 @@ struct Vertex2;
 struct uiDrawCmd{
     Texture* texture;
     Vertex2* vertices;
-    u32*     indicies;
-    vec2i    counts;
+    u32*     indices;
+    RenderDrawCounts counts;
 };
 
 enum{
@@ -422,6 +436,7 @@ struct uiStyle{
     Texture* background_image;
     Type border_style;
     color border_color;
+    color text_color;
 	
     void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(this)); }
 	
@@ -430,31 +445,26 @@ extern uiStyle* ui_initial_style;
 
 struct uiItem{
     TNode node;
-    Flags flags;
     uiStyle style;
-    str8 id;
-    //the following position and size vars are internal and unrelated to actually determining 
-    //the item's position and size at creation. uiStyle is used for that.
-    union{
-        struct{ // position relative to parent
-            s32 lx; 
-            s32 ly;
-        };
+    u64 style_hash;
+    str8 id; //NOTE(sushi) mostly for debugging, not sure if this will have any other use in the interface
+    
+    //INTERNAL
+    union{ // position relative to parent
+        struct{ s32 lx, ly; };
         vec2i lpos;
     };
-    union{
-        struct{ // position relative to screen
-            s32 sx;
-            s32 sy;
-        };
+    union{ // position relative to screen
+        struct{  s32 sx, sy; };
         vec2i spos;
     };
     union{
-        struct{
-            s32 width;
-            s32 height;
-        };
+        struct{ s32 width, height; };
         vec2i size;
+    };
+    union{
+        struct{s32 scrx, scry;};
+        vec2i scroll;
     };
 	
     u64 draw_cmd_count;
@@ -473,9 +483,9 @@ UI_FUNC_API(uiItem*, ui_make_item, str8 id, uiStyle* style, str8 file, upt line)
 #define uiItemMSI(id, style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__))
 
 UI_FUNC_API(uiItem*, ui_begin_item, str8 id, uiStyle* style, str8 file, upt line);
-#define uiItemB() UI_DEF(begin_item(0,STR8(__FILE__),__LINE__)))
-#define uiItemBS(style) UI_DEF(begin_item(0,STR8(__FILE__),__LINE__)))
-#define uiItemBSI(id,style) UI_DEF(begin_item(0,STR8(__FILE__),__LINE__)))
+#define uiItemB() UI_DEF(begin_item({0,0},0,STR8(__FILE__),__LINE__))
+#define uiItemBS(style) UI_DEF(begin_item({0,0},(style),STR8(__FILE__),__LINE__))
+#define uiItemBSI(id,style) UI_DEF(begin_item((id),(style),STR8(__FILE__),__LINE__))
 
 UI_FUNC_API(void, ui_end_item);
 #define uiItemE() UI_DEF(end_item())
@@ -592,8 +602,7 @@ struct uiContext{
 	
 	//// state ////
     uiItem base;
-    uiItem* curitem;
-	
+
 	//// memory ////
 	ArenaList* item_list;
 	ArenaList* drawcmd_list;
