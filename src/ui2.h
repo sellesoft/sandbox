@@ -378,6 +378,7 @@ struct Texture;
 struct Vertex2;
 struct uiDrawCmd{
     Texture* texture;
+    //TODO(sushi) in order to facilitate moving arenas we need to 
     Vertex2* vertices;
     u32*     indices;
     RenderDrawCounts counts;
@@ -609,10 +610,13 @@ struct uiContext{
 	
 	//// state ////
     uiItem base;
+
+
 	
 	//// memory ////
 	ArenaList* item_list;
 	ArenaList* drawcmd_list;
+    RenderTwodBuffer render_buffer;
     array<uiItem*> update_this_frame;
     array<uiItem*> item_stack; //TODO(sushi) eventually put this in it's own arena since we can do a stack more efficiently in it
 };

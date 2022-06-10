@@ -340,8 +340,10 @@ void ui_init(){
     g_ui->base.style.height = DeshWindow->height;
     g_ui->base.id = STR8("base");
     g_ui->base.style_hash = hash<uiStyle>()(&g_ui->base.style);
-	
     push_item(&g_ui->base);
+
+    //g_ui->render_buffer = render_create_external_2d_buffer(Megabytes(1), Megabytes(1));
+
 }
 
 //finds the container of an item eg. a window, child window, or section
