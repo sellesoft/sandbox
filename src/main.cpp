@@ -69,6 +69,15 @@ int main(){
 	window_show(DeshWindow);
     render_use_default_camera();
 	DeshThreadManager->init();
+
+	Vertex2* vbuff = (Vertex2*)memalloc(sizeof(Vertex2)*100);
+	RenderTwodIndex* ibuff = (RenderTwodIndex*)memalloc(sizeof(RenderTwodIndex)*300);
+	RenderDrawCounts counts{0};
+	RenderTwodBuffer buff = render_create_external_2d_buffer(sizeof(Vertex2)*100, sizeof(RenderTwodIndex)*300);
+	//render_start_cmd2_exbuff(vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
+	counts+=render_make_filledcircle(vbuff, ibuff, counts, vec2::ONE * 100, 40, 20, Color_Cyan);
+	counts+=render_make_filledrect(vbuff, ibuff, counts, vec2(300, 300), vec2::ONE*300, Color_Red);
+	render_update_external_2d_buffer(&buff, vbuff, counts.vertices, ibuff, counts.indices);
 	
 	
 	{ //load UI funcs
@@ -127,6 +136,8 @@ int main(){
 	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
+		
+		render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
 #if DESHI_RELOADABLE_UI
 		if(key_pressed(Key_F5 | InputMod_AnyAlt)){
 			//unload the module
