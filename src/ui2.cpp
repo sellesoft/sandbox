@@ -377,6 +377,8 @@ TNode* ui_find_static_sized_parent(TNode* node, TNode* child){
 }
 
 void redraw_item_branch(uiItem* item){
+    if(item != &g_ui->base)
+        item->spos = uiItemFromNode(item->node.parent)->spos + item->lpos;
     switch(item->node.type){
         case uiItemType_Item: ui_gen_item(item); break;
         case uiItemType_Text: ui_gen_text(item); break;
@@ -480,10 +482,18 @@ DrawContext ui_recur(TNode* node){
         }break;
     }
 	
-    //render item
+   
+
+    return drawContext;
+}
+
+void ui_render(TNode* node){
+    uiItem* item = uiItemFromNode(node);
+    
+     //render item
     forI(item->draw_cmd_count){
         render_set_active_surface_idx(0);
-        render_start_cmd2(5, item->drawcmds[i].texture, item->spos, item->size);
+        render_start_cmd2(5, 0, item->drawcmds[i].scissorOffset, item->drawcmds[i].scissorExtent);
         render_add_vertices2(5, 
             item->drawcmds[i].vertices, 
             item->drawcmds[i].counts.vertices, 
@@ -497,13 +507,12 @@ DrawContext ui_recur(TNode* node){
             ui_recur(it);
         }
     }
-
-    return drawContext;
 }
 
 void ui_update(){
     g_ui->base.style.width = DeshWindow->width;
     g_ui->base.style.height = DeshWindow->height;
+    
     if(g_ui->base.node.child_count){
         ui_recur(g_ui->base.node.first_child);
     }

@@ -380,6 +380,8 @@ struct uiDrawCmd{
     Vertex2* vertices;
     u32*     indices;
     RenderDrawCounts counts;
+    vec2i scissorOffset;
+    vec2i scissorExtent;
 };
 
 enum{
@@ -455,7 +457,7 @@ struct uiItem{
         vec2i lpos;
     };
     union{ // position relative to screen
-        struct{  s32 sx, sy; };
+        struct{ s32 sx, sy; };
         vec2i spos;
     };
     union{
@@ -469,6 +471,7 @@ struct uiItem{
 	
     u64 draw_cmd_count;
     uiDrawCmd* drawcmds;
+
 	
     str8 file_created;
     upt  line_created;
