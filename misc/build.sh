@@ -35,7 +35,7 @@
 #_____________________________________________________________________________________________________
 #### Specify paths ####
 misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
-root_folder="$misc_folder/.."
+root_folder="$misc_folder/.." #TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
 glfw_folder="C:/src/glfw-3.3.2.bin.WIN64"   #TODO(delle) platform specific glfw binaries
 vulkan_folder="$VULKAN_SDK"
 
