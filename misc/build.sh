@@ -20,7 +20,16 @@
 #   -platform <win32,mac,linux>           Build for specified OS: win32, mac, linux (default: builder's OS)
 #   -graphics <vulkan,opengl,directx>     Build for specified Graphics API (default: vulkan)
 #   -compiler <cl,gcc,clang>              Build using the specified compiler (default: cl on Windows, gcc on Mac and Linux)
-#   -linker   <link,ld,lld-link>          Build using the specified linlker (default: link on Windows, ld on Mac and Linux)
+#   -linker   <link,ld,lld-link>          Build using the specified linker (default: link on Windows, ld on Mac and Linux)
+#
+# Notes:
+#   >For some reason, the argument count is wrong if you don't add sh.exe before build.sh even if 
+#      it's the default program. Windows usage: "sh build.sh <command> [arguments...]"
+#
+# TODOs:
+#   >support the non-default commands
+#   >echo out when we successfully build things
+#   >early out when we don't successfully build
 #_____________________________________________________________________________________________________
 #                                           Constants
 #_____________________________________________________________________________________________________
@@ -112,7 +121,7 @@ for (( i=1; i<=$#; i++)); do
   #### skip argument if already handled
   if [ $skip_arg == 1 ]; then
     skip_arg=0
-    CONTINUE
+    continue
   fi
 
   #### parse <command>
@@ -128,7 +137,7 @@ for (( i=1; i<=$#; i++)); do
       skip_arg=1
       next_arg=$((i+1))
       build_cmd_one_file="${!next_arg}"
-      CONTINUE
+      continue
     fi
   fi
 
@@ -245,7 +254,7 @@ if [ $build_compiler == "cl" ]; then
   compile_flags="$compile_flags -W1 -wd4100 -wd4189 -wd4201 -wd4311 -wd4706"
 
   if [ $build_release == 0 ]; then
-    compile_flags="$compile_flags -Zi -Od -Fd$app_name"
+    compile_flags="$compile_flags -Zi -Od"
   else
     compile_flags="$compile_flags -O2"
   fi
@@ -331,23 +340,23 @@ if [ $builder_platform == "win32" ]; then
   #echo Waiting for PDB > lock.tmp
 
   #### compile deshi          (generates deshi.obj)
-  exe $build_compiler $deshi_sources $includes -c $compile_flags $defines -Fo"deshi.obj"
+  exe $build_compiler $deshi_sources $includes -c $compile_flags $defines -Fo"deshi.obj" -Fddeshi
 
   #### compile deshi DLLs     (generates deshi.dll)
   if [ $build_shared == 1 ]; then
-    exe $build_compiler $dll_sources $includes -c $compile_flags $defines -DDESHI_DLL -Fodeshi_dlls.obj
-    #exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+    exe $build_compiler $dll_sources $includes -c $compile_flags $defines -DDESHI_DLL -Fodeshi_dlls.obj -Fddeshi_dlls_$RANDOM
+    #exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll
     #rm lock.tmp
     #cp deshi.dll $root_folder/deshi.dll
   fi
 
   #### compile app            (generates app_name.exe)
-  exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"
+  exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"  -Fd$app_name
   exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
 
   #### just for testing: create the dll here so it can reference app_name.obj (because g_ui is in app main.cpp instead of deshi.cpp)
   if [ $build_shared == 1 ]; then
-    exe $build_linker deshi.obj deshi_dlls.obj $app_name.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+    exe $build_linker deshi.obj deshi_dlls.obj $app_name.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll
     cp deshi.dll $root_folder/deshi.dll
   fi
 

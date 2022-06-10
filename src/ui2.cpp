@@ -4,6 +4,8 @@
 #include "core/memory.h"
 #include "core/render.h"
 #include "core/storage.h"
+#include "core/window.h"
+#include "core/logger.h"
 
 #define item_arena g_ui->item_list->arena
 #define drawcmd_arena g_ui->drawcmd_list->arena
@@ -119,13 +121,13 @@ uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){
     item->id = id;
     item->file_created = file;
     item->line_created = line;
-
+	
     item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)*2); 
-
+	
     RenderDrawCounts counts = //reserve enough room for a background and border 
         render_make_filledrect_counts() +
         render_make_rect_counts();
-
+	
     item->draw_cmd_count = 1;
     drawcmd_alloc(item->drawcmds, counts);
     g_ui->update_this_frame.add(item);
@@ -285,7 +287,7 @@ uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Fla
 }
 
 void ui_gen_text(uiItem* item){
-
+	
 }
 
 uiItem* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){
@@ -327,18 +329,18 @@ void ui_init(){
     ui_initial_style->    border_style = border_none;
     ui_initial_style->    border_color = color{180,180,180,255};
     ui_initial_style->      text_color = color{255,255,255,255};
-
-
+	
+	
     g_ui->base = uiItem{0};
     g_ui->base.style = *ui_initial_style;
-    g_ui->base.node.type = uiItemType_Section;
+    g_ui->base.node.type = uiItemType_Item;
     g_ui->base.file_created = STR8(__FILE__);
     g_ui->base.line_created = __LINE__;
     g_ui->base.style.width = DeshWindow->width;
     g_ui->base.style.height = DeshWindow->height;
     g_ui->base.id = STR8("base");
     g_ui->base.style_hash = hash<uiStyle>()(&g_ui->base.style);
-
+	
     push_item(&g_ui->base);
 }
 
@@ -393,10 +395,10 @@ void redraw_item_branch(uiItem* item){
 //reevaluates an entire brach of items
 DrawContext reeval_item_branch(uiItem* item){
     DrawContext drawContext;
-
+	
     if(item->style.height != size_auto) item->height = item->style.height;
     if(item->style.width != size_auto) item->width = item->style.width;
-
+	
     vec2i cursor = item->style.paddingtl;
     for_node(item->node.first_child){
         uiItem* child = uiItemFromNode(it);
@@ -417,27 +419,27 @@ DrawContext reeval_item_branch(uiItem* item){
             item->height = Max(item->height, child->spos.y + ret.bbx.y);
         }
     }
-
-
+	
+	
     //Log("", item->id, " pos: ", item->spos);
     drawContext.bbx.x = item->width;
     drawContext.bbx.y = item->height;
-
+	
     return drawContext;
 }
 
 DrawContext ui_recur(TNode* node){
     uiItem* item = uiItemFromNode(node);
     uiItem* parent = uiItemFromNode(node->parent);
-
+	
     DrawContext drawContext;
     DrawContext childrenDrawContext;
     //depth first walk
     //for_node(node->first_child){
     //    DrawContext ret = ui_recur(it);
     //}
-   
-
+	
+	
     //check if an item's style was modified, if so reevaluate the item,
     //its children, and every child of its parents until a manually sized parent is found
     u32 nuhash = hash<uiStyle>()(&item->style);
@@ -447,8 +449,8 @@ DrawContext ui_recur(TNode* node){
         reeval_item_branch(sspar);
         redraw_item_branch(sspar);
     } 
-
-
+	
+	
     
     //dragging an item
     //it doesnt matter whether its fixed or relative here
@@ -482,24 +484,24 @@ DrawContext ui_recur(TNode* node){
         }break;
     }
 	
-   
-
+	
+	
     return drawContext;
 }
 
 void ui_render(TNode* node){
     uiItem* item = uiItemFromNode(node);
     
-     //render item
+	//render item
     forI(item->draw_cmd_count){
         render_set_active_surface_idx(0);
         render_start_cmd2(5, 0, item->drawcmds[i].scissorOffset, item->drawcmds[i].scissorExtent);
         render_add_vertices2(5, 
-            item->drawcmds[i].vertices, 
-            item->drawcmds[i].counts.vertices, 
-            item->drawcmds[i].indices, 
-            item->drawcmds[i].counts.indices
-        );
+							 item->drawcmds[i].vertices, 
+							 item->drawcmds[i].counts.vertices, 
+							 item->drawcmds[i].indices, 
+							 item->drawcmds[i].counts.indices
+							 );
     }
     
     if(node->child_count){
@@ -510,6 +512,7 @@ void ui_render(TNode* node){
 }
 
 void ui_update(){
+	//Log("test","ayyyye"); //NOTE(delle) uncomment after reloading .dll for testing
     g_ui->base.style.width = DeshWindow->width;
     g_ui->base.style.height = DeshWindow->height;
     

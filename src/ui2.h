@@ -335,6 +335,7 @@ move ui2 to deshi
 #include "kigu/node.h"
 #include "kigu/unicode.h"
 #include "math/vector.h"
+#include "core/render.h"
 
 #if DESHI_RELOADABLE_UI
 #  if DESHI_DLL
@@ -471,7 +472,7 @@ struct uiItem{
 	
     u64 draw_cmd_count;
     uiDrawCmd* drawcmds;
-
+	
 	
     str8 file_created;
     upt  line_created;
@@ -594,6 +595,9 @@ struct uiContext{
 	//// functions ////
 	void* module;
 	b32   module_valid;
+	ui_make_item__sig*         make_item;
+	ui_begin_item__sig*        begin_item;
+	ui_end_item__sig*          end_item;
 	ui_make_window__sig*       make_window;
 	ui_begin_window__sig*      begin_window;
 	ui_end_window__sig*        end_window;
@@ -605,7 +609,7 @@ struct uiContext{
 	
 	//// state ////
     uiItem base;
-
+	
 	//// memory ////
 	ArenaList* item_list;
 	ArenaList* drawcmd_list;
