@@ -5,15 +5,6 @@ Notes
 
   Retained UI is stored in arenas while immediate UI is temp allocated
 
-  Any time an item is modified or removed we find it's parent window and recalculate it entirely
-    this can probably be optimized
-
-  For the reason above, initial generation of a uiItem and it's actual drawinfo generation are in separate functions
-
-  UI macros always automatically apply the str8_lit macro to arguments that ask for text
-
-  uiWindow cursors never take into account styling such as padding (or well, not sure yet)
-
   Everything in the interface is prefixed with "ui" (always lowercase)
     type and macro names follow the prefix and are UpperCamelCase
     function names have a _ after the prefix and are lower_snake_case
@@ -321,7 +312,34 @@ move ui2 to deshi
     ---
     Determines the color of text
 
+    //TODO(sushi) text_color docs
 
+------------------------------------------------------------------------------------------------------------
+*   overflow
+    ---
+    Determines how items that go out of their parent's bounds are displayed.
+
+-   Inherited: no
+
+-   Defaults:
+        This value defaults to scroll.
+
+-  Values:
+    
+    overflow_scroll | scroll
+        When items extend beyond the parents borders, the items are cut off and scroll bars are shown.
+    
+    overflow_scroll_hidden | scroll_hidden
+        Same as overflow_scroll, but scrollbars are not shown
+    
+    overflow_hidden | hidden
+        The overflowing items are cut off, but the user cannot scroll.
+        NOTE(sushi): in this case you can still manually change the scroll value on the item
+                     this just prevents the user from scrolling the item. Good for scrolling things you
+                     dont want the user to mess with.
+    
+    overflow_visible | visible
+        The overflowing items are shown.
 
 */
 
@@ -378,9 +396,11 @@ struct Texture;
 struct Vertex2;
 struct uiDrawCmd{
     Texture* texture;
-    //TODO(sushi) in order to facilitate moving arenas we need to 
-    Vertex2* vertices;
-    u32*     indices;
+    //offsets into the vertex and index arenas
+    // these must be offsets now that the arenas must be contiguous and therefore
+    // must move if overfilled
+    u32 vertex_offset; 
+    u32 index_offset;
     RenderDrawCounts counts;
     vec2i scissorOffset;
     vec2i scissorExtent;
@@ -400,6 +420,11 @@ enum{
 	
     size_auto = -1,
     size_fill = -2,
+
+    overflow_scroll = 0,
+    overflow_scroll_hidden,
+    overflow_hidden,
+    overflow_visible,
 };
 
 struct Font;
@@ -441,8 +466,10 @@ struct uiStyle{
     Type border_style;
     color border_color;
     color text_color;
+    Type overflow;
 	
     void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(this)); }
+
 	
 };
 extern uiStyle* ui_initial_style;
@@ -453,7 +480,11 @@ struct uiItem{
     u64 style_hash;
     str8 id; //NOTE(sushi) mostly for debugging, not sure if this will have any other use in the interface
     
-    //INTERNAL
+    //// state ////
+    b32 hovered;
+    b32 clicked;
+
+    //// INTERNAL ////
     union{ // position relative to parent
         struct{ s32 lx, ly; };
         vec2i lpos;
@@ -466,7 +497,7 @@ struct uiItem{
         struct{ s32 width, height; };
         vec2i size;
     };
-    union{
+    union{//TODO(sushi) this should probably be on uiStyle, so you can programatically change scroll.
         struct{s32 scrx, scry;};
         vec2i scroll;
     };
@@ -570,12 +601,6 @@ struct uiText{
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
-// @ui_section
-//same as a div in HTML, just a section that items will place themselves in
-//TODO(sushi) void ui_make_section(vec2i pos, vec2i size);
-
-
-//-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_context
 UI_FUNC_API(void, ui_init);
 #define uiInit() UI_DEF(init())
@@ -614,8 +639,12 @@ struct uiContext{
 
 	
 	//// memory ////
+    //TODO(sushi) convert these 2 to Heaps when its implemented
 	ArenaList* item_list;
-	ArenaList* drawcmd_list;
+    ArenaList* drawcmd_list;
+    //we cannot chunk these 2 arenas, and they cannot be mixed either
+    Arena* vertex_arena;
+    Arena* index_arena;
     RenderTwodBuffer render_buffer;
     array<uiItem*> update_this_frame;
     array<uiItem*> item_stack; //TODO(sushi) eventually put this in it's own arena since we can do a stack more efficiently in it
