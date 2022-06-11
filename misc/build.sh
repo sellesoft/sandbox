@@ -16,6 +16,8 @@
 #   --d    Build with    debug info and without optimization (default)
 #   --r    Build without debug info and with    optimization
 #   --s    Build certain modules as shared libraries for code implementation reloading
+#   --p    Enable Tracy profiling
+#   --pw   Enable Tracy profiling and force the program to wait for a connection to start running
 #
 #   -platform <win32,mac,linux>           Build for specified OS: win32, mac, linux (default: builder's OS)
 #   -graphics <vulkan,opengl,directx>     Build for specified Graphics API (default: vulkan)
@@ -38,6 +40,7 @@ misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null &&
 root_folder="$misc_folder/.." #TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
 glfw_folder="C:/src/glfw-3.3.2.bin.WIN64"   #TODO(delle) platform specific glfw binaries
 vulkan_folder="$VULKAN_SDK"
+tracy_folder="H:/src/tracy-0.7.8"
 
 
 #### Specify outputs ####
@@ -46,7 +49,7 @@ app_name="sandbox"
 
 
 #### Specify sources ####
-includes="-I$root_folder/src -I$root_folder/deshi/src -I$root_folder/deshi/src/external -I$glfw_folder/include -I$vulkan_folder/include"
+includes="-I$root_folder/src -I$root_folder/deshi/src -I$root_folder/deshi/src/external -I$glfw_folder/include -I$vulkan_folder/include -I$tracy_folder"
 deshi_sources="$root_folder/deshi/src/deshi.cpp"
 dll_sources="$root_folder/src/ui2.cpp"
 app_sources="$root_folder/src/main.cpp"
@@ -110,6 +113,7 @@ build_verbose=0
 build_release=0
 build_shared=0
 build_time=0
+build_profiler=""
 build_platform=$builder_platform
 build_graphics="vulkan"
 build_compiler="$builder_compiler"
@@ -153,6 +157,10 @@ for (( i=1; i<=$#; i++)); do
     build_release=1
   elif [ "${!i}" == "--s" ]; then
     build_shared=1
+  elif [ "${!i}" == "--p" ]; then
+    build_profiler="profile"
+  elif [ "${!i}" == "--pw" ]; then
+    build_profiler="wait and profile"
   elif [ "${!i}" == "-platform" ]; then
     skip_arg=1
     next_arg=$((i+1))
@@ -218,6 +226,13 @@ else
   exit 1
 fi
 
+defines_misc=""
+if [ "$build_profiler" == "profile" ]; then
+  defines_misc="-DTRACY_ENABLE"
+elif [ "$build_profiler" == "wait and profile" ]; then
+  defines_misc="-DTRACY_ENABLE -DDESHI_WAIT_FOR_TRACY_CONNECTION"
+fi
+
 
 defines_shared=""
 if [ $build_shared == 1 ]; then
@@ -227,7 +242,7 @@ else
 fi
 
 
-defines="$defines_release $defines_platform $defines_graphics $defines_shared"
+defines="$defines_release $defines_platform $defines_graphics $defines_shared $defines_misc"
 #_____________________________________________________________________________________________________
 #                                           Build Flags
 #_____________________________________________________________________________________________________
