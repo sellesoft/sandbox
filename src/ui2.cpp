@@ -78,6 +78,8 @@ void ui_gen_item(uiItem* item){
             render_make_rect(vp, ip, counts, item->spos, item->size, 2, item->style.border_color);
         }break;
     }
+    dc->scissorOffset = item->spos;
+    dc->scissorExtent = item->size;
 }
 
 
@@ -237,6 +239,8 @@ void draw_item_branch(uiItem* item){
             default: Assert(!"unhandled uiItem type"); break;
         }
     }
+
+    //Log("", item->id, " pos: ", item->spos, " size: ", item->size);
     
     for_node(item->node.first_child){
         draw_item_branch(uiItemFromNode(it));
@@ -248,8 +252,10 @@ DrawContext eval_item_branch(uiItem* item){
     DrawContext drawContext;
 	
     if(item->style.height != size_auto) item->height = item->style.height;
+    else item->height = 0;
     if(item->style.width != size_auto) item->width = item->style.width;
-	
+    else item->width = 0;
+    
     vec2i cursor = item->style.paddingtl;
     for_node(item->node.first_child){
         uiItem* child = uiItemFromNode(it);
@@ -263,16 +269,19 @@ DrawContext eval_item_branch(uiItem* item){
                     cursor;
             }break;
         }
+        
         if(item->style.width == size_auto){
+            
             item->width = Max(item->width, child->lpos.x + ret.bbx.x);
         }
         if(item->style.height == size_auto){
+            
             item->height = Max(item->height, child->lpos.y + ret.bbx.y);
         }
     }
 	
 	
-    //Log("", item->id, " pos: ", item->spos);
+    
     drawContext.bbx.x = item->width;
     drawContext.bbx.y = item->height;
 	

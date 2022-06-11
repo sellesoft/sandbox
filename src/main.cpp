@@ -120,11 +120,11 @@ int main(){
 	
 	
 	uiItem* mod = 0;
+	uiItem* cont = 0;
 	uiStyle style{};
 	memcpy(&style, ui_initial_style, sizeof(uiStyle));
 	style.padding_top = 10;
-	uiItemBS(&style)->id = STR8("item0");{
-		uiStyle style{};
+	(cont=uiItemBS(&style))->id = STR8("item0");{
 		memcpy(&style, ui_initial_style, sizeof(uiStyle));
 		style.width = 20;
 		style.height = 50;
@@ -183,7 +183,11 @@ int main(){
 		}
 #endif //#if DESHI_RELOADABLE_UI
 		
-		//mod->style.margin_top = BoundTimeOsc(0, 50);
+		mod->style.margin_top = BoundTimeOsc(0, 50);
+		mod->style.margin_left = BoundTimeOsc(20, 50);
+		cont->style.background_color = color(BoundTimeOsc(0,255), 150,100);
+		cont->style.padding_left = BoundTimeOsc(0,50);
+
 		uiUpdate();
 		
         {
