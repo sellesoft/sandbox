@@ -75,7 +75,7 @@ void ui_gen_item(uiItem* item){
     switch(item->style.border_style){
         case border_none:{}break;
         case border_solid:{
-            render_make_rect(vp, ip, counts, item->spos, item->size, 2, item->style.border_color);
+            counts+=render_make_rect(vp, ip, counts, item->spos, item->size, 2, item->style.border_color);
         }break;
     }
     dc->scissorOffset = item->spos;
@@ -252,9 +252,9 @@ DrawContext eval_item_branch(uiItem* item){
     DrawContext drawContext;
 	
     if(item->style.height != size_auto) item->height = item->style.height;
-    else item->height = 0;
+    else item->height = 0; //always reset size on auto sized items
     if(item->style.width != size_auto) item->width = item->style.width;
-    else item->width = 0;
+    else item->width = 0; //always reset size on auto sized items
     
     vec2i cursor = item->style.paddingtl;
     for_node(item->node.first_child){
@@ -270,14 +270,10 @@ DrawContext eval_item_branch(uiItem* item){
             }break;
         }
         
-        if(item->style.width == size_auto){
-            
+        if(item->style.width == size_auto)
             item->width = Max(item->width, child->lpos.x + ret.bbx.x);
-        }
-        if(item->style.height == size_auto){
-            
+        if(item->style.height == size_auto)
             item->height = Max(item->height, child->lpos.y + ret.bbx.y);
-        }
     }
 	
 	

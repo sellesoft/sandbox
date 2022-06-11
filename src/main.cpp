@@ -126,12 +126,21 @@ int main(){
 	style.padding_top = 10;
 	(cont=uiItemBS(&style))->id = STR8("item0");{
 		memcpy(&style, ui_initial_style, sizeof(uiStyle));
-		style.width = 20;
 		style.height = 50;
 		style.background_color = Color_DarkCyan;
 		style.margin_top = 10;
 		(mod=uiItemBS(&style))->id = STR8("item1");{
-			
+			memcpy(&style, ui_initial_style, sizeof(uiStyle));
+			style.width = 100;
+			style.height = 10;
+			style.margin_top = 10;
+			style.margin_left = 10;
+			style.border_style = border_solid;
+			style.border_color = color(255,255,255);
+			style.top = 10;
+			uiItemBS(&style)->id = STR8("item2");{
+
+			}uiItemE();
 		}uiItemE();
 	}uiItemE();
 	
@@ -189,11 +198,14 @@ int main(){
 		cont->style.padding_left = BoundTimeOsc(0,50);
 
 		uiUpdate();
-		
+		string fps = toStr(1000/DeshTime->deltaTime);
+		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
+		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, str8{(u8*)fps.str, fps.count}, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
+
         {
             using namespace UI;
             //Begin(STR8("debuggingUIwithUI"));{
-			
+			//	Text(STR8("here some text"));
             //}End();
         }
 		
