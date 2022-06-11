@@ -248,6 +248,7 @@ void draw_item_branch(uiItem* item){
 }
 
 //reevaluates an entire brach of items
+//NOTE(sushi) DrawContext may be useless here
 DrawContext eval_item_branch(uiItem* item){
     DrawContext drawContext;
 	
@@ -274,9 +275,23 @@ DrawContext eval_item_branch(uiItem* item){
             item->width = Max(item->width, child->lpos.x + ret.bbx.x);
         if(item->style.height == size_auto)
             item->height = Max(item->height, child->lpos.y + ret.bbx.y);
+        
+        if(child->style.margin_bottom == MAX_S32) item->height += child->style.margin_top;
+        else if(child->style.margin_bottom > 0) item->height += child->style.margin_bottom;
+        if(child->style.margin_right == MAX_S32) item->width += child->style.margin_left;
+        else if(child->style.margin_right > 0) item->width += child->style.margin_right;
+        
+
+
+        cursor.x = item->style.padding_left;
+        cursor.y = child->lpos.y + ret.bbx.y;
     }
-	
-	
+
+    if(item->style.padding_bottom == MAX_S32) item->height += item->style.padding_top;
+    else if(item->style.padding_bottom > 0) item->height += item->style.padding_bottom;
+    if(item->style.padding_right == MAX_S32) item->width += item->style.padding_left;
+    else if(item->style.padding_right > 0) item->width += item->style.padding_right;
+        
     
     drawContext.bbx.x = item->width;
     drawContext.bbx.y = item->height;
