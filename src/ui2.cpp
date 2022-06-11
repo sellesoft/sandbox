@@ -269,6 +269,13 @@ DrawContext eval_item_branch(uiItem* item){
                     item->scroll +
                     cursor;
             }break;
+            case pos_relative:{
+                child->lpos = 
+                    child->style.margintl +
+                    item->scroll +
+                    cursor +
+                    child->style.tl;
+            }break;
         }
         
         if(item->style.width == size_auto)
@@ -318,7 +325,7 @@ void ui_recur(TNode* node){
         if(key_released(Mouse_LEFT)) dragging = false;
         
         if(dragging){
-            item->spos = input_mouse_position() + mp_offset;
+            item->lpos = input_mouse_position() + mp_offset;
             //ui_regen_item(item);
         }
     }

@@ -119,41 +119,67 @@ int main(){
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	
-	uiItem* item0 = 0;
-	uiItem* item1 = 0;
-	uiItem* item2 = 0;
-	uiItem* item3 = 0;
+	// uiItem* item0 = 0;
+	// uiItem* item1 = 0;
+	// uiItem* item2 = 0;
+	// uiItem* item3 = 0;
+	// uiStyle style{};
+	// memcpy(&style, ui_initial_style, sizeof(uiStyle));
+	// style.paddingtl = vec2i(20,20);
+	// style.positioning = pos_draggable_relative;
+	// style.margintl = vec2i(20,20); 
+	// (item0=uiItemBS(&style))->id = STR8("item0");{
+	// 	memcpy(&style, ui_initial_style, sizeof(uiStyle));
+	// 	style.height = 50;
+	// 	style.background_color = Color_DarkCyan;
+	// 	(item1=uiItemBS(&style))->id = STR8("item1");{
+	// 		memcpy(&style, ui_initial_style, sizeof(uiStyle));
+	// 		style.width = 100;
+	// 		style.height = 10;
+	// 		style.margin_top = 10;
+	// 		style.margin_left = 10;
+	// 		style.border_style = border_solid;
+	// 		style.border_color = color(255,255,255);
+	// 		style.top = 10;
+	// 		(item2=uiItemBS(&style))->id = STR8("item2");{
+
+	// 		}uiItemE();
+	// 		memcpy(&style, ui_initial_style, sizeof(uiStyle));
+	// 		style.background_color = color(25,25,25);
+	// 		style.height = 20;
+	// 		style.width = 10;
+	// 		style.margin_top = 10;
+	// 		style.margin_left = 10;
+	// 		(item3=uiItemBS(&style))->id = STR8("item3");{
+
+	// 		}uiItemE();
+	// 	}uiItemE();
+	// }uiItemE();
+
+	
+	
 	uiStyle style{};
 	memcpy(&style, ui_initial_style, sizeof(uiStyle));
-	style.paddingtl = vec2i(20,20);
-	style.margintl = vec2i(20,20); 
-	(item0=uiItemBS(&style))->id = STR8("item0");{
-		memcpy(&style, ui_initial_style, sizeof(uiStyle));
-		style.height = 50;
-		style.background_color = Color_DarkCyan;
-		(item1=uiItemBS(&style))->id = STR8("item1");{
-			memcpy(&style, ui_initial_style, sizeof(uiStyle));
-			style.width = 100;
-			style.height = 10;
-			style.margin_top = 10;
-			style.margin_left = 10;
-			style.border_style = border_solid;
-			style.border_color = color(255,255,255);
-			style.top = 10;
-			(item2=uiItemBS(&style))->id = STR8("item2");{
+	//style.margintl = vec2i(3,3);
+	style.padding_left = 3;
+	style.padding_top = 3;
+	style.positioning = pos_relative;
+	const u32 n = 50;
+	uiItem* items[n] = {0};
+	forI(n){
+		style.background_color = color(f32(i)/n*255,40,100);
+		items[i] = uiItemBS(&style);
+	}
+	
+	style.height = 10;
+	style.width = 10;
+	uiItemBS(&style);
+	uiItemE();
 
-			}uiItemE();
-			memcpy(&style, ui_initial_style, sizeof(uiStyle));
-			style.background_color = color(25,25,25);
-			style.height = 20;
-			style.width = 10;
-			style.margin_top = 10;
-			style.margin_left = 10;
-			(item3=uiItemBS(&style))->id = STR8("item3");{
-
-			}uiItemE();
-		}uiItemE();
-	}uiItemE();
+	forI(n){
+		uiItemE();
+	}
+	
 	
 	
 	//start main loop
@@ -202,7 +228,13 @@ int main(){
 			}
 		}
 #endif //#if DESHI_RELOADABLE_UI
-		item0->style.background_color = color(BoundTimeOsc(0,50), 50, 155);
+
+		forI(n){
+			if(!i) continue;
+			items[i]->style.left = 20*(sin(DeshTotalTime/1000 + M_PI/i)+1)/2;
+			items[i]->style.top = 20*(cos(DeshTotalTime/1000 + M_PI/i)+1)/2;
+		}
+
 		uiUpdate();
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
