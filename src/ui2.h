@@ -308,6 +308,11 @@ move ui2 to deshi
     //TODO(sushi) border_style docs
 
 ------------------------------------------------------------------------------------------------------------
+*   border_width
+    ---
+    Determines the width of border a uiItem has
+
+------------------------------------------------------------------------------------------------------------
 *   text_color
     ---
     Determines the color of text
@@ -354,6 +359,7 @@ move ui2 to deshi
 #include "kigu/unicode.h"
 #include "math/vector.h"
 #include "core/render.h"
+#include "kigu/hash.h"
 
 #if DESHI_RELOADABLE_UI
 #  if DESHI_DLL
@@ -428,7 +434,7 @@ enum{
 };
 
 struct Font;
-struct uiStyle{
+external struct uiStyle{
     Type positioning;  
     union{
         struct{s32 left, top;};
@@ -465,14 +471,49 @@ struct uiStyle{
     Texture* background_image;
     Type border_style;
     color border_color;
+    u32 border_width;
     color text_color;
     Type overflow;
 	
-    void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(this)); }
+    void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(uiStyle)); }
 
 	
 };
 extern uiStyle* ui_initial_style;
+
+template<>
+struct hash<uiStyle> {
+	inline u32 operator()(const uiStyle& s){DPZoneScoped;
+		u32 seed = 2166136261;
+		seed ^= s.positioning;             seed *= 16777619;
+		seed ^= s.left;                    seed *= 16777619;
+		seed ^= s.top;                     seed *= 16777619;
+		seed ^= s.right;                   seed *= 16777619;
+		seed ^= s.bottom;                  seed *= 16777619;
+		seed ^= s.width;                   seed *= 16777619;
+		seed ^= s.height;                  seed *= 16777619;
+		seed ^= s.margin_left;             seed *= 16777619;
+		seed ^= s.margin_top;              seed *= 16777619;
+		seed ^= s.margin_bottom;           seed *= 16777619;
+		seed ^= s.margin_right;            seed *= 16777619;
+		seed ^= s.padding_left;            seed *= 16777619;
+		seed ^= s.padding_top;             seed *= 16777619;
+		seed ^= s.padding_bottom;          seed *= 16777619;
+		seed ^= s.padding_right;           seed *= 16777619;
+		seed ^= *(u32*)&s.content_align.x; seed *= 16777619;
+		seed ^= *(u32*)&s.content_align.y; seed *= 16777619;
+		seed ^= (u32)s.font;               seed *= 16777619;
+		seed ^= s.font_height;             seed *= 16777619;
+		seed ^= s.background_color.rgba;   seed *= 16777619;
+		seed ^= (u32)s.background_image;   seed *= 16777619;
+		seed ^= s.border_style;            seed *= 16777619;
+		seed ^= s.border_color.rgba;       seed *= 16777619;
+		seed ^= s.border_width;            seed *= 16777619;
+		seed ^= s.text_color.rgba;         seed *= 16777619;
+		seed ^= s.overflow;                seed *= 16777619;
+        return seed;
+	}
+};
 
 struct uiItem{
     TNode node;
@@ -515,7 +556,7 @@ struct uiItem{
 
 UI_FUNC_API(uiItem*, ui_make_item, str8 id, uiStyle* style, str8 file, upt line);
 #define uiItemM() UI_DEF(make_item({0}, 0,STR8(__FILE__),__LINE__)))
-#define uiItemMS(style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__)))
+#define uiItemMS(style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__))
 #define uiItemMSI(id, style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__))
 
 UI_FUNC_API(uiItem*, ui_begin_item, str8 id, uiStyle* style, str8 file, upt line);
@@ -636,8 +677,6 @@ struct uiContext{
 	//// state ////
     uiItem base;
 
-
-	
 	//// memory ////
     //TODO(sushi) convert these 2 to Heaps when its implemented
 	ArenaList* item_list;

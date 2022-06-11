@@ -10,11 +10,11 @@
 #define item_arena g_ui->item_list->arena
 #define drawcmd_arena g_ui->drawcmd_list->arena
 
-void push_item(uiItem* item){
+void push_item(uiItem* item){DPZoneScoped;
     g_ui->item_stack.add(item);
 }
 
-uiItem* pop_item(){
+uiItem* pop_item(){DPZoneScoped;
     uiItem* ret = *g_ui->item_stack.last;
     g_ui->item_stack.pop();
     return ret;
@@ -30,14 +30,14 @@ uiItem* pop_item(){
 //@Window
 
 
-ArenaList* create_arena_list(ArenaList* old){
+ArenaList* create_arena_list(ArenaList* old){DPZoneScoped;
     ArenaList* nual = (ArenaList*)memalloc(sizeof(ArenaList));
     if(old) NodeInsertNext(&old->node, &nual->node);
     nual->arena = memory_create_arena(Megabytes(1));
     return nual;
 }
 
-void* arena_add(Arena* arena, upt size){
+void* arena_add(Arena* arena, upt size){DPZoneScoped;
     if(arena->size < arena->used+size) 
         g_ui->item_list = create_arena_list(g_ui->item_list);
     u8* cursor = arena->cursor;
@@ -46,7 +46,7 @@ void* arena_add(Arena* arena, upt size){
     return cursor;
 }
 
-void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){
+void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){DPZoneScoped;
     if(drawcmd_arena->size < drawcmd_arena->used + counts.vertices * sizeof(Vertex2) + counts.indices * sizeof(u32))
         g_ui->drawcmd_list = create_arena_list(g_ui->drawcmd_list);
     drawcmd->vertex_offset = g_ui->vertex_arena->used / sizeof(Vertex2);
@@ -64,7 +64,7 @@ void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){
 //@Helpers
 
 //@Functionality
-void ui_gen_item(uiItem* item){
+void ui_gen_item(uiItem* item){DPZoneScoped;
     uiDrawCmd* dc = item->drawcmds;
     Vertex2* vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
     u32*     ip = (u32*)g_ui->index_arena->start + dc->index_offset;
@@ -75,7 +75,7 @@ void ui_gen_item(uiItem* item){
     switch(item->style.border_style){
         case border_none:{}break;
         case border_solid:{
-            counts+=render_make_rect(vp, ip, counts, item->spos, item->size, 2, item->style.border_color);
+            counts+=render_make_rect(vp, ip, counts, item->spos + vec2i::ONE*ceil(item->style.border_width / 2.f), item->size - vec2i::ONE*ceil(item->style.border_width / 2.f), item->style.border_width, item->style.border_color);
         }break;
     }
     dc->scissorOffset = item->spos;
@@ -83,7 +83,7 @@ void ui_gen_item(uiItem* item){
 }
 
 
-uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){
+uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
     uiItem* curitem = *g_ui->item_stack.last;
     uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
     insert_last(&curitem->node, &item->node);
@@ -108,7 +108,7 @@ uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){
     return item;
 }
 
-uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){
+uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
     uiItem* item = ui_make_item(id, style, file, line);
     push_item(item);
     return item;
@@ -118,7 +118,7 @@ void ui_end_item(){
     pop_item();
 }
 
-uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){
+uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){DPZoneScoped;
     //uiBeginItem(uiWindow, win, &g_ui->base, uiItemType_Window, flags, 1, file, line);
     uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
     item->node.type = uiItemType_Window;
@@ -126,13 +126,13 @@ uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt li
     return 0;
 }
 
-uiItem* ui_begin_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){
+uiItem* ui_begin_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){DPZoneScoped;
     ui_make_window(name, flags, style, file, line);
     
     return 0;
 }
 
-uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line){
+uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line){DPZoneScoped;
     //uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, flags, 1, file, line);
     //button->item.lpos   = ui_decide_item_pos(window);
     //button->item.spos   = button->item.lpos + window->item.spos;
@@ -145,18 +145,18 @@ uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Fla
     return 0;
 }
 
-void ui_gen_text(uiItem* item){
+void ui_gen_text(uiItem* item){DPZoneScoped;
 	
 }
 
-uiItem* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){
+uiItem* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
     return 0;
 }
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_context
-void ui_init(){
+void ui_init(){DPZoneScoped;
 	g_ui->item_list    = create_arena_list(0);
     g_ui->drawcmd_list = create_arena_list(0);
     g_ui->vertex_arena = memory_create_arena(Megabytes(1));
@@ -184,6 +184,7 @@ void ui_init(){
     ui_initial_style->background_image = 0;
     ui_initial_style->    border_style = border_none;
     ui_initial_style->    border_color = color{180,180,180,255};
+    ui_initial_style->    border_width = 1;
     ui_initial_style->      text_color = color{255,255,255,255};
 	
     g_ui->base = uiItem{0};
@@ -194,7 +195,7 @@ void ui_init(){
     g_ui->base.style.width = DeshWindow->width;
     g_ui->base.style.height = DeshWindow->height;
     g_ui->base.id = STR8("base");
-    g_ui->base.style_hash = hash<uiStyle>()(&g_ui->base.style);
+    g_ui->base.style_hash = hash<uiStyle>()(g_ui->base.style);
     //ui_make_item(STR8("base"), ui_initial_style, STR8(__FILE__), __LINE__);
     push_item(&g_ui->base);
 
@@ -204,7 +205,7 @@ void ui_init(){
 
 //finds the container of an item eg. a window, child window, or section
 //probably
-TNode* ui_find_container(TNode* item){
+TNode* ui_find_container(TNode* item){DPZoneScoped;
     if(item->type == uiItemType_Window || 
        item->type == uiItemType_ChildWindow) return item;
     if(item->parent) return ui_find_container(item->parent);
@@ -218,7 +219,7 @@ struct DrawContext{
 };
 
 //pass 0 for child on first call
-TNode* ui_find_static_sized_parent(TNode* node, TNode* child){
+TNode* ui_find_static_sized_parent(TNode* node, TNode* child){DPZoneScoped;
     uiItem* item = uiItemFromNode(node);
     if(!child) return ui_find_static_sized_parent(item->node.parent, &item->node);
     if(item->style.width != size_auto && item->style.height != size_auto){
@@ -228,7 +229,7 @@ TNode* ui_find_static_sized_parent(TNode* node, TNode* child){
     }
 }
 
-void draw_item_branch(uiItem* item){
+void draw_item_branch(uiItem* item){DPZoneScoped;
     if(item != &g_ui->base)
         item->spos = uiItemFromNode(item->node.parent)->spos + item->lpos;
     
@@ -249,7 +250,7 @@ void draw_item_branch(uiItem* item){
 
 //reevaluates an entire brach of items
 //NOTE(sushi) DrawContext may be useless here
-DrawContext eval_item_branch(uiItem* item){
+DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
     DrawContext drawContext;
 	
     if(item->style.height != size_auto) item->height = item->style.height;
@@ -267,6 +268,7 @@ DrawContext eval_item_branch(uiItem* item){
                 child->lpos =  
                     child->style.margintl +
                     item->scroll +
+                    item->style.border_width * vec2i::ONE +
                     cursor;
             }break;
             case pos_relative:{
@@ -274,6 +276,7 @@ DrawContext eval_item_branch(uiItem* item){
                     child->style.margintl +
                     item->scroll +
                     cursor +
+                    item->style.border_width * vec2i::ONE +
                     child->style.tl;
             }break;
         }
@@ -306,7 +309,7 @@ DrawContext eval_item_branch(uiItem* item){
     return drawContext;
 }
 
-void ui_recur(TNode* node){
+void ui_recur(TNode* node){DPZoneScoped;
     uiItem* item = uiItemFromNode(node);
     uiItem* parent = uiItemFromNode(node->parent);
 	
@@ -332,7 +335,7 @@ void ui_recur(TNode* node){
 	
     //check if an item's style was modified, if so reevaluate the item,
     //its children, and every child of its parents until a manually sized parent is found
-    u32 nuhash = hash<uiStyle>()(&item->style);
+    u32 nuhash = hash<uiStyle>()(item->style);
     if(nuhash!=item->style_hash){
         item->style_hash = nuhash; 
         uiItem* sspar = uiItemFromNode(ui_find_static_sized_parent(&item->node, 0));
@@ -367,7 +370,7 @@ void ui_recur(TNode* node){
     }
 }
 
-void ui_update(){
+void ui_update(){DPZoneScoped;
 	//Log("test","ayyyye"); //NOTE(delle) uncomment after reloading .dll for testing
     g_ui->base.style.width = DeshWindow->width;
     g_ui->base.style.height = DeshWindow->height;

@@ -158,30 +158,41 @@ int main(){
 
 	
 	
-	uiStyle style{};
-	memcpy(&style, ui_initial_style, sizeof(uiStyle));
-	//style.margintl = vec2i(3,3);
-	style.padding_left = 3;
-	style.padding_top = 3;
-	style.positioning = pos_relative;
-	const u32 n = 50;
-	uiItem* items[n] = {0};
-	forI(n){
-		style.background_color = color(f32(i)/n*255,40,100);
-		items[i] = uiItemBS(&style);
-	}
-	
-	style.height = 10;
-	style.width = 10;
-	uiItemBS(&style);
-	uiItemE();
+	//uiStyle style{};
+	//memcpy(&style, ui_initial_style, sizeof(uiStyle));
+	////style.margintl = vec2i(3,3);
+	//style.padding_left = 3;
+	//style.padding_top = 3;
+	//style.positioning = pos_relative;
+	//style.border_style = border_solid;
+	//style.border_color = Color_White;
+	//const u32 n = 50;
+	//uiItem* items[n] = {0};
+	//forI(n){
+	//	style.background_color = color(f32(i)/n*255,40,100);
+	//	items[i] = uiItemBS(&style);
+	//}
+	//
+	//style.height = 10;
+	//style.width = 10;
+	//uiItemBS(&style);
+	//uiItemE();
 
-	forI(n){
-		uiItemE();
-	}
+	//forI(n){
+	//	uiItemE();
+	//}
+	//
 	
 	
-	
+	uiStyle style{};style = *ui_initial_style;
+	style.margintl = {10,10};
+	style.border_style = border_solid;
+	style.border_color = Color_White;
+	style.height = 20;
+	style.width = 20;
+	style.background_color = Color_DarkGrey;
+	uiItemMS(&style);
+
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		
@@ -229,11 +240,14 @@ int main(){
 		}
 #endif //#if DESHI_RELOADABLE_UI
 
-		forI(n){
-			if(!i) continue;
-			items[i]->style.left = 20*(sin(DeshTotalTime/1000 + M_PI/i)+1)/2;
-			items[i]->style.top = 20*(cos(DeshTotalTime/1000 + M_PI/i)+1)/2;
-		}
+		//forI(n){
+			//if(!i) continue;
+			////items[i]->style.left = 20*(sin(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
+			////items[i]->style.top = 20*(cos(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
+			//items[i]->style.border_width = 20*(sin(2*M_PI*DeshTotalTime/1000/3)+1)/2;
+		//}
+		render_start_cmd2(5,0,vec2::ZERO,DeshWindow->dimensions);
+		render_quad2(vec2::ONE * 300, vec2::ONE*300);
 
 		uiUpdate();
 		string fps = toStr(1000/DeshTime->deltaTime);
