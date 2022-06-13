@@ -171,7 +171,7 @@ for (( i=1; i<=$#; i++)); do
     build_profiler="profile"
   elif [ "${!i}" == "--pw" ]; then
     build_profiler="wait and profile"
-  elif [ "${!i}" == "--pw" ]; then
+  elif [ "${!i}" == "--sa" ]; then
     build_static_analysis=1
   elif [ "${!i}" == "-platform" ]; then
     skip_arg=1
@@ -238,7 +238,7 @@ else
   exit 1
 fi
 
-defines_misc=""
+defines_misc="-D_CRT_SECURE_NO_WARNINGS"
 if [ "$build_profiler" == "profile" ]; then
   defines_misc="-DTRACY_ENABLE"
 elif [ "$build_profiler" == "wait and profile" ]; then
@@ -259,67 +259,71 @@ defines="$defines_release $defines_platform $defines_graphics $defines_shared $d
 #_____________________________________________________________________________________________________
 compile_flags=""
 if [ $build_compiler == "cl" ]; then #________________________________________________________________________________cl
-  #### NOTE(delle): -diagnostics:caret shows the column and code where the error is in the source
-  #### NOTE(delle): -EHsc   enables exception handling
-  #### NOTE(delle): -nologo prevents Microsoft copyright banner showing up
-  #### NOTE(delle): -MD     is used because vulkan's shader compilation lib requires dynamic linking with the CRT
-  #### NOTE(delle): -MP     enables building with multiple processors
-  #### NOTE(delle): -Oi     enables function inlining
-  #### NOTE(delle): -GR     enables RTTI and dynamic_cast<>()
-  #### NOTE(delle): -Gm-    disables minimal rebuild (recompile all files)
-  #### NOTE(delle): -std:c++17 specifies to use the C++17 standard
-  #### NOTE(delle): -utf-8  specifies that source files are in utf8
+  #### -diagnostics:caret (shows the column and code where the error is in the source)
+  #### -EHsc   (enables exception handling)
+  #### -nologo (prevents Microsoft copyright banner showing up)
+  #### -MD     (is used because vulkan's shader compilation lib requires dynamic linking with the CRT)
+  #### -MP     (enables building with multiple processors)
+  #### -Oi     (enables function inlining)
+  #### -GR     (enables RTTI and dynamic_cast<>())
+  #### -Gm-    (disables minimal rebuild (recompile all files))
+  #### -std:c++17 (specifies to use the C++17 standard)
+  #### -utf-8  (specifies that source files are in utf8)
   compile_flags="$compile_flags -diagnostics:caret -EHsc -nologo -MD -MP -Oi -GR -Gm- -std:c++17 -utf-8"
 
-  #### NOTE(delle): -W1 is the warning level
-  #### NOTE(delle): -wd4100 disables the warning: unused function parameter
-  #### NOTE(delle): -wd4189 disables the warning: unused local variabled
-  #### NOTE(delle): -wd4201 disables the warning: nameless union or struct
-  #### NOTE(delle): -wd4311 disables the warning: pointer truncation
-  #### NOTE(delle): -wd4706 disables the warning: assignment within conditional expression
+  #### -W1 (is the warning level)
+  #### -wd4100 (disables warning: unused function parameter)
+  #### -wd4189 (disables warning: unused local variables)
+  #### -wd4201 (disables warning: nameless union or struct)
+  #### -wd4311 (disables warning: pointer truncation)
+  #### -wd4706 (disables warning: assignment within conditional expression)
   compile_flags="$compile_flags -W1 -wd4100 -wd4189 -wd4201 -wd4311 -wd4706"
 
   if [ $build_release == 0 ]; then
-    #### -Zi produces a .pdb file containing debug information
-    #### -Od prevents all optimization
+    #### -Zi (produces a .pdb file containing debug information)
+    #### -Od (prevents all optimization)
     compile_flags="$compile_flags -Zi -Od"
   else
-    #### -O2 maximizes speed (O1 minimizes size)
+    #### -O2 (maximizes speed (O1 minimizes size))
     compile_flags="$compile_flags -O2"
   fi
 
   if [ $build_static_analysis == 1 ]; then
-    #### -analyze enables static analysis
+    #### -analyze (enables static analysis)
     compile_flags="$compile_flags -analyze"
   fi
-
 elif [ $build_compiler == "gcc" ]; then #____________________________________________________________________________gcc
-  
-  #### -exceptions enables exception handling
-  compile_flags="$compile_flags -exceptions"
-  
+  #### -exceptions (enables exception handling)
+  #### -std=c++17  (specifies use of the C++17 standard)
+  compile_flags="$compile_flags -exceptions -std=c++17"
   
   if [ $build_release == 0 ]; then
-    #### -ggdb3 produces max debug info with extra stuff for gdb
-    #### -Og    optimize debugging experience, -O0 also disables some debug information so its not recommended for debugging
-    #### -std=c++17 specifies use of the C++17 standard
-    compile_flags="$compile_flags -std=c++17 -ggdb3 -Og -fpermissive"
+    #### -ggdb3 (produces max debug info with extra stuff for gdb)
+    #### -Og    (optimize debugging experience, -O0 also disables some debug information so its not recommended for debugging)
+    #### -fpermissive ()
+    compile_flags="$compile_flags -ggdb3 -Og -fpermissive"
 
-    #### -Wno-return-type   disables warnings about no return statement 
-    #### -Wno-write-strings disables warnings about converting a constant string to a char*
-    #### -Wno-pointer-arith disables warnings about NULL being used in pointer arithmetic (==NULL apparently counts as this)
+    #### -Wno-return-type   (disables warning: no return statement)
+    #### -Wno-write-strings (disables warning: converting a constant string to a char*)
+    #### -Wno-pointer-arith (disables warning: NULL being used in pointer arithmetic (==NULL apparently counts as this))
     compile_flags="$compile_flags -Wno-return-type -Wno-write-strings -Wno-pointer-arith"
 
   else
-    #### -O3 enable all optimizations that are standard compliant, -Ofast disregards standards TODO consider that
+    #### -O3 (enable all optimizations that are standard compliant, -Ofast disregards standards) TODO(sushi) consider -Ofast
     compile_flags="$compile_flags -O3"
   fi
 
   if [ $build_static_analysis == 1 ]; then
-    #### -fanalyzer  enables static analysis TODO look into other analyzer settings 
+    #### -fanalyzer (enables static analysis) TODO(sushi) look into other analyzer settings
     compile_flags="$compile_flags -fanalysis"
   fi
-elif [ $build_compiler == "clang" ]; then
+elif [ $build_compiler == "clang" ]; then #__________________________________________________________________________clang
+  #### -std=c++17 (specifies to use the C++17 standard)
+  #### -fexceptions ()
+  #### -fcxx-exceptions ()
+  #### -finline-functions ()
+  #### -pipe ()
+  #### -msse3 ()
   compile_flags="$compile_flags 
     -std=c++17 
     -fexceptions 
@@ -328,7 +332,14 @@ elif [ $build_compiler == "clang" ]; then
     -pipe 
     -msse3"
 
-  compile_flags="$compile_flags 
+  #### -Wno-unused-value ()
+  #### -Wno-implicitly-unsigned-literal ()
+  #### -Wno-nonportable-include-path ()
+  #### -Wno-writable-strings ()
+  #### -Wno-unused-function ()
+  #### -Wno-unused-variable ()
+  #### -Wno-undefined-inline ()
+  compile_flags="$compile_flags
     -Wno-unused-value 
     -Wno-implicitly-unsigned-literal 
     -Wno-nonportable-include-path 
@@ -338,8 +349,12 @@ elif [ $build_compiler == "clang" ]; then
     -Wno-undefined-inline"
 
   if [ $build_release == 0 ]; then
+    #### -ggdb3 (produces max debug info with extra stuff for gdb)
+    #### -gcodeview ()
+    #### -O0 ()
     compile_flags="$compile_flags -ggdb3 -gcodeview -O0"
   else
+    #### -O2 ()
     compile_flags="$compile_flags -O2"
   fi
 else
@@ -351,12 +366,13 @@ fi
 link_flags=""
 link_libs=""
 if [ $build_linker == "link" ]; then
-  #### NOTE(delle): -nologo prevents Microsoft copyright banner showing up
-  #### NOTE(delle): -opt:ref eliminates functions and data that are never used
-  #### NOTE(delle): -incremental:no disables incremental linking (relink all files)
+  #### -nologo (prevents Microsoft copyright banner showing up)
+  #### -opt:ref (eliminates functions and data that are never used)
+  #### -incremental:no (disables incremental linking (relink all files))
   link_flags="$link_flags -nologo -opt:ref -incremental:no"
 
   if [ $build_release == 0 ]; then
+    #### -debug:full (enabled debug info and PDB generation during linking)
     link_flags="$link_flags -debug:full"
   fi
 
@@ -401,20 +417,16 @@ exe(){
   fi
 }
 
-if [ $build_time == 1 ]; then
- start=$(date +%s.%3N)
-fi
-
 date +"%a, %h %d %Y, %H:%M:%S"
 if [ ! -e $build_folder ]; then mkdir $build_folder; fi
 if [ ! -e $build_dir ]; then mkdir $build_dir; fi
 pushd $build_dir > /dev/null
 if [ $builder_platform == "win32" ]; then
   if [ -e $misc_folder/ctime.exe ]; then ctime -begin $misc_folder/$app_name.ctm; fi
+  if [ $build_time == 1 ]; then start_time=$(date +%s.%3N); fi
   echo ---------------------------------
   
-  if [ $build_compiler == "cl" ]; then
-    
+  if [ $build_compiler == "cl" ]; then #_____________________________________________________________________________cl
     #### delete previous debug info
     rm *.pdb > /dev/null 2> /dev/null
     #echo Waiting for PDB > lock.tmp
@@ -428,76 +440,58 @@ if [ $builder_platform == "win32" ]; then
       #exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll
       #rm lock.tmp
       #cp deshi.dll $root_folder/deshi.dll
+      #if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
     fi
 
     #### compile app            (generates app_name.exe)
     exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"  -Fd$app_name
     exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
+    if [ -e $app_name.exe ]; then echo "  $app_name.exe"; fi
 
     #### just for testing: create the dll here so it can reference app_name.obj (because g_ui is in app main.cpp instead of deshi.cpp)
     if [ $build_shared == 1 ]; then
       exe $build_linker deshi.obj deshi_dlls.obj $app_name.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll
       cp deshi.dll $root_folder/deshi.dll
+      if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
     fi
-
-   
- 
-  elif [ $build_compiler == "gcc" ]; then
-    ####
-    #### TODO someone else set this up if the code is ever compatible with it 
-    ####
-
-    #### compile deshi (generates deshi.o)
-    exe gcc $deshi_sources -c $compile_flags $defines $includes -o"deshi.o"
-    
-    if [ $build_shared == 1 ]; then
-      #### compile dlls (generates deshi.dll)
-      exe gcc $dll_sources -c -shared $compile_flags $defines -DDESHI_DLL $includes -o"deshi.dll"
-    fi
-
-    #### compile app (generates app_name.o)
-    exe gcc -c $app_sources $compile_flags $defines $includes -o"$app_name.o"
-    
-    #### link everything (generates app_name.exe)
-    exe gcc deshi.o app_name.o $link_flags $link_libs -o"$app_name.exe"
-
-  elif [ $build_compiler == "clang" ]; then
-
+  elif [ $build_compiler == "gcc" ]; then #__________________________________________________________________________gcc
+    echo "Execute commands not setup for compiler: $builder_compiler"
+  elif [ $build_compiler == "clang" ]; then #________________________________________________________________________clang
+    #### compile deshi          (generates deshi.o)
     exe clang $deshi_sources -c $compile_flags $defines $includes -o"deshi.o"
     
+    #### compile deshi DLLs     (generates deshi.dll)
     if [ $build_shared == 1 ]; then
-      #### compile dlls (generates deshi.dll)
-      exe clang $dll_sources -c -shared $compile_flags $defines -DDESHI_DLL $includes -o"deshi.dll"
+      exe clang $dll_sources $includes -c $compile_flags $defines -DDESHI_DLL -o"deshi_dlls.o"
+      #exe $build_linker deshi.o deshi_dlls.o $link_flags $link_libs -o"deshi.dll"
+      #cp deshi.dll $root_folder/deshi.dll
+      #if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
     fi
 
-    #### compile app (generates app_name.o)
-    exe clang -c $app_sources $compile_flags $defines $includes -o"$app_name.o"
-    
-    #### link everything (generates app_name.exe)
-    exe clang deshi.o $app_name.o $link_flags $link_libs -o"$app_name.exe"
+    #### compile app            (generates app_name.exe)
+    exe clang -c $app_sources $compile_flags $defines $includes -o"$app_name.o"    
+    exe $build_linker deshi.o $app_name.o $link_flags $link_libs -o"$app_name.exe"
+    if [ -e $app_name.exe ]; then echo "  $app_name.exe"; fi
 
+    #### just for testing: create the dll here so it can reference app_name.o (because g_ui is in app main.cpp instead of deshi.cpp)
+    if [ $build_shared == 1 ]; then
+      exe $build_linker deshi.o deshi_dlls.o $app_name.o $link_flags $link_libs -o"deshi.dll"
+      cp deshi.dll $root_folder/deshi.dll
+      if [ -e deshi.dll ]; then  echo "  deshi.dll"; fi
+    fi
   fi
 
   echo ---------------------------------
   if [ -e $misc_folder/ctime.exe ]; then ctime -end $misc_folder/$app_name.ctm; fi
-
+  if [ $build_time == 1 ]; then printf "BUILD: %f seconds" $(awk "BEGIN {print $(date +%s.%3N) - $start_time}"); fi
 elif [ $builder_platform == "mac" ]; then
   echo "Execute commands not setup for platform: $builder_platform"
-  exit 1
 elif [ $builder_platform == "linux" ]; then
   echo "Execute commands not setup for platform: $builder_platform"
-  exit 1
 else
   echo "Execute commands not setup for platform: $builder_platform"
-  exit 1
 fi
 popd > /dev/null
-
-if [ $build_time == 1 ]; then
-  end=$(date +%s.%3N)
-  time_took=$(awk "BEGIN {print $end - $start}")
-  printf "\nbuild took %f seconds" $time_took
-fi
 
 
 
