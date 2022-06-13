@@ -14,6 +14,7 @@ Notes
     no hardcoding of anything and everything that can be abstracted out to a single function
     should be.
 
+
 Index
 -----
 @ui_style
@@ -107,7 +108,8 @@ move ui2 to deshi
 
 ------------------------------------------------------------------------------------------------------------
 *   size, width, height
-    Determines the size of the item.
+    Determines the size of the item. Note that text is not affected by this property, and its size is always
+    as it appears on the screen. If you want to change text size use font_height.
 
 -   Inherited: no
 
@@ -564,8 +566,8 @@ UI_FUNC_API(uiItem*, ui_begin_item, str8 id, uiStyle* style, str8 file, upt line
 #define uiItemBS(style) UI_DEF(begin_item({0,0},(style),STR8(__FILE__),__LINE__))
 #define uiItemBSI(id,style) UI_DEF(begin_item((id),(style),STR8(__FILE__),__LINE__))
 
-UI_FUNC_API(void, ui_end_item);
-#define uiItemE() UI_DEF(end_item())
+UI_FUNC_API(void, ui_end_item, str8 file, upt line);
+#define uiItemE() UI_DEF(end_item(STR8(__FILE__),__LINE__))
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
@@ -595,16 +597,6 @@ UI_FUNC_API(uiItem*, ui_begin_window, str8 name, Flags flags, uiStyle* style, st
 
 UI_FUNC_API(uiItem*, ui_end_window);
 #define uiWindowE() UI_DEF(window_end())
-
-
-// makes a child window inside another window
-//
-// window: uiWindow to emplace this window in
-//   name: name of the window
-//    pos: initial position of the window
-//   size: initial size of the window
-UI_FUNC_API(uiWindow*, ui_make_child_window, uiWindow* window, str8 name, vec2i size, Flags flags, str8 file, upt line);
-
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_button
@@ -639,7 +631,15 @@ struct uiText{
     uiItem item;
     str8 text; 
 };
+#define uiTextFromItem(x) CastFromMember(uiText, item, x)
 
+UI_FUNC_API(uiText*, ui_make_text, str8 text, str8 id, uiStyle* style, str8 file, upt line);
+//NOTE(sushi) does not automatically make a str8, use uiTextML for that.
+#define uiTextM(text)         UI_DEF(make_text((text),     {0},       0, STR8(__FILE__),__LINE__))
+#define uiTextMS(text, style) UI_DEF(make_text((text),     {0}, (style), STR8(__FILE__),__LINE__))
+//NOTE(sushi) this automatically applies STR8() to text, so you can only use literals with this macro
+#define uiTextML(text)        UI_DEF(make_text(STR8(text), {0},       0, STR8(__FILE__),__LINE__))
+#define uiTextMLS(text,style) UI_DEF(make_text(STR8(text), {0}, (style), STR8(__FILE__),__LINE__))
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_context
@@ -668,8 +668,8 @@ struct uiContext{
 	ui_make_window__sig*       make_window;
 	ui_begin_window__sig*      begin_window;
 	ui_end_window__sig*        end_window;
-	ui_make_child_window__sig* make_child_window;
 	ui_make_button__sig*       make_button;
+    ui_make_text__sig*         make_text;
 	ui_init__sig*              init;
 	ui_update__sig*            update;
 #endif //#if DESHI_RELOADABLE_UI

@@ -92,12 +92,12 @@ int main(){
 			g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
 			g_ui->begin_window      = platform_get_module_function(g_ui->module, "ui_begin_window", ui_begin_window);
 			g_ui->end_window        = platform_get_module_function(g_ui->module, "ui_end_window", ui_end_window);
-			g_ui->make_child_window = platform_get_module_function(g_ui->module, "ui_make_child_window", ui_make_child_window);
 			g_ui->make_button       = platform_get_module_function(g_ui->module, "ui_make_button", ui_make_button);
+			g_ui->make_text         = platform_get_module_function(g_ui->module, "ui_make_text", ui_make_text);
 			g_ui->init              = platform_get_module_function(g_ui->module, "ui_init", ui_init);
 			g_ui->update            = platform_get_module_function(g_ui->module, "ui_update", ui_update);
 			g_ui->module_valid = (g_ui->make_item && g_ui->begin_item && g_ui->end_item && g_ui->make_window && g_ui->begin_window
-								  && g_ui->end_window && g_ui->make_child_window && g_ui->make_button && g_ui->init && g_ui->update);
+								  && g_ui->end_window && g_ui->make_text && g_ui->make_button && g_ui->init && g_ui->update);
 		}
 		if(!g_ui->module_valid){
 			g_ui->make_item         = ui_make_item__stub;
@@ -106,8 +106,8 @@ int main(){
 			g_ui->make_window       = ui_make_window__stub;
 			g_ui->begin_window      = ui_begin_window__stub;
 			g_ui->end_window        = ui_end_window__stub;
-			g_ui->make_child_window = ui_make_child_window__stub;
 			g_ui->make_button       = ui_make_button__stub;
+			g_ui->make_text         = ui_make_text__stub;
 			g_ui->init              = ui_init__stub;
 			g_ui->update            = ui_update__stub;
 			//TODO(delle) asserts arent working
@@ -141,8 +141,7 @@ int main(){
 	// 		style.border_style = border_solid;
 	// 		style.border_color = color(255,255,255);
 	// 		style.top = 10;
-	// 		(item2=uiItemBS(&style))->id = STR8("item2");{
-
+	// 		(item2=uiItemBS(&style))->id = STR8("item2")
 	// 		}uiItemE();
 	// 		memcpy(&style, ui_initial_style, sizeof(uiStyle));
 	// 		style.background_color = color(25,25,25);
@@ -150,8 +149,7 @@ int main(){
 	// 		style.width = 10;
 	// 		style.margin_top = 10;
 	// 		style.margin_left = 10;
-	// 		(item3=uiItemBS(&style))->id = STR8("item3");{
-
+	// 		(item3=uiItemBS(&style))->id = STR8("item3")
 	// 		}uiItemE();
 	// 	}uiItemE();
 	// }uiItemE();
@@ -184,14 +182,26 @@ int main(){
 	//
 	
 	
-	uiStyle style{};style = *ui_initial_style;
-	style.margintl = {10,10};
-	style.border_style = border_solid;
-	style.border_color = Color_White;
-	style.height = 20;
-	style.width = 20;
-	style.background_color = Color_DarkGrey;
-	uiItemMS(&style);
+	// uiStyle style{};style = *ui_initial_style;
+	// style.margintl = {10,10};
+	// style.border_style = border_solid;
+	// style.border_color = Color_White;
+	// style.height = 20;
+	// style.width = 20;
+	// style.background_color = Color_DarkGrey;
+	// uiItemMS(&style);
+
+	uiStyle style{};style=*ui_initial_style;
+	style.margintl = {100,100};
+	style.paddingtl = {100,100};
+	style.background_color = Color_DarkBlue;
+	uiItemMS(&style)->id=STR8("container");{
+		style=*ui_initial_style;
+		uiTextML("hello")->item.id = STR8("text");
+	}uiItemE();
+
+
+
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
@@ -211,18 +221,19 @@ int main(){
 			file_copy(STR8("deshi.dll"), STR8("deshi_temp.dll"));
 			g_ui->module = platform_load_module(STR8("deshi_temp.dll"));
 			if(g_ui->module){
+				//TODO(delle) functions arent loading
 				g_ui->make_item         = platform_get_module_function(g_ui->module, "ui_make_item", ui_make_item);
 				g_ui->begin_item        = platform_get_module_function(g_ui->module, "ui_begin_item", ui_begin_item);
 				g_ui->end_item          = platform_get_module_function(g_ui->module, "ui_end_item", ui_end_item);
 				g_ui->make_window       = platform_get_module_function(g_ui->module, "ui_make_window", ui_make_window);
 				g_ui->begin_window      = platform_get_module_function(g_ui->module, "ui_begin_window", ui_begin_window);
 				g_ui->end_window        = platform_get_module_function(g_ui->module, "ui_end_window", ui_end_window);
-				g_ui->make_child_window = platform_get_module_function(g_ui->module, "ui_make_child_window", ui_make_child_window);
 				g_ui->make_button       = platform_get_module_function(g_ui->module, "ui_make_button", ui_make_button);
+				g_ui->make_text         = platform_get_module_function(g_ui->module, "ui_make_text", ui_make_text);
 				g_ui->init              = platform_get_module_function(g_ui->module, "ui_init", ui_init);
 				g_ui->update            = platform_get_module_function(g_ui->module, "ui_update", ui_update);
 				g_ui->module_valid = (g_ui->make_item && g_ui->begin_item && g_ui->end_item && g_ui->make_window && g_ui->begin_window
-									  && g_ui->end_window && g_ui->make_child_window && g_ui->make_button && g_ui->init && g_ui->update);
+										&& g_ui->end_window && g_ui->make_button && g_ui->make_text && g_ui->init && g_ui->update);
 			}
 			if(!g_ui->module_valid){
 				g_ui->make_item         = ui_make_item__stub;
@@ -231,10 +242,11 @@ int main(){
 				g_ui->make_window       = ui_make_window__stub;
 				g_ui->begin_window      = ui_begin_window__stub;
 				g_ui->end_window        = ui_end_window__stub;
-				g_ui->make_child_window = ui_make_child_window__stub;
 				g_ui->make_button       = ui_make_button__stub;
+				g_ui->make_text         = ui_make_text__stub;
 				g_ui->init              = ui_init__stub;
 				g_ui->update            = ui_update__stub;
+				//TODO(delle) asserts arent working
 				Assert(!"module is invalid");
 			}
 		}

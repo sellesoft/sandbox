@@ -62,6 +62,54 @@ void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){DPZoneScoped;
 //@Functions
 
 //@Helpers
+//fills an item struct and make its a child of the current item
+void ui_fill_item(uiItem* item, str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
+    uiItem* curitem = *g_ui->item_stack.last;
+    
+    insert_last(&curitem->node, &item->node);
+
+    if(style) memcpy(&item->style, style, sizeof(uiStyle));
+    else      memcpy(&item->style, ui_initial_style, sizeof(uiStyle));
+
+    //TODO(sushi) if an item has an id put it in a map
+    item->id = id;
+    item->file_created = file;
+    item->line_created = line;
+}
+
+vec2i calc_text_size(uiText* item){
+    uiStyle* style = &item->item.style;
+    str8 text = item->text;
+    vec2i result = vec2i{0, (s32)style->font_height};
+	f32 line_width = 0;
+	switch(style->font->type){
+		case FontType_BDF: case FontType_NONE:{
+			u32 codepoint;
+			while(text && (codepoint = str8_advance(&text).codepoint)){
+				if(codepoint == '\n'){
+					result.y += style->font_height;
+					line_width = 0;
+				}
+				line_width += style->font->max_width * style->font_height / style->font->aspect_ratio / style->font->max_width;
+				if(line_width > result.x) result.x = line_width;
+			}
+		}break;
+		case FontType_TTF:{
+			u32 codepoint;
+			while(text && (codepoint = str8_advance(&text).codepoint)){
+				if(codepoint == '\n'){
+					result.y += style->font_height;
+					line_width = 0;
+				}
+				line_width += font_packed_char(style->font, codepoint)->xadvance * style->font_height / style->font->aspect_ratio / style->font->max_width;
+				if(line_width > result.x) result.x = line_width;
+			}
+		}break;
+		default: Assert(!"unhandled font type"); break;
+	}
+	return result;
+}
+
 
 //@Functionality
 void ui_gen_item(uiItem* item){DPZoneScoped;
@@ -84,18 +132,9 @@ void ui_gen_item(uiItem* item){DPZoneScoped;
 
 
 uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
-    uiItem* curitem = *g_ui->item_stack.last;
     uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
-    insert_last(&curitem->node, &item->node);
-    
-    if(style) memcpy(&item->style, style, sizeof(uiStyle));
-    else      memcpy(&item->style, ui_initial_style, sizeof(uiStyle));
+    ui_fill_item(item, id, style, file, line);
 
-    //TODO(sushi) if an item has an id put it in a map
-    item->id = id;
-    item->file_created = file;
-    item->line_created = line;
-	
     item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
 	
     RenderDrawCounts counts = //reserve enough room for a background and border 
@@ -104,7 +143,6 @@ uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	
     item->draw_cmd_count = 1;
     drawcmd_alloc(item->drawcmds, counts);
-    g_ui->update_this_frame.add(item);
     return item;
 }
 
@@ -114,8 +152,16 @@ uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped
     return item;
 }
 
-void ui_end_item(){
+void ui_end_item(str8 file, upt line){
+    if(*(g_ui->item_stack.last) == &g_ui->base){
+        LogE("ui", 
+            "In ", str8{file.str+file.count-dec, dec}, " at line ", line, " :\n",
+            "\tAttempted to end base item. Did you call uiItemE too many times? Did you use uiItemM instead of uiItemB?"
+        );
+        //TODO(sushi) implement a hint showing what instruction could possibly be wrong 
+    }
     pop_item();
+
 }
 
 uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){DPZoneScoped;
@@ -146,11 +192,32 @@ uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Fla
 }
 
 void ui_gen_text(uiItem* item){DPZoneScoped;
-	
+	uiText* t = uiTextFromItem(item);
+    RenderDrawCounts counts = {0};
+    uiDrawCmd* dc = t->item.drawcmds;
+    Vertex2* vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
+    u32*     ip = (u32*)g_ui->index_arena->start + dc->index_offset;
+    render_make_text(vp, ip, counts, t->text, t->item.style.font, t->item.spos, t->item.style.text_color, vec2::ONE * t->item.style.font_height / t->item.style.font->max_height);
+    //NOTE(sushi) text size is always determined here and NEVER set by the user
+    //TODO(sushi) text sizing should probably be moved to eval_item_branch and made to take into account wrapping
+    t->item.style.size = calc_text_size(t);
+    dc->scissorOffset = item->spos;
+    dc->scissorExtent = item->style.size;
 }
 
-uiItem* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
-    return 0;
+uiText* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
+    uiText* item = (uiText*)arena_add(item_arena, sizeof(uiText));
+    ui_fill_item(&item->item, id, style, file, line);
+    
+    item->item.node.type = uiItemType_Text;
+    item->item.drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
+    item->text = text;
+
+    RenderDrawCounts counts = render_make_text_counts(str8_length(text));
+
+    item->item.draw_cmd_count = 1;
+    drawcmd_alloc(item->item.drawcmds, counts);
+    return item;
 }
 
 
@@ -178,7 +245,7 @@ void ui_init(){DPZoneScoped;
     ui_initial_style->   padding_right = MAX_S32;
     ui_initial_style->  padding_bottom = MAX_S32;
     ui_initial_style->   content_align = vec2{0,0};
-    ui_initial_style->            font = 0, //we cant initialize this here because memory hasnt been initialized yet
+    ui_initial_style->            font = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
     ui_initial_style->     font_height = 11;
     ui_initial_style->background_color = color{0,0,0,0};
     ui_initial_style->background_image = 0;
@@ -196,11 +263,9 @@ void ui_init(){DPZoneScoped;
     g_ui->base.style.height = DeshWindow->height;
     g_ui->base.id = STR8("base");
     g_ui->base.style_hash = hash<uiStyle>()(g_ui->base.style);
-    //ui_make_item(STR8("base"), ui_initial_style, STR8(__FILE__), __LINE__);
     push_item(&g_ui->base);
 
     //g_ui->render_buffer = render_create_external_2d_buffer(Megabytes(1), Megabytes(1));
-
 }
 
 //finds the container of an item eg. a window, child window, or section
@@ -286,12 +351,11 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
         if(item->style.height == size_auto)
             item->height = Max(item->height, child->lpos.y + ret.bbx.y);
         
-        if(child->style.margin_bottom == MAX_S32) item->height += child->style.margin_top;
-        else if(child->style.margin_bottom > 0) item->height += child->style.margin_bottom;
-        if(child->style.margin_right == MAX_S32) item->width += child->style.margin_left;
-        else if(child->style.margin_right > 0) item->width += child->style.margin_right;
-        
-
+        //extend bottom and right margins/padding if they arent explicitly set
+        // if(child->style.margin_bottom == MAX_S32) item->height += child->style.margin_top;
+        // else if(child->style.margin_bottom > 0) item->height += child->style.margin_bottom;
+        // if(child->style.margin_right == MAX_S32) item->width += child->style.margin_left;
+        // else if(child->style.margin_right > 0) item->width += child->style.margin_right;
 
         cursor.x = item->style.padding_left;
         cursor.y = child->lpos.y + ret.bbx.y;
@@ -302,7 +366,6 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
     if(item->style.padding_right == MAX_S32) item->width += item->style.padding_left;
     else if(item->style.padding_right > 0) item->width += item->style.padding_right;
         
-    
     drawContext.bbx.x = item->width;
     drawContext.bbx.y = item->height;
 	

@@ -427,7 +427,7 @@ if [ $builder_platform == "win32" ]; then
   if [ $build_time == 1 ]; then start_time=$(date +%s.%3N); fi
   echo ---------------------------------
   
-  if [ $build_compiler == "cl" ]; then #_____________________________________________________________________________cl
+  if [ $build_compiler == "cl" ]; then #______________________________________________________________________________cl
     #### delete previous debug info
     rm *.pdb > /dev/null 2> /dev/null
     #echo Waiting for PDB > lock.tmp
@@ -457,7 +457,7 @@ if [ $builder_platform == "win32" ]; then
     fi
   elif [ $build_compiler == "gcc" ]; then #__________________________________________________________________________gcc
     echo "Execute commands not setup for compiler: $builder_compiler"
-  elif [ $build_compiler == "clang" ]; then #________________________________________________________________________clang
+  elif [ $build_compiler == "clang" ]; then #______________________________________________________________________clang
     #### compile deshi          (generates deshi.o)
     exe clang $deshi_sources -c $compile_flags $defines $includes -o"deshi.o"
     
@@ -484,7 +484,7 @@ if [ $builder_platform == "win32" ]; then
 
   echo ---------------------------------
   if [ -e $misc_folder/ctime.exe ]; then ctime -end $misc_folder/$app_name.ctm; fi
-  if [ $build_time == 1 ]; then printf "BUILD: %f seconds" $(awk "BEGIN {print $(date +%s.%3N) - $start_time}"); fi
+  if [ $build_time == 1 ]; then printf "time: %f seconds" $(awk "BEGIN {print $(date +%s.%3N) - $start_time}"); fi
 elif [ $builder_platform == "mac" ]; then
   echo "Execute commands not setup for platform: $builder_platform"
 elif [ $builder_platform == "linux" ]; then
