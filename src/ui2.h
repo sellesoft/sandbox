@@ -502,10 +502,10 @@ struct hash<uiStyle> {
 		seed ^= s.padding_right;           seed *= 16777619;
 		seed ^= *(u32*)&s.content_align.x; seed *= 16777619;
 		seed ^= *(u32*)&s.content_align.y; seed *= 16777619;
-		seed ^= (u32)s.font;               seed *= 16777619;
+		seed ^= (u64)s.font;               seed *= 16777619;
 		seed ^= s.font_height;             seed *= 16777619;
 		seed ^= s.background_color.rgba;   seed *= 16777619;
-		seed ^= (u32)s.background_image;   seed *= 16777619;
+		seed ^= (u64)s.background_image;   seed *= 16777619;
 		seed ^= s.border_style;            seed *= 16777619;
 		seed ^= s.border_color.rgba;       seed *= 16777619;
 		seed ^= s.border_width;            seed *= 16777619;
@@ -550,7 +550,7 @@ struct uiItem{
     str8 file_created;
     upt  line_created;
 	
-    void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(this));}
+    void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(uiItem));}
 };
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
 
