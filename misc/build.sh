@@ -35,6 +35,7 @@
 #   >early out when we don't successfully build
 #   > eventually support gcc in the code base when someone really wants it
 #       but push for them to use clang instead :)
+#   > make this script easy to use without deshi
 #_____________________________________________________________________________________________________
 #                                           Constants
 #_____________________________________________________________________________________________________
