@@ -210,24 +210,32 @@ int main(){
 	// 	uiTextMLS(":O!!", &style)->item.id = STR8("text5");
 	// }uiItemE();
 
-	u32 n = 20;
+	// u32 n = 20;
+	// uiStyle style{};style=*ui_initial_style;
+	// style.paddingtl={0,0};
+	// style.margintl ={0,0};
+	// style.content_align=0;
+	// forI(n){
+	// 	style.background_color = color(0,u8(f32(i)/n*255),(u8)255-u8(f32(i)/n*255));
+	// 	uiItemBS(&style);
+	// 	uiTextML("hello");
+	// }
+	// style=*ui_initial_style;
+	// style.size = {10,10};
+	// uiItemBS(&style);
+	// uiItemE();
+	// forI(n){
+	// 	uiTextML("hello again");
+	// 	uiItemE();
+	// }
+
 	uiStyle style{};style=*ui_initial_style;
-	style.paddingtl={0,0};
-	style.margintl ={0,0};
-	style.content_align=1;
-	forI(n){
-		style.background_color = color(0,u8(f32(i)/n*255),(u8)255-u8(f32(i)/n*255));
-		uiItemBS(&style);
-		uiTextML("hello");
-	}
-	style=*ui_initial_style;
-	style.size = {10,10};
-	uiItemBS(&style);
-	uiItemE();
-	forI(n){
-		uiTextML("hello again");
-		uiItemE();
-	}
+	uiItemB();{
+		style.size = {10,10};
+		uiItemBS(&style);{
+			
+		}uiItemE();
+	}uiItemE();
 
 
 
