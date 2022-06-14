@@ -69,7 +69,7 @@ int main(){
 	window_show(DeshWindow);
     render_use_default_camera();
 	DeshThreadManager->init();
-
+	
 	//Vertex2* vbuff = (Vertex2*)memalloc(sizeof(Vertex2)*100);
 	//RenderTwodIndex* ibuff = (RenderTwodIndex*)memalloc(sizeof(RenderTwodIndex)*300);
 	//RenderDrawCounts counts{0};
@@ -79,9 +79,10 @@ int main(){
 	//counts+=render_make_filledrect(vbuff, ibuff, counts, vec2(300, 300), vec2::ONE*300, Color_Red);
 	//render_update_external_2d_buffer(&buff, vbuff, counts.vertices, ibuff, counts.indices);
 	
-
+	Assert(false);
 	{ //load UI funcs
 #if DESHI_RELOADABLE_UI
+		if(file_exists(STR8("deshi_temp.dll"))) file_delete(STR8("deshi_temp.dll"));
 		file_copy(STR8("deshi.dll"), STR8("deshi_temp.dll"));
 		g_ui->module = platform_load_module(STR8("deshi_temp.dll"));
 		if(g_ui->module){
@@ -115,7 +116,7 @@ int main(){
 		}
 #endif //#if DESHI_RELOADABLE_UI
 	}
-	uiInit();
+	uiInit(deshi_allocator, deshi_temp_allocator);
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	
@@ -153,7 +154,7 @@ int main(){
 	// 		}uiItemE();
 	// 	}uiItemE();
 	// }uiItemE();
-
+	
 	
 	
 	//uiStyle style{};
@@ -175,7 +176,7 @@ int main(){
 	//style.width = 10;
 	//uiItemBS(&style);
 	//uiItemE();
-
+	
 	//forI(n){
 	//	uiItemE();
 	//}
@@ -190,7 +191,7 @@ int main(){
 	// style.width = 20;
 	// style.background_color = Color_DarkGrey;
 	// uiItemMS(&style);
-
+	
 	// uiStyle style{};style=*ui_initial_style;
 	// style.margintl = {100,100};
 	// style.paddingtl = {10,10};
@@ -269,7 +270,7 @@ int main(){
 				g_ui->init              = platform_get_module_function(g_ui->module, "ui_init", ui_init);
 				g_ui->update            = platform_get_module_function(g_ui->module, "ui_update", ui_update);
 				g_ui->module_valid = (g_ui->make_item && g_ui->begin_item && g_ui->end_item && g_ui->make_window && g_ui->begin_window
-										&& g_ui->end_window && g_ui->make_button && g_ui->make_text && g_ui->init && g_ui->update);
+									  && g_ui->end_window && g_ui->make_button && g_ui->make_text && g_ui->init && g_ui->update);
 			}
 			if(!g_ui->module_valid){
 				g_ui->make_item         = ui_make_item__stub;
@@ -287,21 +288,21 @@ int main(){
 			}
 		}
 #endif //#if DESHI_RELOADABLE_UI
-
+		
 		//forI(n){
-			//if(!i) continue;
-			////items[i]->style.left = 20*(sin(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
-			////items[i]->style.top = 20*(cos(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
-			//items[i]->style.border_width = 20*(sin(2*M_PI*DeshTotalTime/1000/3)+1)/2;
+		//if(!i) continue;
+		////items[i]->style.left = 20*(sin(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
+		////items[i]->style.top = 20*(cos(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
+		//items[i]->style.border_width = 20*(sin(2*M_PI*DeshTotalTime/1000/3)+1)/2;
 		//}
 		render_start_cmd2(5,0,vec2::ZERO,DeshWindow->dimensions);
 		render_quad2(vec2::ONE * 300, vec2::ONE*300);
-
+		
 		uiUpdate();
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
 		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, str8{(u8*)fps.str, fps.count}, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
-
+		
         {
             using namespace UI;
             //Begin(STR8("debuggingUIwithUI"));{

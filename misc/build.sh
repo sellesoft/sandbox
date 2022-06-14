@@ -40,15 +40,9 @@
 #                                           Constants
 #_____________________________________________________________________________________________________
 #### Specify paths ####
-#TODO(sushi) delle check that this works on your machine, idk if you were doing all of that for a specific reason
-#            but this fixes the __FILE__ issue i mentioned awhile ago
-misc_folder="$(pwd -W)" 
-#"$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
-pushd .. > /dev/null
-root_folder="$(pwd -W)"
-#"$misc_folder/.."
-popd > /dev/null
- #TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
+misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
+root_folder="$misc_folder/.."
+#TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
 glfw_folder="C:/src/glfw-3.3.2.bin.WIN64"   #TODO(delle) platform specific glfw binaries
 vulkan_folder="$VULKAN_SDK"
 tracy_folder="H:/src/tracy-0.7.8" #TODO(sushi) make this an env var
@@ -61,15 +55,15 @@ app_name="sandbox"
 
 #### Specify sources ####
 includes="
-  -I$root_folder/src 
-  -I$root_folder/deshi/src 
-  -I$root_folder/deshi/src/external 
+  -Isrc 
+  -Ideshi/src 
+  -Ideshi/src/external 
   -I$glfw_folder/include 
   -I$vulkan_folder/include 
   -I$tracy_folder"
-deshi_sources="$root_folder/deshi/src/deshi.cpp"
-dll_sources="$root_folder/src/ui2.cpp"
-app_sources="$root_folder/src/main.cpp"
+deshi_sources="deshi/src/deshi.cpp"
+dll_sources="src/ui2.cpp"
+app_sources="src/main.cpp"
 
 
 #### Specifiy libs ####
@@ -125,7 +119,7 @@ fi
 #_____________________________________________________________________________________________________
 build_cmd=""
 build_cmd_one_file=""
-build_dir="$build_folder/debug"
+build_dir="debug"
 build_verbose=0
 build_release=0
 build_shared=0
@@ -136,6 +130,7 @@ build_platform=$builder_platform
 build_graphics="vulkan"
 build_compiler="$builder_compiler"
 build_linker="$builder_linker"
+build_object=""
 
 
 skip_arg=0
@@ -171,7 +166,7 @@ for (( i=1; i<=$#; i++)); do
   elif [ "${!i}" == "--d" ]; then
     echo "" #### do nothing since this is default (bash has to have something inside an if)
   elif [ "${!i}" == "--r" ]; then
-    build_dir="$build_folder/release"
+    build_dir="release"
     build_release=1
   elif [ "${!i}" == "--s" ]; then
     build_shared=1
@@ -186,30 +181,45 @@ for (( i=1; i<=$#; i++)); do
     next_arg=$((i+1))
     if [ "${!next_arg}" == "win32" ] || [ "${!next_arg}" == "mac" ] || [ "${!next_arg}" == "linux" ]; then
       build_platform="${!next_arg}"
+    else
+      echo "Unknown platform: ${!next_arg}; Valid options: win32, mac, linux"
     fi
   elif [ "${!i}" == "-graphics" ]; then
     skip_arg=1
     next_arg=$((i+1))
     if [ "${!next_arg}" == "vulkan" ] || [ "${!next_arg}" == "opengl" ] || [ "${!next_arg}" == "directx" ]; then
       build_graphics="${!next_arg}"
+    else
+      echo "Unknown graphics API: ${!next_arg}; Valid options: vulkan, opengl, directx"
     fi
   elif [ "${!i}" == "-compiler" ]; then
     skip_arg=1
     next_arg=$((i+1))
     if [ "${!next_arg}" == "cl" ] || [ "${!next_arg}" == "gcc" ] || [ "${!next_arg}" == "clang" ]; then
       build_compiler="${!next_arg}"
+    else
+      echo "Unknown compiler: ${!next_arg}; Valid options: cl, gcc, clang"
     fi
   elif [ "${!i}" == "-linker" ]; then
     skip_arg=1
     next_arg=$((i+1))
     if [ "${!next_arg}" == "link" ] || [ "${!next_arg}" == "ld" ] || [ "${!next_arg}" == "lld-link" ]; then
       build_linker="${!next_arg}"
+    else
+      echo "Unknown linker: ${!next_arg}; Valid options: link, ld, lld-link"
     fi
   else
     echo "Unknown switch: ${!i}"
     exit 1
   fi
 done
+
+
+if [ "$build_compiler" == "cl" ]; then
+  build_object="obj"
+else
+  build_object="o"
+fi
 #_____________________________________________________________________________________________________
 #                                         Global Defines
 #_____________________________________________________________________________________________________
@@ -267,7 +277,8 @@ defines="$defines_release $defines_platform $defines_graphics $defines_shared $d
 #_____________________________________________________________________________________________________
 compile_flags=""
 if [ $build_compiler == "cl" ]; then #________________________________________________________________________________cl
-  #### -diagnostics:caret (shows the column and code where the error is in the source)
+  #### -diagnostics:column (shows the file and column where the error is)
+  #### -diagnostics:caret (shows the file, column, and code where the error is)
   #### -EHsc   (enables exception handling)
   #### -nologo (prevents Microsoft copyright banner showing up)
   #### -MD     (is used because vulkan's shader compilation lib requires dynamic linking with the CRT)
@@ -277,7 +288,7 @@ if [ $build_compiler == "cl" ]; then #__________________________________________
   #### -Gm-    (disables minimal rebuild (recompile all files))
   #### -std:c++17 (specifies to use the C++17 standard)
   #### -utf-8  (specifies that source files are in utf8)
-  compile_flags="$compile_flags -diagnostics:caret -EHsc -nologo -MD -MP -Oi -GR -Gm- -std:c++17 -utf-8"
+  compile_flags="$compile_flags -diagnostics:column -EHsc -nologo -MD -MP -Oi -GR -Gm- -std:c++17 -utf-8"
 
   #### -W1 (is the warning level)
   #### -wd4100 (disables warning: unused function parameter)
@@ -290,7 +301,7 @@ if [ $build_compiler == "cl" ]; then #__________________________________________
   if [ $build_release == 0 ]; then
     #### -Zi (produces a .pdb file containing debug information)
     #### -Od (prevents all optimization)
-    compile_flags="$compile_flags -Zi -Od"
+    compile_flags="$compile_flags -Z7 -Od"
   else
     #### -O2 (maximizes speed (O1 minimizes size))
     compile_flags="$compile_flags -O2"
@@ -419,7 +430,6 @@ fi
 exe(){
   if [ $build_verbose == 1 ]; then
     echo "\$ $@"; "$@";
-    printf "\n"
   else
     "$@";
   fi
@@ -427,8 +437,9 @@ exe(){
 
 date +"%a, %h %d %Y, %H:%M:%S"
 if [ ! -e $build_folder ]; then mkdir $build_folder; fi
-if [ ! -e $build_dir ]; then mkdir $build_dir; fi
-pushd $build_dir > /dev/null
+if [ ! -e $build_folder/$build_dir ]; then mkdir $build_folder/$build_dir; fi
+pushd $root_folder > /dev/null
+build_dir="build/$build_dir"
 if [ $builder_platform == "win32" ]; then
   if [ -e $misc_folder/ctime.exe ]; then ctime -begin $misc_folder/$app_name.ctm; fi
   if [ $build_time == 1 ]; then start_time=$(date +%s.%3N); fi
@@ -436,57 +447,45 @@ if [ $builder_platform == "win32" ]; then
   
   if [ $build_compiler == "cl" ]; then #______________________________________________________________________________cl
     #### delete previous debug info
-    rm *.pdb > /dev/null 2> /dev/null
+    rm $build_dir/*.pdb > /dev/null 2> /dev/null
     #echo Waiting for PDB > lock.tmp
 
-    #### compile deshi          (generates deshi.obj)
-    exe $build_compiler $deshi_sources $includes -c $compile_flags $defines -Fo"deshi.obj" -Fddeshi
+    #### compile app (generates app_name.exe)
+    exe $build_compiler $app_sources $deshi_sources $includes $compile_flags $defines -Fo"$build_dir/" -link $link_flags $link_libs -OUT:"$build_dir/$app_name.exe" -PDB:"$build_dir/$app_name.pdb"
+    if [ $? == 0 ] && [ -e $build_dir/$app_name.exe ]; then
+      echo "  $app_name.exe"
 
-    #### compile deshi DLLs     (generates deshi.dll)
-    if [ $build_shared == 1 ]; then
-      exe $build_compiler $dll_sources $includes -c $compile_flags $defines -DDESHI_DLL -Fodeshi_dlls.obj -Fddeshi_dlls_$RANDOM
-      #exe $build_linker deshi.obj deshi_dlls.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll
-      #rm lock.tmp
-      #cp deshi.dll $root_folder/deshi.dll
-      #if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
-    fi
+      #### compile dll (generates deshi.dll)
+      if [ $build_shared == 1 ]; then
+        exe $build_compiler $dll_sources $build_dir/deshi.obj $build_dir/main.obj $includes $compile_flags $defines -Fo$build_dir/ -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:$build_dir/deshi.dll -PDB:$build_dir/deshi_dlls_$RANDOM.pdb
 
-    #### compile app            (generates app_name.exe)
-    exe $build_compiler $app_sources $includes -c $compile_flags $defines -Fo"$app_name.obj"  -Fd$app_name
-    exe $build_linker deshi.obj $app_name.obj $link_flags $link_libs -OUT:$app_name.exe
-    if [ -e $app_name.exe ]; then echo "  $app_name.exe"; fi
-
-    #### just for testing: create the dll here so it can reference app_name.obj (because g_ui is in app main.cpp instead of deshi.cpp)
-    if [ $build_shared == 1 ]; then
-      exe $build_linker deshi.obj deshi_dlls.obj $app_name.obj -dll -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll
-      cp deshi.dll $root_folder/deshi.dll
-      if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
+        if [ $? == 0 ] && [ -e $build_dir/deshi.dll ]; then
+          echo "  deshi.dll"
+          cp $build_dir/deshi.dll $root_folder/deshi.dll
+        else
+          echo "Failed to build: deshi.dll"
+        fi
+      fi
+    else
+      echo "Failed to build: $app_name.exe"
     fi
   elif [ $build_compiler == "gcc" ]; then #__________________________________________________________________________gcc
     echo "Execute commands not setup for compiler: $builder_compiler"
   elif [ $build_compiler == "clang" ]; then #______________________________________________________________________clang
-    #### compile deshi          (generates deshi.o)
     exe clang $deshi_sources -c $compile_flags $defines $includes -o"deshi.o"
-    
-    #### compile deshi DLLs     (generates deshi.dll)
+
+      #### compile dlls (generates deshi.dll)
     if [ $build_shared == 1 ]; then
-      exe clang $dll_sources $includes -c $compile_flags $defines -DDESHI_DLL -o"deshi_dlls.o"
-      #exe $build_linker deshi.o deshi_dlls.o $link_flags $link_libs -o"deshi.dll"
-      #cp deshi.dll $root_folder/deshi.dll
-      #if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
+      exe clang $dll_sources -c -shared $compile_flags $defines -DDESHI_DLL $includes -o"deshi.dll"
+      if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
     fi
 
-    #### compile app            (generates app_name.exe)
-    exe clang -c $app_sources $compile_flags $defines $includes -o"$app_name.o"    
-    exe $build_linker deshi.o $app_name.o $link_flags $link_libs -o"$app_name.exe"
+    #### compile app (generates app_name.o)
+    exe clang -c $app_sources $compile_flags $defines $includes -o"$app_name.o"
+
+    #### link everything (generates app_name.exe)
+    exe clang deshi.o $app_name.o $link_flags $link_libs -o"$app_name.exe"
     if [ -e $app_name.exe ]; then echo "  $app_name.exe"; fi
-
-    #### just for testing: create the dll here so it can reference app_name.o (because g_ui is in app main.cpp instead of deshi.cpp)
-    if [ $build_shared == 1 ]; then
-      exe $build_linker deshi.o deshi_dlls.o $app_name.o $link_flags $link_libs -o"deshi.dll"
-      cp deshi.dll $root_folder/deshi.dll
-      if [ -e deshi.dll ]; then  echo "  deshi.dll"; fi
-    fi
   fi
 
   echo ---------------------------------
@@ -500,6 +499,3 @@ else
   echo "Execute commands not setup for platform: $builder_platform"
 fi
 popd > /dev/null
-
-
-
