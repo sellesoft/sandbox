@@ -67,10 +67,10 @@ void ui_fill_item(uiItem* item, str8 id, uiStyle* style, str8 file, upt line){DP
     uiItem* curitem = *g_ui->item_stack.last;
     
     insert_last(&curitem->node, &item->node);
-
+	
     if(style) memcpy(&item->style, style, sizeof(uiStyle));
     else      memcpy(&item->style, ui_initial_style, sizeof(uiStyle));
-
+	
     //TODO(sushi) if an item has an id put it in a map
     item->id = id;
     item->file_created = file;
@@ -134,7 +134,7 @@ void ui_gen_item(uiItem* item){DPZoneScoped;
 uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
     uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
     ui_fill_item(item, id, style, file, line);
-
+	
     item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
 	
     RenderDrawCounts counts = //reserve enough room for a background and border 
@@ -155,20 +155,20 @@ uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped
 void ui_end_item(str8 file, upt line){
     if(*(g_ui->item_stack.last) == &g_ui->base){
         LogE("ui", 
-            "In ", file, " at line ", line, " :\n",
-            "\tAttempted to end base item. Did you call uiItemE too many times? Did you use uiItemM instead of uiItemB?"
-        );
+			 "In ", file, " at line ", line, " :\n",
+			 "\tAttempted to end base item. Did you call uiItemE too many times? Did you use uiItemM instead of uiItemB?"
+			 );
         //TODO(sushi) implement a hint showing what instruction could possibly be wrong 
     }
     pop_item();
-
+	
 }
 
 uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){DPZoneScoped;
     //uiBeginItem(uiWindow, win, &g_ui->base, uiItemType_Window, flags, 1, file, line);
     uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
     item->node.type = uiItemType_Window;
-
+	
     return 0;
 }
 
@@ -176,6 +176,10 @@ uiItem* ui_begin_window(str8 name, Flags flags, uiStyle* style, str8 file, upt l
     ui_make_window(name, flags, style, file, line);
     
     return 0;
+}
+
+uiItem* ui_end_window(){
+	return 0;
 }
 
 uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line){DPZoneScoped;
@@ -212,9 +216,9 @@ uiText* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){DP
     item->item.node.type = uiItemType_Text;
     item->item.drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
     item->text = text;
-
+	
     RenderDrawCounts counts = render_make_text_counts(str8_length(text));
-
+	
     item->item.draw_cmd_count = 1;
     drawcmd_alloc(item->item.drawcmds, counts);
     return item;
@@ -228,7 +232,7 @@ void ui_init(){DPZoneScoped;
     g_ui->drawcmd_list = create_arena_list(0);
     g_ui->vertex_arena = memory_create_arena(Megabytes(1));
     g_ui->index_arena  = memory_create_arena(Megabytes(1));
-
+	
     ui_initial_style->     positioning = pos_static;
     ui_initial_style->            left = 0;
     ui_initial_style->             top = 0;
@@ -265,7 +269,7 @@ void ui_init(){DPZoneScoped;
     g_ui->base.id = STR8("base");
     g_ui->base.style_hash = hash<uiStyle>()(g_ui->base.style);
     push_item(&g_ui->base);
-
+	
     //g_ui->render_buffer = render_create_external_2d_buffer(Megabytes(1), Megabytes(1));
 }
 
@@ -306,7 +310,7 @@ void draw_item_branch(uiItem* item){DPZoneScoped;
             default: Assert(!"unhandled uiItem type"); break;
         }
     }
-
+	
     //Log("", item->id, " pos: ", item->spos, " size: ", item->size);
     
     for_node(item->node.first_child){
@@ -361,17 +365,17 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
             if(child->style.margin_right == MAX_S32) item->width += child->style.margin_left;
             else if(child->style.margin_right > 0) item->width += child->style.margin_right;
         }
-
+		
         cursor.x = item->style.padding_left;
         cursor.y = child->lpos.y + ret.bbx.y;
     }
-
+	
     //extend bottom and right padding if they arent explicitly set
     if(item->style.padding_bottom == MAX_S32) item->height += item->style.padding_top;
     else if(item->style.padding_bottom > 0) item->height += item->style.padding_bottom;
     if(item->style.padding_right == MAX_S32) item->width += item->style.padding_left;
     else if(item->style.padding_right > 0) item->width += item->style.padding_right;
-
+	
     if(item->style.content_align > 0){
         u32 last_static_offset = 0;
         u32 padr = item->style.padding_right;
@@ -391,7 +395,7 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
             }
         }
     }
-
+	
     drawContext.bbx.x = item->width;
     drawContext.bbx.y = item->height;
 	
@@ -431,7 +435,7 @@ void ui_recur(TNode* node){DPZoneScoped;
         eval_item_branch(sspar);
         draw_item_branch(sspar);
     } 
-
+	
     //do updates of each item type
     switch(node->type){
         case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
@@ -459,11 +463,11 @@ void ui_recur(TNode* node){DPZoneScoped;
         }
         render_start_cmd2(5, tex, scoff, scext);
         render_add_vertices2(5, 
-            (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
-            item->drawcmds[i].counts.vertices, 
-            (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
-            item->drawcmds[i].counts.indices
-        );
+							 (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
+							 item->drawcmds[i].counts.vertices, 
+							 (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
+							 item->drawcmds[i].counts.indices
+							 );
     }
     
     if(node->child_count){

@@ -352,20 +352,20 @@ TODO(sushi) example
 #if DESHI_RELOADABLE_UI
 #  if DESHI_DLL
 #    define UI_FUNC_API(sig__return_type, sig__name, ...) \
-__declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
+external __declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
 typedef sig__return_type GLUE(sig__name,__sig)(__VA_ARGS__); \
 sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__);
 #  else
 #    define UI_FUNC_API(sig__return_type, sig__name, ...) \
-__declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
+external __declspec(dllexport) sig__return_type sig__name(__VA_ARGS__); \
 typedef sig__return_type GLUE(sig__name,__sig)(__VA_ARGS__); \
 sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;}
-#  endif
+#  endif //DESHI_DLL
 #  define UI_DEF(x) GLUE(g_ui->, x)
 #else
 #  define UI_FUNC_API(sig__return_type, sig__name, ...) external sig__return_type sig__name(__VA_ARGS__)
-#  define UI_DEF(x) GLUE(ui_, x) 
-#endif
+#  define UI_DEF(x) GLUE(ui_, x)
+#endif //DESHI_RELOADABLE_UI
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
@@ -414,7 +414,7 @@ enum{
 	
     size_auto = -1,
     size_fill = -2,
-
+	
     overflow_scroll = 0,
     overflow_scroll_hidden,
     overflow_hidden,
@@ -464,7 +464,7 @@ external struct uiStyle{
     Type overflow;
 	
     void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(uiStyle)); }
-
+	
 	
 };
 extern uiStyle* ui_initial_style;
@@ -511,7 +511,7 @@ struct uiItem{
     //// state ////
     b32 hovered;
     b32 clicked;
-
+	
     //// INTERNAL ////
     union{ // position relative to parent
         struct{ s32 lx, ly; };
@@ -661,7 +661,7 @@ struct uiContext{
 	
 	//// state ////
     uiItem base;
-
+	
 	//// memory ////
     //TODO(sushi) convert these 2 to Heaps when its implemented
 	ArenaList* item_list;
