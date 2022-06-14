@@ -453,21 +453,21 @@ if [ $builder_platform == "win32" ]; then
     #### compile app (generates app_name.exe)
     exe $build_compiler $app_sources $deshi_sources $includes $compile_flags $defines -Fo"$build_dir/" -link $link_flags $link_libs -OUT:"$build_dir/$app_name.exe" -PDB:"$build_dir/$app_name.pdb"
     if [ $? == 0 ] && [ -e $build_dir/$app_name.exe ]; then
-      echo "  $app_name.exe"
+      echo "[32m  $app_name.exe[0m"
 
       #### compile dll (generates deshi.dll)
       if [ $build_shared == 1 ]; then
         exe $build_compiler $dll_sources $build_dir/deshi.obj $build_dir/main.obj $includes $compile_flags $defines -Fo$build_dir/ -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:$build_dir/deshi.dll -PDB:$build_dir/deshi_dlls_$RANDOM.pdb
 
         if [ $? == 0 ] && [ -e $build_dir/deshi.dll ]; then
-          echo "  deshi.dll"
+          echo "[32m  deshi.dll[0m"
           cp $build_dir/deshi.dll $root_folder/deshi.dll
         else
-          echo "Failed to build: deshi.dll"
+          echo "[93mFailed to build: deshi.dll[0m"
         fi
       fi
     else
-      echo "Failed to build: $app_name.exe"
+      echo "[93mFailed to build: $app_name.exe[0m"
     fi
   elif [ $build_compiler == "gcc" ]; then #__________________________________________________________________________gcc
     echo "Execute commands not setup for compiler: $builder_compiler"
