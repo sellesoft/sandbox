@@ -40,15 +40,8 @@
 #                                           Constants
 #_____________________________________________________________________________________________________
 #### Specify paths ####
-#misc_folder="$(pwd -W)"
-#pushd .. > /dev/null
-#root_folder="$(pwd -W)"
-#popd > /dev/null
-#echo $root_folder
-
 misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
 root_folder="$misc_folder/.."
-
 #TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
 glfw_folder="C:/src/glfw-3.3.2.bin.WIN64"   #TODO(delle) platform specific glfw binaries
 vulkan_folder="$VULKAN_SDK"
@@ -62,15 +55,15 @@ app_name="sandbox"
 
 #### Specify sources ####
 includes="
-  -I$root_folder/src 
-  -I$root_folder/deshi/src 
-  -I$root_folder/deshi/src/external 
+  -Isrc 
+  -Ideshi/src 
+  -Ideshi/src/external 
   -I$glfw_folder/include 
   -I$vulkan_folder/include 
   -I$tracy_folder"
-deshi_sources="$root_folder/deshi/src/deshi.cpp"
-dll_sources="$root_folder/src/ui2.cpp"
-app_sources="$root_folder/src/main.cpp"
+deshi_sources="deshi/src/deshi.cpp"
+dll_sources="src/ui2.cpp"
+app_sources="src/main.cpp"
 
 
 #### Specifiy libs ####
@@ -126,7 +119,7 @@ fi
 #_____________________________________________________________________________________________________
 build_cmd=""
 build_cmd_one_file=""
-build_dir="$build_folder/debug"
+build_dir="debug"
 build_verbose=0
 build_release=0
 build_shared=0
@@ -173,7 +166,7 @@ for (( i=1; i<=$#; i++)); do
   elif [ "${!i}" == "--d" ]; then
     echo "" #### do nothing since this is default (bash has to have something inside an if)
   elif [ "${!i}" == "--r" ]; then
-    build_dir="$build_folder/release"
+    build_dir="release"
     build_release=1
   elif [ "${!i}" == "--s" ]; then
     build_shared=1
@@ -437,7 +430,6 @@ fi
 exe(){
   if [ $build_verbose == 1 ]; then
     echo "\$ $@"; "$@";
-    printf "\n"
   else
     "$@";
   fi
@@ -445,8 +437,9 @@ exe(){
 
 date +"%a, %h %d %Y, %H:%M:%S"
 if [ ! -e $build_folder ]; then mkdir $build_folder; fi
-if [ ! -e $build_dir ]; then mkdir $build_dir; fi
-pushd $build_dir > /dev/null
+if [ ! -e $build_folder/$build_dir ]; then mkdir $build_folder/$build_dir; fi
+pushd $root_folder > /dev/null
+build_dir="build/$build_dir"
 if [ $builder_platform == "win32" ]; then
   if [ -e $misc_folder/ctime.exe ]; then ctime -begin $misc_folder/$app_name.ctm; fi
   if [ $build_time == 1 ]; then start_time=$(date +%s.%3N); fi
@@ -454,23 +447,27 @@ if [ $builder_platform == "win32" ]; then
   
   if [ $build_compiler == "cl" ]; then #______________________________________________________________________________cl
     #### delete previous debug info
-    rm *.pdb > /dev/null 2> /dev/null
+    rm $build_dir/*.pdb > /dev/null 2> /dev/null
     #echo Waiting for PDB > lock.tmp
 
     #### compile app (generates app_name.exe)
-    exe $build_compiler $app_sources $deshi_sources $includes $compile_flags $defines -link $link_flags $link_libs -OUT:$app_name.exe -PDB:$app_name.pdb
-    if [ $? == 0 ] && [ -e $app_name.exe ]; then
+    exe $build_compiler $app_sources $deshi_sources $includes $compile_flags $defines -Fo"$build_dir/" -link $link_flags $link_libs -OUT:"$build_dir/$app_name.exe" -PDB:"$build_dir/$app_name.pdb"
+    if [ $? == 0 ] && [ -e $build_dir/$app_name.exe ]; then
       echo "  $app_name.exe"
 
       #### compile dll (generates deshi.dll)
       if [ $build_shared == 1 ]; then
-        exe $build_compiler $dll_sources deshi.obj main.obj $includes $compile_flags $defines -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+        exe $build_compiler $dll_sources $build_dir/deshi.obj $build_dir/main.obj $includes $compile_flags $defines -Fo$build_dir/ -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:$build_dir/deshi.dll -PDB:$build_dir/deshi_dlls_$RANDOM.pdb
 
-        if [ $? == 0 ] && [ -e deshi.dll ]; then
+        if [ $? == 0 ] && [ -e $build_dir/deshi.dll ]; then
           echo "  deshi.dll"
-          cp deshi.dll $root_folder/deshi.dll
+          cp $build_dir/deshi.dll $root_folder/deshi.dll
+        else
+          echo "Failed to build: deshi.dll"
         fi
       fi
+    else
+      echo "Failed to build: $app_name.exe"
     fi
   elif [ $build_compiler == "gcc" ]; then #__________________________________________________________________________gcc
     echo "Execute commands not setup for compiler: $builder_compiler"
@@ -502,6 +499,3 @@ else
   echo "Execute commands not setup for platform: $builder_platform"
 fi
 popd > /dev/null
-
-
-
