@@ -155,7 +155,7 @@ uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped
 void ui_end_item(str8 file, upt line){
     if(*(g_ui->item_stack.last) == &g_ui->base){
         LogE("ui", 
-            "In ", str8{file.str+file.count-dec, dec}, " at line ", line, " :\n",
+            "In ", file, " at line ", line, " :\n",
             "\tAttempted to end base item. Did you call uiItemE too many times? Did you use uiItemM instead of uiItemB?"
         );
         //TODO(sushi) implement a hint showing what instruction could possibly be wrong 
@@ -417,7 +417,13 @@ void ui_recur(TNode* node){DPZoneScoped;
     //render item
     forI(item->draw_cmd_count){
         render_set_active_surface_idx(0);
-        render_start_cmd2(5, 0, item->drawcmds[i].scissorOffset, item->drawcmds[i].scissorExtent);
+        Texture* tex = 0;
+        if(item->node.type == uiItemType_Text){
+            tex = item->style.font->tex;
+        }else if(item->style.background_image){
+            tex = item->style.background_image;
+        }
+        render_start_cmd2(5, tex, item->drawcmds[i].scissorOffset, item->drawcmds[i].scissorExtent);
         render_add_vertices2(5, 
             (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
             item->drawcmds[i].counts.vertices, 

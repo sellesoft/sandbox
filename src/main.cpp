@@ -79,7 +79,7 @@ int main(){
 	//counts+=render_make_filledrect(vbuff, ibuff, counts, vec2(300, 300), vec2::ONE*300, Color_Red);
 	//render_update_external_2d_buffer(&buff, vbuff, counts.vertices, ibuff, counts.indices);
 	
-	
+
 	{ //load UI funcs
 #if DESHI_RELOADABLE_UI
 		file_copy(STR8("deshi.dll"), STR8("deshi_temp.dll"));
@@ -195,7 +195,7 @@ int main(){
 	style.margintl = {100,100};
 	style.paddingtl = {100,100};
 	style.background_color = Color_DarkBlue;
-	uiItemMS(&style)->id=STR8("container");{
+	uiItemBS(&style)->id=STR8("container");{
 		style=*ui_initial_style;
 		uiTextML("hello")->item.id = STR8("text");
 	}uiItemE();
