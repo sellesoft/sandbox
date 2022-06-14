@@ -40,8 +40,15 @@
 #                                           Constants
 #_____________________________________________________________________________________________________
 #### Specify paths ####
-misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
-root_folder="$misc_folder/.." #TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
+#TODO(sushi) delle check that this works on your machine, idk if you were doing all of that for a specific reason
+#            but this fixes the __FILE__ issue i mentioned awhile ago
+misc_folder="$(pwd -W)" 
+#"$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
+pushd .. > /dev/null
+root_folder="$(pwd -W)"
+#"$misc_folder/.."
+popd > /dev/null
+ #TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
 glfw_folder="C:/src/glfw-3.3.2.bin.WIN64"   #TODO(delle) platform specific glfw binaries
 vulkan_folder="$VULKAN_SDK"
 tracy_folder="H:/src/tracy-0.7.8" #TODO(sushi) make this an env var
