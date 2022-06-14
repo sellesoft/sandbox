@@ -628,8 +628,8 @@ UI_FUNC_API(uiText*, ui_make_text, str8 text, str8 id, uiStyle* style, str8 file
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_context
-UI_FUNC_API(void, ui_init);
-#define uiInit() UI_DEF(init())
+UI_FUNC_API(void, ui_init, Allocator* generic_allocator, Allocator* temp_allocator);
+#define uiInit(ga,ta) UI_DEF(init((ga),(ta)))
 
 UI_FUNC_API(void, ui_update);
 #define uiUpdate() UI_DEF(update())
@@ -663,6 +663,8 @@ struct uiContext{
     uiItem base;
 	
 	//// memory ////
+	Allocator* generic_allocator;
+	Allocator* temp_allocator;
     //TODO(sushi) convert these 2 to Heaps when its implemented
 	ArenaList* item_list;
     ArenaList* drawcmd_list;

@@ -284,7 +284,8 @@ defines="$defines_release $defines_platform $defines_graphics $defines_shared $d
 #_____________________________________________________________________________________________________
 compile_flags=""
 if [ $build_compiler == "cl" ]; then #________________________________________________________________________________cl
-  #### -diagnostics:caret (shows the column and code where the error is in the source)
+  #### -diagnostics:column (shows the file and column where the error is)
+  #### -diagnostics:caret (shows the file, column, and code where the error is)
   #### -EHsc   (enables exception handling)
   #### -nologo (prevents Microsoft copyright banner showing up)
   #### -MD     (is used because vulkan's shader compilation lib requires dynamic linking with the CRT)
@@ -294,7 +295,7 @@ if [ $build_compiler == "cl" ]; then #__________________________________________
   #### -Gm-    (disables minimal rebuild (recompile all files))
   #### -std:c++17 (specifies to use the C++17 standard)
   #### -utf-8  (specifies that source files are in utf8)
-  compile_flags="$compile_flags -diagnostics:caret -EHsc -nologo -MD -MP -Oi -GR -Gm- -std:c++17 -utf-8"
+  compile_flags="$compile_flags -diagnostics:column -EHsc -nologo -MD -MP -Oi -GR -Gm- -std:c++17 -utf-8"
 
   #### -W1 (is the warning level)
   #### -wd4100 (disables warning: unused function parameter)
@@ -458,14 +459,18 @@ if [ $builder_platform == "win32" ]; then
 
     #### compile app (generates app_name.exe)
     exe $build_compiler $app_sources $deshi_sources $includes $compile_flags $defines -link $link_flags $link_libs -OUT:$app_name.exe -PDB:$app_name.pdb
-    if [ -e $app_name.exe ]; then echo "  $app_name.exe"; fi
+    if [ $? == 0 ] && [ -e $app_name.exe ]; then
+      echo "  $app_name.exe"
 
-    #### compile dll (generates deshi.dll)
-    if [ $build_shared == 1 ]; then
-      exe $build_compiler $dll_sources deshi.obj main.obj $includes $compile_flags $defines -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
+      #### compile dll (generates deshi.dll)
+      if [ $build_shared == 1 ]; then
+        exe $build_compiler $dll_sources deshi.obj main.obj $includes $compile_flags $defines -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:deshi.dll -PDB:deshi_dlls_$RANDOM.pdb
 
-      cp deshi.dll $root_folder/deshi.dll
-      if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
+        if [ $? == 0 ] && [ -e deshi.dll ]; then
+          echo "  deshi.dll"
+          cp deshi.dll $root_folder/deshi.dll
+        fi
+      fi
     fi
   elif [ $build_compiler == "gcc" ]; then #__________________________________________________________________________gcc
     echo "Execute commands not setup for compiler: $builder_compiler"

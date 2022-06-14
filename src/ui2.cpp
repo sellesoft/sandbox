@@ -7,8 +7,73 @@
 #include "core/window.h"
 #include "core/logger.h"
 
+
+//-////////////////////////////////////////////////////////////////////////////////////////////////
+// @ui_memory
+#if DESHI_RELOADABLE_UI
+#  define ui_alloc(bytes)    g_ui->generic_allocator->reserve((bytes))
+#  define ui_realloc(bytes)  g_ui->generic_allocator->reserve((bytes))
+#  define ui_free(ptr)       g_ui->generic_allocator->release((ptr))
+#  define ui_talloc(bytes)   g_ui->temp_allocator->reserve((bytes))
+
+inline Arena* ui_create_arena(upt bytes){
+	Arena* result = (Arena*)g_ui->generic_allocator->reserve(bytes+sizeof(Arena));
+	result->start  = (u8*)(result+1);
+	result->cursor = result->start;
+	result->size   = bytes;
+	return result;
+}
+
+inline Arena* ui_grow_arena(Arena* arena, upt bytes){
+	upt cursor_offset = arena->cursor - arena->start;
+	Arena* result = (Arena*)g_ui->generic_allocator->resize(arena, arena->size+bytes+sizeof(Arena));
+	result->start  = (u8*)(result+1);
+	result->cursor = result->start + cursor_offset;
+	return result;
+}
+
+inline void ui_clear_arena(Arena* arena){
+	ZeroMemory(arena->start, arena->size);
+	arena->cursor = arena->start;
+	arena->used   = 0;
+}
+
+FORCE_INLINE void ui_delete_arena(Arena* arena){
+	g_ui->generic_allocator->release(arena);
+}
+#else
+#  define ui_alloc(bytes)    memory_alloc((bytes))
+#  define ui_realloc(bytes)  memory_realloc((bytes))
+#  define ui_free(ptr)       memory_zfree((ptr))
+#  define ui_talloc(bytes)   memory_talloc((bytes))
+#  define ui_create_arena(bytes)     memory_create_arena((bytes))
+#  define ui_grow_arena(arena,bytes) memory_grow_arena((arena),(bytes))
+#  define ui_clear_arena(arena)      memory_clear_arena((arena))
+#  define ui_delete_arena(arena)     memory_delete_arena((arena))
+#endif //DESHI_RELOADABLE_UI
+
 #define item_arena g_ui->item_list->arena
 #define drawcmd_arena g_ui->drawcmd_list->arena
+
+ArenaList* create_arena_list(ArenaList* old){DPZoneScoped;
+    ArenaList* nual = (ArenaList*)ui_alloc(sizeof(ArenaList));
+    if(old) NodeInsertNext(&old->node, &nual->node);
+    nual->arena = ui_create_arena(Megabytes(1));
+    return nual;
+}
+
+void* arena_add(Arena* arena, upt size){DPZoneScoped;
+    if(arena->size < arena->used+size) 
+        g_ui->item_list = create_arena_list(g_ui->item_list);
+    u8* cursor = arena->cursor;
+    arena->cursor += size;
+    arena->used += size;
+    return cursor;
+}
+
+
+
+
 
 void push_item(uiItem* item){DPZoneScoped;
     g_ui->item_stack.add(item);
@@ -29,22 +94,6 @@ uiItem* pop_item(){DPZoneScoped;
 
 //@Window
 
-
-ArenaList* create_arena_list(ArenaList* old){DPZoneScoped;
-    ArenaList* nual = (ArenaList*)memalloc(sizeof(ArenaList));
-    if(old) NodeInsertNext(&old->node, &nual->node);
-    nual->arena = memory_create_arena(Megabytes(1));
-    return nual;
-}
-
-void* arena_add(Arena* arena, upt size){DPZoneScoped;
-    if(arena->size < arena->used+size) 
-        g_ui->item_list = create_arena_list(g_ui->item_list);
-    u8* cursor = arena->cursor;
-    arena->cursor += size;
-    arena->used += size;
-    return cursor;
-}
 
 void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){DPZoneScoped;
     if(drawcmd_arena->size < drawcmd_arena->used + counts.vertices * sizeof(Vertex2) + counts.indices * sizeof(u32))
@@ -227,11 +276,14 @@ uiText* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){DP
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_context
-void ui_init(){DPZoneScoped;
+void ui_init(Allocator* generic_allocator, Allocator* temp_allocator){DPZoneScoped;
+	g_ui->generic_allocator = generic_allocator;
+	g_ui->temp_allocator = temp_allocator;
+	
 	g_ui->item_list    = create_arena_list(0);
     g_ui->drawcmd_list = create_arena_list(0);
-    g_ui->vertex_arena = memory_create_arena(Megabytes(1));
-    g_ui->index_arena  = memory_create_arena(Megabytes(1));
+    g_ui->vertex_arena = ui_create_arena(Megabytes(1));
+    g_ui->index_arena  = ui_create_arena(Megabytes(1));
 	
     ui_initial_style->     positioning = pos_static;
     ui_initial_style->            left = 0;
@@ -486,3 +538,12 @@ void ui_update(){DPZoneScoped;
         ui_recur(g_ui->base.node.first_child);
     }
 }
+
+#undef ui_alloc
+#undef ui_realloc
+#undef ui_free
+#undef ui_talloc
+#undef ui_create_arena
+#undef ui_delete_arena
+#undef item_arena
+#undef drawcmd_arena

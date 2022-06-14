@@ -79,7 +79,7 @@ int main(){
 	//counts+=render_make_filledrect(vbuff, ibuff, counts, vec2(300, 300), vec2::ONE*300, Color_Red);
 	//render_update_external_2d_buffer(&buff, vbuff, counts.vertices, ibuff, counts.indices);
 	
-	
+	Assert(false);
 	{ //load UI funcs
 #if DESHI_RELOADABLE_UI
 		if(file_exists(STR8("deshi_temp.dll"))) file_delete(STR8("deshi_temp.dll"));
@@ -116,7 +116,7 @@ int main(){
 		}
 #endif //#if DESHI_RELOADABLE_UI
 	}
-	uiInit();
+	uiInit(deshi_allocator, deshi_temp_allocator);
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	
