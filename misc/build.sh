@@ -226,9 +226,9 @@ fi
 #_____________________________________________________________________________________________________
 defines_build=""
 if [ $build_release == 0 ]; then
-  defines_build="-DBUILD_INTERNAL=0 -DBUILD_SLOW=0 -DBUILD_RELEASE=1"
-else
   defines_build="-DBUILD_INTERNAL=1 -DBUILD_SLOW=1 -DBUILD_RELEASE=0"
+else
+  defines_build="-DBUILD_INTERNAL=0 -DBUILD_SLOW=0 -DBUILD_RELEASE=1"
 fi
 
 
