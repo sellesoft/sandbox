@@ -367,6 +367,10 @@ sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;
 #  define UI_DEF(x) GLUE(ui_, x)
 #endif //DESHI_RELOADABLE_UI
 
+//NOTE(sushi) only values in between 0 and 100 are supported here
+//            (technically 0 and 127, but the renderer will ignore anything above 100)
+#define UI_PERCENT_MASK 0xffffff80 
+#define percent(x) (s32)(UI_PERCENT_MASK | x)
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_item
@@ -642,6 +646,16 @@ struct ArenaList{
 };
 #define ArenaListFromNode(x) CastFromMember(ArenaList, node, x);
 
+typedef u32 uiInputState; enum{
+    uiISNone,
+    uiISScrolling,
+    uiISDragging,
+    uiISResizing,
+    uiISPreventInputs,
+    uiISExternalPreventInputs,
+};
+
+
 struct uiContext{
 #if DESHI_RELOADABLE_UI
 	//// functions ////
@@ -661,6 +675,8 @@ struct uiContext{
 	
 	//// state ////
     uiItem base;
+    uiItem* hovered; //item currently hovered by the mouse
+    uiInputState istate;
 	
 	//// memory ////
 	Allocator* generic_allocator;

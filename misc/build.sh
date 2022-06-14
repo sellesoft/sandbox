@@ -70,6 +70,7 @@ app_sources="src/main.cpp"
 lib_paths=(
   $glfw_folder/lib-vc2019
   $vulkan_folder/lib
+  #"H:/msys2 2/mingw64/bin"
 )
 libs=(
   glfw3
@@ -405,6 +406,7 @@ if [ $build_linker == "link" ]; then
     link_libs="$link_libs $lib_lib.lib"
   done
 elif [ $build_linker == "ld" ]; then
+  #link_libs
   for ((i=0; i<${#lib_paths[@]}; i++)); do
     lib_path=${lib_paths[i]}
     link_libs="$link_libs -L$lib_path"

@@ -64,7 +64,7 @@ int main(){
 	console_init();
 	render_init();
 	Storage::Init();
-	//UI::Init();
+	UI::Init();
 	cmd_init();
 	window_show(DeshWindow);
     render_use_default_camera();
@@ -211,38 +211,60 @@ int main(){
 	// 	uiTextMLS(":O!!", &style)->item.id = STR8("text5");
 	// }uiItemE();
 
-	// u32 n = 20;
+	// u32 n = 50;
 	// uiStyle style{};style=*ui_initial_style;
-	// style.paddingtl={0,0};
-	// style.margintl ={0,0};
-	// style.content_align=0;
+	// style.paddingtl={1,1};
+	// style.margintl ={1,1};
+	// style.content_align=0.5;
+	// style.positioning = pos_draggable_relative;
 	// forI(n){
 	// 	style.background_color = color(0,u8(f32(i)/n*255),(u8)255-u8(f32(i)/n*255));
 	// 	uiItemBS(&style);
-	// 	uiTextML("hello");
 	// }
 	// style=*ui_initial_style;
-	// style.size = {10,10};
-	// uiItemBS(&style);
+	// style.size = {2,2};
+	// uiItem* i = uiItemBS(&style);
 	// uiItemE();
 	// forI(n){
-	// 	uiTextML("hello again");
 	// 	uiItemE();
 	// }
 
-	uiStyle style{};style=*ui_initial_style;
-	uiItemB();{
-		style.size = {10,10};
-		uiItemBS(&style);{
+	// uiItem* item0;
+	// uiItem* item1;
+	// uiStyle style{};style=*ui_initial_style;
+	// style.paddingtl={10,10};
+	// style.background_color = Color_DarkRed;
+	// style.positioning = pos_draggable_relative;
+	// (item0=uiItemBS(&style))->id=STR8("item0");{
+	// 	style.background_color = Color_DarkBlue;
+	// 	style.size = {20,20};
+	// 	(item1=uiItemBS(&style))->id=STR8("item1");{
+
+	// 	}uiItemE();
+	// }uiItemE();
+
+	// uiStyle style{};style=*ui_initial_style;
+	// uiItemB();{
+	// 	style.size = {10,10};
+	// 	style.background_color = Color_White;
+	// 	uiItemBS(&style);{
 			
-		}uiItemE();
+	// 	}uiItemE();
+	// }uiItemE();
+
+	uiStyle style{};style=*ui_initial_style;
+	style.size = {100,100};
+	style.background_color=Color_Blue;
+	uiItemBS(&style);{
+		style.size = {percent(25), percent(75)};
+		style.background_color = Color_Red;
+		uiItemMS(&style);
 	}uiItemE();
 
 
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
-		
 		//render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
 #if DESHI_RELOADABLE_UI
 		if(key_pressed(Key_F5 | InputMod_AnyAlt)){
@@ -288,16 +310,8 @@ int main(){
 			}
 		}
 #endif //#if DESHI_RELOADABLE_UI
-		
-		//forI(n){
-		//if(!i) continue;
-		////items[i]->style.left = 20*(sin(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
-		////items[i]->style.top = 20*(cos(2*M_PI*DeshTotalTime/1000/3 + i)+1)/2;
-		//items[i]->style.border_width = 20*(sin(2*M_PI*DeshTotalTime/1000/3)+1)/2;
-		//}
-		render_start_cmd2(5,0,vec2::ZERO,DeshWindow->dimensions);
-		render_quad2(vec2::ONE * 300, vec2::ONE*300);
-		
+
+
 		uiUpdate();
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
@@ -305,13 +319,22 @@ int main(){
 		
         {
             using namespace UI;
-            //Begin(STR8("debuggingUIwithUI"));{
-			//	Text(STR8("here some text"));
-            //}End();
+            Begin(STR8("debuggingUIwithUI"));{
+				// string item0p = toStr("item0 pos: ", item0->style.tl);
+				// string item1p = toStr("item1 pos: ", item1->style.tl);
+				// Text({(u8*)item0p.str, item0p.count});
+				// Text({(u8*)item1p.str, item1p.count});
+
+            }End();
+			
+			if(g_ui->hovered){
+				render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
+				render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
+			}
         }
 		
 		//console_update();
-		//UI::Update();
+		UI::Update();
 		render_update();
 		logger_update();
 		memory_clear_temp();

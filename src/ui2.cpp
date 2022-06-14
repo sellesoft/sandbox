@@ -16,7 +16,7 @@
 #  define ui_free(ptr)       g_ui->generic_allocator->release((ptr))
 #  define ui_talloc(bytes)   g_ui->temp_allocator->reserve((bytes))
 
-inline Arena* ui_create_arena(upt bytes){
+inline Arena* ui_create_arena(upt bytes){DPZoneScoped;
 	Arena* result = (Arena*)g_ui->generic_allocator->reserve(bytes+sizeof(Arena));
 	result->start  = (u8*)(result+1);
 	result->cursor = result->start;
@@ -24,7 +24,7 @@ inline Arena* ui_create_arena(upt bytes){
 	return result;
 }
 
-inline Arena* ui_grow_arena(Arena* arena, upt bytes){
+inline Arena* ui_grow_arena(Arena* arena, upt bytes){DPZoneScoped;
 	upt cursor_offset = arena->cursor - arena->start;
 	Arena* result = (Arena*)g_ui->generic_allocator->resize(arena, arena->size+bytes+sizeof(Arena));
 	result->start  = (u8*)(result+1);
@@ -32,13 +32,13 @@ inline Arena* ui_grow_arena(Arena* arena, upt bytes){
 	return result;
 }
 
-inline void ui_clear_arena(Arena* arena){
+inline void ui_clear_arena(Arena* arena){DPZoneScoped;
 	ZeroMemory(arena->start, arena->size);
 	arena->cursor = arena->start;
 	arena->used   = 0;
 }
 
-FORCE_INLINE void ui_delete_arena(Arena* arena){
+FORCE_INLINE void ui_delete_arena(Arena* arena){DPZoneScoped;
 	g_ui->generic_allocator->release(arena);
 }
 #else
@@ -126,7 +126,7 @@ void ui_fill_item(uiItem* item, str8 id, uiStyle* style, str8 file, upt line){DP
     item->line_created = line;
 }
 
-vec2i calc_text_size(uiText* item){
+vec2i calc_text_size(uiText* item){DPZoneScoped;
     uiStyle* style = &item->item.style;
     str8 text = item->text;
     vec2i result = vec2i{0, (s32)style->font_height};
@@ -334,12 +334,6 @@ TNode* ui_find_container(TNode* item){DPZoneScoped;
     return 0;
 }
 
-struct DrawContext{
-    vec2i bbx;
-    u64   drawcmd_count;
-    uiDrawCmd* drawCmds;
-};
-
 //pass 0 for child on first call
 TNode* ui_find_static_sized_parent(TNode* node, TNode* child){DPZoneScoped;
     uiItem* item = uiItemFromNode(node);
@@ -371,42 +365,56 @@ void draw_item_branch(uiItem* item){DPZoneScoped;
 }
 
 //reevaluates an entire brach of items
-//NOTE(sushi) DrawContext may be useless here
-DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
-    DrawContext drawContext;
+void eval_item_branch(uiItem* item){DPZoneScoped;
+    uiItem* parent = uiItemFromNode(item->node.parent);
 	
-    if(item->style.height != size_auto) item->height = item->style.height;
-    else item->height = 0; //always reset size on auto sized items
-    if(item->style.width != size_auto) item->width = item->style.width;
-    else item->width = 0; //always reset size on auto sized items
+    b32 wauto = item->style.width == size_auto;
+    b32 hauto = item->style.height == size_auto;
+
+    if(!hauto){
+        if((item->style.height & UI_PERCENT_MASK)==UI_PERCENT_MASK){
+            if(parent->style.height > 0){
+                item->height = f32(item->style.height & ~UI_PERCENT_MASK)/100.f * parent->style.height;
+            } else hauto = 1;
+        } else item->height = item->style.height;
+    } else item->height = 0; //always reset size on auto sized items
+    
+    if(!wauto){
+        if((item->style.width & UI_PERCENT_MASK)==UI_PERCENT_MASK){
+            if(parent->style.width > 0){
+                item->width = f32(item->style.width & ~UI_PERCENT_MASK)/100.f * parent->style.width;
+            } else hauto = 1;
+        } else item->width = item->style.width;
+    } else item->width = 0; //always reset size on auto sized items
+
     vec2i cursor = item->style.paddingtl;
     for_node(item->node.first_child){
         uiItem* child = uiItemFromNode(it);
-        DrawContext ret = eval_item_branch(child);    
+        eval_item_branch(child);    
         vec2i cursorloc = cursor;
         switch(child->style.positioning){
             case pos_static:{
-                child->lpos =  
-                    child->style.margintl +
-                    item->scroll +
-                    item->style.border_width * vec2i::ONE +
-                    cursor;
+                child->lpos =  child->style.margintl;
+                if(item->style.border_style)
+                    child->lpos += item->style.border_width * vec2i::ONE;
+                child->lpos += item->scroll;
+                child->lpos += cursor;
             }break;
             case pos_relative:
             case pos_draggable_relative:{
-                child->lpos = 
-                    child->style.margintl +
-                    item->scroll +
-                    cursor +
-                    item->style.border_width * vec2i::ONE +
-                    child->style.tl;
+                child->lpos =  child->style.margintl;
+                if(item->style.border_style)
+                    child->lpos += item->style.border_width * vec2i::ONE;
+                child->lpos += item->scroll;
+                child->lpos += cursor;
+                child->lpos += child->style.tl;
             }break;
         }
         
         if(item->style.width == size_auto)
-            item->width = Max(item->width, child->lpos.x + ret.bbx.x);
+            item->width = Max(item->width, child->lpos.x + child->width);
         if(item->style.height == size_auto)
-            item->height = Max(item->height, child->lpos.y + ret.bbx.y);
+            item->height = Max(item->height, child->lpos.y + child->height);
         
         //extend bottom and right margins if they arent explicitly set
         if(item->style.height == size_auto){
@@ -419,7 +427,7 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
         }
 		
         cursor.x = item->style.padding_left;
-        cursor.y = child->lpos.y + ret.bbx.y;
+        cursor.y = child->lpos.y + child->height;
     }
 	
     //extend bottom and right padding if they arent explicitly set
@@ -447,20 +455,10 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
             }
         }
     }
-	
-    drawContext.bbx.x = item->width;
-    drawContext.bbx.y = item->height;
-	
-    return drawContext;
 }
 
-void ui_recur(TNode* node){DPZoneScoped;
-    uiItem* item = uiItemFromNode(node);
-    uiItem* parent = uiItemFromNode(node->parent);
-	
-    //dragging an item
-    //it doesnt matter whether its fixed or relative here
-    //that only matters in scrolling
+void drag_item(uiItem* item){DPZoneScoped;
+    if(!item) return;
     if(item->style.positioning == pos_draggable_fixed || 
        item->style.positioning == pos_draggable_relative){
         vec2i mp_cur = vec2i(DeshInput->mouseX, DeshInput->mouseY); 
@@ -469,14 +467,32 @@ void ui_recur(TNode* node){DPZoneScoped;
         if(key_pressed(Mouse_LEFT) && Math::PointInRectangle(mp_cur, item->spos, item->size)){
             mp_offset = item->style.tl - mp_cur;
             dragging = true;
+            g_ui->istate = uiISDragging;            
         }
-        if(key_released(Mouse_LEFT)) dragging = false;
+        if(key_released(Mouse_LEFT)){ dragging = false;  g_ui->istate = uiISNone; }
         
         if(dragging){
             item->style.tl = input_mouse_position() + mp_offset;
-            //ui_regen_item(item);
+           
         }
     }
+}
+
+//depth first walk to ensure we find topmost hovered item
+b32 find_hovered_item(uiItem* item){DPZoneScoped;
+    for_node(item->node.first_child){
+        if(find_hovered_item(uiItemFromNode(it))) return 1;
+    }
+    if(Math::PointInRectangle(input_mouse_position(), item->spos, item->size)){
+        g_ui->hovered = item;
+        return 1;
+    }
+    return 0;
+}
+
+void ui_recur(TNode* node){DPZoneScoped;
+    uiItem* item = uiItemFromNode(node);
+    uiItem* parent = uiItemFromNode(node->parent);
 	
     //check if an item's style was modified, if so reevaluate the item,
     //its children, and every child of its parents until a manually sized parent is found
@@ -515,13 +531,15 @@ void ui_recur(TNode* node){DPZoneScoped;
         }
         render_start_cmd2(5, tex, scoff, scext);
         render_add_vertices2(5, 
-							 (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
-							 item->drawcmds[i].counts.vertices, 
-							 (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
-							 item->drawcmds[i].counts.indices
-							 );
+            (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
+            item->drawcmds[i].counts.vertices, 
+            (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
+            item->drawcmds[i].counts.indices
+        );
+        
+       
     }
-    
+
     if(node->child_count){
         for_node(node->first_child){
             ui_recur(it);
@@ -534,6 +552,15 @@ void ui_update(){DPZoneScoped;
     g_ui->base.style.width = DeshWindow->width;
     g_ui->base.style.height = DeshWindow->height;
     
+    //in order to prevent the mouse from entering another window during input
+    //this can probably be moved to only be done on mouse input, but maybe left so 
+    //user can get this info at any time OR make a function for that
+    if(g_ui->istate == uiISNone) 
+        find_hovered_item(&g_ui->base);
+    
+    if(g_ui->istate == uiISNone || g_ui->istate == uiISDragging) 
+        drag_item(g_ui->hovered);
+
     if(g_ui->base.node.child_count){
         ui_recur(g_ui->base.node.first_child);
     }
