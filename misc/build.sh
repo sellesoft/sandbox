@@ -272,7 +272,7 @@ else
 fi
 
 
-defines="$defines_release $defines_platform $defines_graphics $defines_shared $defines_misc"
+defines="$defines_build $defines_platform $defines_graphics $defines_shared $defines_misc"
 #_____________________________________________________________________________________________________
 #                                           Build Flags
 #_____________________________________________________________________________________________________
