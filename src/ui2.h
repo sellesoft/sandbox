@@ -14,6 +14,10 @@ Notes
     no hardcoding of anything and everything that can be abstracted out to a single function
     should be.
 
+  
+
+  Differences from HTML/CSS:
+    Margins do not collapse
 
 Index
 -----
@@ -176,6 +180,9 @@ move ui2 to deshi
         in string:
             margin: 10px 10%;
 
+-   Behavoir:
+        Margins do not cause items to push away their siblings, a margin for an item just 
+
 ------------------------------------------------------------------------------------------------------------
 *   padding, padding_top, padding_bottom, padding_left, padding_right
     ---
@@ -216,46 +223,25 @@ move ui2 to deshi
 ------------------------------------------------------------------------------------------------------------
 *   content_align
     ---
-    Determines how to align an item's contents. This only works when positioning is set to static, otherwise its
-    value will be ignored. This value is a vec2 whose valid values range from 0 to 1.
+    Determines how to align an item's contents over the x axis. 
+    This only works on children who's positioning is static or relative.
+    This respects margins and padding, content will only be aligned within their valid space. 
+    Negative values are not valid.
+    Values larger than 1 are not valid.
+    This does not apply when alignment is set to inline.
+
+-   Performance:
+        In order to properly do this (as far as I can tell), we must reevaluate all children of an item
+        after having already evaluated them because the size of the group of items is not known until
+        all of them have been evaluated. So this more or less doubles the evaluation time of every
+        item that uses it.
 
 -   Inherited: no
 
 -   Defaults:
-        Defaults to {0,0}
+        Defaults to 0
 
--   Example:
-        in code:
-            uiStyle style;
-            style.content_align = vec2{0.5,0.5}; //aligns the item's content to be centered over x and y
-        in string:
-            content_align: 0.5 0; //aligns the item's content to be centered over x and top aligned over y
-        visual:
-            {0, 0.5}
-            ┌----------------------------┑
-            |                            |
-            |┌------------------┑        |
-            ||                  |        |
-            ||                  |        |
-            ||                  |        |
-            ||                  |        |
-            ||                  |        |
-            |└------------------┙        |
-            |                            |
-            └----------------------------┙
-
-            {1, 1}
-            ┌----------------------------┑
-            |                            |
-            |                            |
-            |        ┌------------------┑|
-            |        |                  ||
-            |        |                  ||
-            |        |                  ||
-            |        |                  ||
-            |        |                  ||
-            |        └------------------┙|
-            └----------------------------┙
+TODO(sushi) example
 
 ------------------------------------------------------------------------------------------------------------
 *   font
@@ -466,7 +452,7 @@ external struct uiStyle{
         struct{s32 padding_bottom, padding_right;};
         vec2i paddingbr;        
     };
-    vec2 content_align; 
+    f32 content_align; 
     Font* font;
     u32 font_height;
     color background_color;
@@ -487,32 +473,31 @@ template<>
 struct hash<uiStyle> {
 	inline u32 operator()(const uiStyle& s){DPZoneScoped;
 		u32 seed = 2166136261;
-		seed ^= s.positioning;             seed *= 16777619;
-		seed ^= s.left;                    seed *= 16777619;
-		seed ^= s.top;                     seed *= 16777619;
-		seed ^= s.right;                   seed *= 16777619;
-		seed ^= s.bottom;                  seed *= 16777619;
-		seed ^= s.width;                   seed *= 16777619;
-		seed ^= s.height;                  seed *= 16777619;
-		seed ^= s.margin_left;             seed *= 16777619;
-		seed ^= s.margin_top;              seed *= 16777619;
-		seed ^= s.margin_bottom;           seed *= 16777619;
-		seed ^= s.margin_right;            seed *= 16777619;
-		seed ^= s.padding_left;            seed *= 16777619;
-		seed ^= s.padding_top;             seed *= 16777619;
-		seed ^= s.padding_bottom;          seed *= 16777619;
-		seed ^= s.padding_right;           seed *= 16777619;
-		seed ^= *(u32*)&s.content_align.x; seed *= 16777619;
-		seed ^= *(u32*)&s.content_align.y; seed *= 16777619;
-		seed ^= (u64)s.font;               seed *= 16777619;
-		seed ^= s.font_height;             seed *= 16777619;
-		seed ^= s.background_color.rgba;   seed *= 16777619;
-		seed ^= (u64)s.background_image;   seed *= 16777619;
-		seed ^= s.border_style;            seed *= 16777619;
-		seed ^= s.border_color.rgba;       seed *= 16777619;
-		seed ^= s.border_width;            seed *= 16777619;
-		seed ^= s.text_color.rgba;         seed *= 16777619;
-		seed ^= s.overflow;                seed *= 16777619;
+		seed ^= s.positioning;           seed *= 16777619;
+		seed ^= s.left;                  seed *= 16777619;
+		seed ^= s.top;                   seed *= 16777619;
+		seed ^= s.right;                 seed *= 16777619;
+		seed ^= s.bottom;                seed *= 16777619;
+		seed ^= s.width;                 seed *= 16777619;
+		seed ^= s.height;                seed *= 16777619;
+		seed ^= s.margin_left;           seed *= 16777619;
+		seed ^= s.margin_top;            seed *= 16777619;
+		seed ^= s.margin_bottom;         seed *= 16777619;
+		seed ^= s.margin_right;          seed *= 16777619;
+		seed ^= s.padding_left;          seed *= 16777619;
+		seed ^= s.padding_top;           seed *= 16777619;
+		seed ^= s.padding_bottom;        seed *= 16777619;
+		seed ^= s.padding_right;         seed *= 16777619;
+		seed ^= *(u32*)&s.content_align; seed *= 16777619;
+		seed ^= (u64)s.font;             seed *= 16777619;
+		seed ^= s.font_height;           seed *= 16777619;
+		seed ^= s.background_color.rgba; seed *= 16777619;
+		seed ^= (u64)s.background_image; seed *= 16777619;
+		seed ^= s.border_style;          seed *= 16777619;
+		seed ^= s.border_color.rgba;     seed *= 16777619;
+		seed ^= s.border_width;          seed *= 16777619;
+		seed ^= s.text_color.rgba;       seed *= 16777619;
+		seed ^= s.overflow;              seed *= 16777619;
         return seed;
 	}
 };

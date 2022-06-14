@@ -244,7 +244,7 @@ void ui_init(){DPZoneScoped;
     ui_initial_style->     padding_top = 0;
     ui_initial_style->   padding_right = MAX_S32;
     ui_initial_style->  padding_bottom = MAX_S32;
-    ui_initial_style->   content_align = vec2{0,0};
+    ui_initial_style->   content_align = 0;
     ui_initial_style->            font = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
     ui_initial_style->     font_height = 11;
     ui_initial_style->background_color = color{0,0,0,0};
@@ -253,6 +253,7 @@ void ui_init(){DPZoneScoped;
     ui_initial_style->    border_color = color{180,180,180,255};
     ui_initial_style->    border_width = 1;
     ui_initial_style->      text_color = color{255,255,255,255};
+    ui_initial_style->        overflow = overflow_hidden;
 	
     g_ui->base = uiItem{0};
     g_ui->base.style = *ui_initial_style;
@@ -322,7 +323,6 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
     else item->height = 0; //always reset size on auto sized items
     if(item->style.width != size_auto) item->width = item->style.width;
     else item->width = 0; //always reset size on auto sized items
-    
     vec2i cursor = item->style.paddingtl;
     for_node(item->node.first_child){
         uiItem* child = uiItemFromNode(it);
@@ -336,7 +336,8 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
                     item->style.border_width * vec2i::ONE +
                     cursor;
             }break;
-            case pos_relative:{
+            case pos_relative:
+            case pos_draggable_relative:{
                 child->lpos = 
                     child->style.margintl +
                     item->scroll +
@@ -351,21 +352,46 @@ DrawContext eval_item_branch(uiItem* item){DPZoneScoped;
         if(item->style.height == size_auto)
             item->height = Max(item->height, child->lpos.y + ret.bbx.y);
         
-        //extend bottom and right margins/padding if they arent explicitly set
-        // if(child->style.margin_bottom == MAX_S32) item->height += child->style.margin_top;
-        // else if(child->style.margin_bottom > 0) item->height += child->style.margin_bottom;
-        // if(child->style.margin_right == MAX_S32) item->width += child->style.margin_left;
-        // else if(child->style.margin_right > 0) item->width += child->style.margin_right;
+        //extend bottom and right margins if they arent explicitly set
+        if(item->style.height == size_auto){
+            if(child->style.margin_bottom == MAX_S32) item->height += child->style.margin_top;
+            else if(child->style.margin_bottom > 0) item->height += child->style.margin_bottom;
+        }
+        if(item->style.width == size_auto){
+            if(child->style.margin_right == MAX_S32) item->width += child->style.margin_left;
+            else if(child->style.margin_right > 0) item->width += child->style.margin_right;
+        }
 
         cursor.x = item->style.padding_left;
         cursor.y = child->lpos.y + ret.bbx.y;
     }
 
+    //extend bottom and right padding if they arent explicitly set
     if(item->style.padding_bottom == MAX_S32) item->height += item->style.padding_top;
     else if(item->style.padding_bottom > 0) item->height += item->style.padding_bottom;
     if(item->style.padding_right == MAX_S32) item->width += item->style.padding_left;
     else if(item->style.padding_right > 0) item->width += item->style.padding_right;
-        
+
+    if(item->style.content_align > 0){
+        u32 last_static_offset = 0;
+        u32 padr = item->style.padding_right;
+        u32 padl = item->style.padding_left;
+        u32 child_space = (item->width - (padr==MAX_S32?padl:padr)) - padl;
+        for_node(item->node.first_child){
+            uiItem* child = uiItemFromNode(it);
+            if(child->style.positioning == pos_static){
+                last_static_offset = child->lpos.x;
+                u32 marr = child->style.margin_right;
+                u32 marl = child->style.margin_left;
+                u32 true_width = child->width + (marr==MAX_S32?marl:marr) + marl;
+                child->lpos.x = item->style.padding_left+ child->style.margin_left + item->style.content_align * (child_space - true_width);
+                last_static_offset = child->lpos.x - last_static_offset;
+            }else if(child->style.positioning==pos_relative){
+                child->lpos.x += last_static_offset;
+            }
+        }
+    }
+
     drawContext.bbx.x = item->width;
     drawContext.bbx.y = item->height;
 	
@@ -385,13 +411,13 @@ void ui_recur(TNode* node){DPZoneScoped;
         persist b32 dragging = false;
         persist vec2i mp_offset;
         if(key_pressed(Mouse_LEFT) && Math::PointInRectangle(mp_cur, item->spos, item->size)){
-            mp_offset = item->spos - mp_cur;
+            mp_offset = item->style.tl - mp_cur;
             dragging = true;
         }
         if(key_released(Mouse_LEFT)) dragging = false;
         
         if(dragging){
-            item->lpos = input_mouse_position() + mp_offset;
+            item->style.tl = input_mouse_position() + mp_offset;
             //ui_regen_item(item);
         }
     }
@@ -423,7 +449,15 @@ void ui_recur(TNode* node){DPZoneScoped;
         }else if(item->style.background_image){
             tex = item->style.background_image;
         }
-        render_start_cmd2(5, tex, item->drawcmds[i].scissorOffset, item->drawcmds[i].scissorExtent);
+        vec2 scoff;
+        vec2 scext;
+        uiItem* parent = uiItemFromNode(item->node.parent); 
+        if(parent->style.overflow == overflow_hidden){
+            scoff = parent->spos; scext = parent->size; 
+        }else{
+            scoff = vec2::ZERO; scext = DeshWindow->dimensions;
+        }
+        render_start_cmd2(5, tex, scoff, scext);
         render_add_vertices2(5, 
             (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
             item->drawcmds[i].counts.vertices, 

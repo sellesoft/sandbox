@@ -191,15 +191,43 @@ int main(){
 	// style.background_color = Color_DarkGrey;
 	// uiItemMS(&style);
 
-	uiStyle style{};style=*ui_initial_style;
-	style.margintl = {100,100};
-	style.paddingtl = {100,100};
-	style.background_color = Color_DarkBlue;
-	uiItemBS(&style)->id=STR8("container");{
-		style=*ui_initial_style;
-		uiTextML("hello")->item.id = STR8("text");
-	}uiItemE();
+	// uiStyle style{};style=*ui_initial_style;
+	// style.margintl = {100,100};
+	// style.paddingtl = {10,10};
+	// //style.paddingtl = {0};
+	// style.background_color = Color_DarkBlue;
+	// style.content_align= 0.5;
+	// style.size = {100,100};
+	// style.positioning = pos_draggable_relative;
+	// const u32 n = 20;
+	// uiItemBS(&style)->id=STR8("container");{
+	// 	style=*ui_initial_style;
+	// 	style.margintl = {10,10};
+	// 	uiTextMLS("hello1", &style)->item.id = STR8("text1");
+	// 	uiTextMLS("hello long", &style)->item.id = STR8("text2");
+	// 	uiTextMLS("he", &style)->item.id = STR8("text3");
+	// 	uiTextMLS(":)", &style)->item.id = STR8("text4");
+	// 	uiTextMLS(":O!!", &style)->item.id = STR8("text5");
+	// }uiItemE();
 
+	u32 n = 20;
+	uiStyle style{};style=*ui_initial_style;
+	style.paddingtl={0,0};
+	style.margintl ={0,0};
+	style.content_align=1;
+	forI(n){
+		style.background_color = color(0,u8(f32(i)/n*255),(u8)255-u8(f32(i)/n*255));
+		uiItemBS(&style);
+		uiTextML("hello");
+	}
+	style=*ui_initial_style;
+	style.size = {10,10};
+	uiItemBS(&style);
+	uiItemE();
+	forI(n){
+		uiTextML("hello again");
+		uiItemE();
+	}
 
 
 
