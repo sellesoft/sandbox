@@ -23,7 +23,7 @@
 #   -platform <win32,mac,linux>           Build for specified OS: win32, mac, linux (default: builder's OS)
 #   -graphics <vulkan,opengl,directx>     Build for specified Graphics API (default: vulkan)
 #   -compiler <cl,gcc,clang,clang-cl>     Build using the specified compiler (default: cl on Windows, gcc on Mac and Linux)
-#   -linker <link,ld,lld-link>            Build using the specified linker (default: link on Windows, ld on Mac and Linux)
+#   -linker <link,ld,lld,lld-link>        Build using the specified linker (default: link on Windows, ld on Mac and Linux)
 #   -vulkan_path <path_to_vulkan>         Override the default $VULKAN_SDK path with this path
 #
 # Notes:
@@ -44,27 +44,27 @@
 builder_platform="unknown"
 builder_compiler="unknown"
 builder_linker="unknown"
-if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+if [ "$OSTYPE" == "linux-gnu"* ]; then
   builder_platform="linux"
   builder_compiler="gcc"
   builder_linker="ld"
-elif [[ "$OSTYPE" == "darwin"* ]]; then
+elif [ "$OSTYPE" == "darwin"* ]; then
   builder_platform="mac"
   builder_compiler="gcc"
   builder_linker="ld"
-elif [[ "$OSTYPE" == "cygwin" ]]; then
+elif [ "$OSTYPE" == "cygwin" ]; then
   builder_platform="win32"
   builder_compiler="cl"
   builder_linker="link"
-elif [[ "$OSTYPE" == "msys" ]]; then
+elif [ "$OSTYPE" == "msys" ]; then
   builder_platform="win32"
   builder_compiler="cl"
   builder_linker="link"
-elif [[ "$OSTYPE" == "win32" ]]; then
+elif [ "$OSTYPE" == "win32" ]; then
   builder_platform="win32"
   builder_compiler="cl"
   builder_linker="link"
-elif [[ "$OSTYPE" == "freebsd"* ]]; then
+elif [ "$OSTYPE" == "freebsd"* ]; then
   builder_platform="linux"
   builder_compiler="gcc"
   builder_linker="ld"
@@ -162,10 +162,10 @@ for (( i=1; i<=$#; i++)); do
   elif [ "${!i}" == "-linker" ]; then
     skip_arg=1
     next_arg=$((i+1))
-    if [ "${!next_arg}" == "link" ] || [ "${!next_arg}" == "ld" ] || [ "${!next_arg}" == "lld-link" ]; then
+    if [ "${!next_arg}" == "link" ] || [ "${!next_arg}" == "ld" ] || [ "${!next_arg}" == "lld" ] || [ "${!next_arg}" == "lld-link" ]; then
       build_linker="${!next_arg}"
     else
-      echo "Unknown linker: ${!next_arg}; Valid options: link, ld, lld-link"
+      echo "Unknown linker: ${!next_arg}; Valid options: link, ld, lld, lld-link"
     fi
   elif [ "${!i}" == "-vulkan_path" ]; then
     skip_arg=1
@@ -402,7 +402,7 @@ fi
 
 link_flags=""
 link_libs=""
-if [ $build_linker == "link" ]; then
+if [ $build_linker == "link" ] || [ $build_linker == "lld-link" ]; then
   #### -nologo (prevents Microsoft copyright banner showing up)
   #### -opt:ref (eliminates functions and data that are never used)
   #### -incremental:no (disables incremental linking (relink all files))
@@ -422,8 +422,9 @@ if [ $build_linker == "link" ]; then
     lib_lib=${libs[i]}
     link_libs="$link_libs $lib_lib.lib"
   done
-elif [ $build_linker == "ld" ]; then
-  #link_libs
+elif [ $build_linker == "ld" ] || [ $build_linker == "lld" ]; then
+
+
   for ((i=0; i<${#lib_paths[@]}; i++)); do
     lib_path=${lib_paths[i]}
     link_libs="$link_libs -L$lib_path"
@@ -433,18 +434,21 @@ elif [ $build_linker == "ld" ]; then
     lib_lib=${libs[i]}
     link_libs="$link_libs -l$lib_lib"
   done
-elif [ $build_linker == "lld-linker" ]; then
-  echo "Link flags not setup for linker: $build_linker"
-  exit 1
 else
   echo "Link flags not setup for linker: $build_linker"
+  exit 1
+fi
+
+if ([ $build_compiler == "cl" ] || [ $build_compiler == "clang-cl" ]) && ([ $build_linker == "ld" ] || [ $build_linker == "lld" ]); then
+  echo "[31mcl/clang-cl compilers are not compatible with ld/lld linkers.[0m"
+  exit 1
+elif ([ $build_compiler == "gcc" ] || [ $build_compiler == "clang" ]) && ([ $build_linker == "link" ] || [ $build_linker == "lld-link" ]); then
+  echo "[31mgcc/clang compilers are not compatible with link/lld-link linkers.[0m"
   exit 1
 fi
 #_____________________________________________________________________________________________________
 #                                           Execute Commands
 #_____________________________________________________________________________________________________
-#TODO(delle) add non-default command checking
-
 #### function to echo and execute commands if verbose flag is set
 exe(){
   if [ $build_verbose == 1 ]; then
@@ -453,6 +457,7 @@ exe(){
     "$@";
   fi
 }
+
 
 date +"%a, %h %d %Y, %H:%M:%S"
 if [ ! -e $build_folder ]; then mkdir $build_folder; fi
