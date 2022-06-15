@@ -22,8 +22,9 @@
 #
 #   -platform <win32,mac,linux>           Build for specified OS: win32, mac, linux (default: builder's OS)
 #   -graphics <vulkan,opengl,directx>     Build for specified Graphics API (default: vulkan)
-#   -compiler <cl,gcc,clang>              Build using the specified compiler (default: cl on Windows, gcc on Mac and Linux)
-#   -linker   <link,ld,lld-link>          Build using the specified linker (default: link on Windows, ld on Mac and Linux)
+#   -compiler <cl,gcc,clang,clang-cl>     Build using the specified compiler (default: cl on Windows, gcc on Mac and Linux)
+#   -linker <link,ld,lld-link>            Build using the specified linker (default: link on Windows, ld on Mac and Linux)
+#   -vulkan_path <path_to_vulkan>         Override the default $VULKAN_SDK path with this path
 #
 # Notes:
 #   >For some reason, the argument count is wrong if you don't add sh.exe before build.sh even if 
@@ -37,52 +38,8 @@
 #       but push for them to use clang instead :)
 #   > make this script easy to use without deshi
 #_____________________________________________________________________________________________________
-#                                           Constants
+#                                           Builder Vars
 #_____________________________________________________________________________________________________
-#### Specify paths ####
-misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
-root_folder="$misc_folder/.."
-#TODO(sushi) don't try to link glfw on windows and eventually on linux and mac
-glfw_folder="C:/src/glfw-3.3.2.bin.WIN64"   #TODO(delle) platform specific glfw binaries
-vulkan_folder="$VULKAN_SDK"
-tracy_folder="H:/src/tracy-0.7.8" #TODO(sushi) make this an env var
-
-
-#### Specify outputs ####
-build_folder="$root_folder/build"
-app_name="sandbox"
-
-
-#### Specify sources ####
-includes="
-  -Isrc 
-  -Ideshi/src 
-  -Ideshi/src/external 
-  -I$glfw_folder/include 
-  -I$vulkan_folder/include 
-  -I$tracy_folder"
-deshi_sources="deshi/src/deshi.cpp"
-dll_sources="src/ui2.cpp"
-app_sources="src/main.cpp"
-
-
-#### Specifiy libs ####
-lib_paths=(
-  $glfw_folder/lib-vc2019
-  $vulkan_folder/lib
-  #"H:/msys2 2/mingw64/bin"
-)
-libs=(
-  glfw3
-  gdi32
-  shell32
-  ws2_32
-  opengl32
-  vulkan-1
-  shaderc_combined
-)
-
-
 #### Determine builder's OS ####
 builder_platform="unknown"
 builder_compiler="unknown"
@@ -132,6 +89,7 @@ build_graphics="vulkan"
 build_compiler="$builder_compiler"
 build_linker="$builder_linker"
 build_object=""
+vulkan_override=0
 
 
 skip_arg=0
@@ -196,10 +154,10 @@ for (( i=1; i<=$#; i++)); do
   elif [ "${!i}" == "-compiler" ]; then
     skip_arg=1
     next_arg=$((i+1))
-    if [ "${!next_arg}" == "cl" ] || [ "${!next_arg}" == "gcc" ] || [ "${!next_arg}" == "clang" ]; then
+    if [ "${!next_arg}" == "cl" ] || [ "${!next_arg}" == "gcc" ] || [ "${!next_arg}" == "clang" ] || [ "${!next_arg}" == "clang-cl" ]; then
       build_compiler="${!next_arg}"
     else
-      echo "Unknown compiler: ${!next_arg}; Valid options: cl, gcc, clang"
+      echo "Unknown compiler: ${!next_arg}; Valid options: cl, gcc, clang, clang-cl"
     fi
   elif [ "${!i}" == "-linker" ]; then
     skip_arg=1
@@ -209,6 +167,10 @@ for (( i=1; i<=$#; i++)); do
     else
       echo "Unknown linker: ${!next_arg}; Valid options: link, ld, lld-link"
     fi
+  elif [ "${!i}" == "-vulkan_path" ]; then
+    skip_arg=1
+    next_arg=$((i+1))
+    vulkan_override="${!next_arg}"
   else
     echo "Unknown switch: ${!i}"
     exit 1
@@ -221,6 +183,49 @@ if [ "$build_compiler" == "cl" ]; then
 else
   build_object="o"
 fi
+#_____________________________________________________________________________________________________
+#                                           Build Vars
+#_____________________________________________________________________________________________________
+#### Specify paths ####
+misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null && pwd 2> /dev/null; )";
+root_folder="$misc_folder/.."
+vulkan_folder="$VULKAN_SDK"
+tracy_folder="H:/src/tracy-0.7.8" #TODO(sushi) make this an env var
+
+if [ $vulkan_override != 0 ]; then
+  vulkan_folder=$vulkan_override
+fi
+
+
+#### Specify outputs ####
+build_folder="$root_folder/build"
+app_name="sandbox"
+
+
+#### Specify sources ####
+includes="
+  -Isrc
+  -Ideshi/src
+  -Ideshi/src/external
+  -I$vulkan_folder/include
+  -I$tracy_folder"
+deshi_sources="deshi/src/deshi.cpp"
+dll_sources="src/ui2.cpp"
+app_sources="src/main.cpp"
+
+
+#### Specifiy libs ####
+lib_paths=(
+  $vulkan_folder/lib
+)
+libs=(
+  gdi32
+  shell32
+  ws2_32
+  opengl32
+  vulkan-1
+  shaderc_combined
+)
 #_____________________________________________________________________________________________________
 #                                         Global Defines
 #_____________________________________________________________________________________________________
@@ -277,7 +282,7 @@ defines="$defines_build $defines_platform $defines_graphics $defines_shared $def
 #                                           Build Flags
 #_____________________________________________________________________________________________________
 compile_flags=""
-if [ $build_compiler == "cl" ]; then #________________________________________________________________________________cl
+if [ $build_compiler == "cl" ] || [ $build_compiler == "clang-cl" ]; then #__________________________________________cl
   #### -diagnostics:column (shows the file and column where the error is)
   #### -diagnostics:caret (shows the file, column, and code where the error is)
   #### -EHsc   (enables exception handling)
@@ -291,13 +296,25 @@ if [ $build_compiler == "cl" ]; then #__________________________________________
   #### -utf-8  (specifies that source files are in utf8)
   compile_flags="$compile_flags -diagnostics:column -EHsc -nologo -MD -MP -Oi -GR -Gm- -std:c++17 -utf-8"
 
-  #### -W1 (is the warning level)
-  #### -wd4100 (disables warning: unused function parameter)
-  #### -wd4189 (disables warning: unused local variables)
-  #### -wd4201 (disables warning: nameless union or struct)
-  #### -wd4311 (disables warning: pointer truncation)
-  #### -wd4706 (disables warning: assignment within conditional expression)
-  compile_flags="$compile_flags -W1 -wd4100 -wd4189 -wd4201 -wd4311 -wd4706"
+  if [ $build_compiler == "clang-cl" ]; then
+    #### -msse3 (enable SSE)
+    #### -Wno-unused-value ()
+    #### -Wno-implicitly-unsigned-literal ()
+    #### -Wno-nonportable-include-path ()
+    #### -Wno-writable-strings ()
+    #### -Wno-unused-function ()
+    #### -Wno-unused-variable ()
+    #### -Wno-undefined-inline ()
+    compile_flags="$compile_flags -msse3 -Wno-unused-value -Wno-implicitly-unsigned-literal -Wno-nonportable-include-path -Wno-writable-strings -Wno-unused-function -Wno-unused-variable -Wno-undefined-inline"
+  else
+    #### -W1 (is the warning level)
+    #### -wd4100 (disables warning: unused function parameter)
+    #### -wd4189 (disables warning: unused local variables)
+    #### -wd4201 (disables warning: nameless union or struct)
+    #### -wd4311 (disables warning: pointer truncation)
+    #### -wd4706 (disables warning: assignment within conditional expression)
+    compile_flags="$compile_flags -W1 -wd4100 -wd4189 -wd4201 -wd4311 -wd4706"
+  fi
 
   if [ $build_release == 0 ]; then
     #### -Zi (produces a .pdb file containing debug information)
@@ -447,19 +464,20 @@ if [ $builder_platform == "win32" ]; then
   if [ $build_time == 1 ]; then start_time=$(date +%s.%3N); fi
   echo ---------------------------------
   
-  if [ $build_compiler == "cl" ]; then #______________________________________________________________________________cl
+  if [ $build_compiler == "cl" ] || [ $build_compiler == "clang-cl" ]; then #______________________________________cl
     #### delete previous debug info
     rm $build_dir/*.pdb > /dev/null 2> /dev/null
     #echo Waiting for PDB > lock.tmp
 
     #### compile app (generates app_name.exe)
     exe $build_compiler $app_sources $deshi_sources $includes $compile_flags $defines -Fo"$build_dir/" -link $link_flags $link_libs -OUT:"$build_dir/$app_name.exe" -PDB:"$build_dir/$app_name.pdb"
+
     if [ $? == 0 ] && [ -e $build_dir/$app_name.exe ]; then
       echo "[32m  $app_name.exe[0m"
 
       #### compile dll (generates deshi.dll)
       if [ $build_shared == 1 ]; then
-        exe $build_compiler $dll_sources $build_dir/deshi.obj $build_dir/main.obj $includes $compile_flags $defines -Fo$build_dir/ -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:$build_dir/deshi.dll -PDB:$build_dir/deshi_dlls_$RANDOM.pdb
+        exe $build_compiler $dll_sources $build_dir/deshi.obj $build_dir/main.obj $includes $compile_flags $defines -Fo"$build_dir/" -DDESHI_DLL -LD -link -noimplib -noexp $link_flags $link_libs -OUT:"$build_dir/deshi.dll" -PDB:"$build_dir/deshi_dlls_$RANDOM.pdb"
 
         if [ $? == 0 ] && [ -e $build_dir/deshi.dll ]; then
           echo "[32m  deshi.dll[0m"
@@ -471,23 +489,47 @@ if [ $builder_platform == "win32" ]; then
     else
       echo "[93mFailed to build: $app_name.exe[0m"
     fi
-  elif [ $build_compiler == "gcc" ]; then #__________________________________________________________________________gcc
+  elif [ $build_compiler == "gcc" ]; then #________________________________________________________________________gcc
     echo "Execute commands not setup for compiler: $builder_compiler"
   elif [ $build_compiler == "clang" ]; then #______________________________________________________________________clang
-    exe clang $deshi_sources -c $compile_flags $defines $includes -o"deshi.o"
+    #### compile app (generates app_name.exe)
+    exe $build_compiler $app_sources $deshi_sources $includes $compile_flags $defines -Fo"$build_dir/" $link_flags $link_libs -o"$build_dir/$app_name.exe"
 
-      #### compile dlls (generates deshi.dll)
-    if [ $build_shared == 1 ]; then
-      exe clang $dll_sources -c -shared $compile_flags $defines -DDESHI_DLL $includes -o"deshi.dll"
-      if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
+    if [ $? == 0 ] && [ -e $build_dir/$app_name.exe ]; then
+      echo "[32m  $app_name.exe[0m"
+    
+      #### compile dll (generates deshi.dll)
+      if [ $build_shared == 1 ]; then
+        exe $build_compiler $dll_sources $build_dir/deshi.o $build_dir/main.o $includes $compile_flags $defines -Fo"$build_dir/" -DDESHI_DLL $link_flags $link_libs -o"$build_dir/deshi.dll"
+
+        if [ $? == 0 ] && [ -e $build_dir/deshi.dll ]; then
+          echo "[32m  deshi.dll[0m"
+          cp $build_dir/deshi.dll $root_folder/deshi.dll
+        else
+          echo "[93mFailed to build: deshi.dll[0m"
+        fi
+      fi
+    else
+      echo "[93mFailed to build: $app_name.exe[0m"
     fi
 
-    #### compile app (generates app_name.o)
-    exe clang -c $app_sources $compile_flags $defines $includes -o"$app_name.o"
 
-    #### link everything (generates app_name.exe)
-    exe clang deshi.o $app_name.o $link_flags $link_libs -o"$app_name.exe"
-    if [ -e $app_name.exe ]; then echo "  $app_name.exe"; fi
+
+    #exe clang $deshi_sources -c $compile_flags $defines $includes -o"$build_dir/deshi.o"
+    #
+    ##### compile dlls (generates deshi.dll)
+    #if [ $build_shared == 1 ]; then
+    #  exe clang $dll_sources -c -shared $compile_flags $defines -DDESHI_DLL $includes -o"$build_dir/deshi.dll"
+    #  
+    #  if [ -e deshi.dll ]; then echo "  deshi.dll"; fi
+    #fi
+    #
+    #### compile app (generates app_name.o)
+    #exe clang -c $app_sources $compile_flags $defines $includes -o"$build_dir/$app_name.o"
+    #
+    ##### link everything (generates app_name.exe)
+    #exe clang deshi.o $app_name.o $link_flags $link_libs -o"$app_name.exe"
+    #if [ -e $app_name.exe ]; then echo "  $app_name.exe"; fi
   fi
 
   echo ---------------------------------

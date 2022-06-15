@@ -110,12 +110,11 @@ int main(){
 			g_ui->make_text         = ui_make_text__stub;
 			g_ui->init              = ui_init__stub;
 			g_ui->update            = ui_update__stub;
-			//TODO(delle) asserts arent working
 			Assert(!"module is invalid");
 		}
 #endif //#if DESHI_RELOADABLE_UI
 	}
-	uiInit(deshi_allocator, deshi_temp_allocator);
+	uiInit(g_memory, g_ui);
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	
@@ -227,7 +226,7 @@ int main(){
 	// 	uiTextMLS(":)", &style)->item.id = STR8("text4");
 	// 	uiTextMLS(":O!!", &style)->item.id = STR8("text5");
 	// }uiItemE();
-
+	
 	// u32 n = 50;
 	// uiStyle style{};style=*ui_initial_style;
 	// style.paddingtl={1,1};
@@ -246,7 +245,7 @@ int main(){
 	// forI(n){
 	// 	uiItemE();
 	// }
-
+	
 	// uiItem* item0;
 	// uiItem* item1;
 	// uiStyle style{};style=*ui_initial_style;
@@ -257,19 +256,19 @@ int main(){
 	// 	style.background_color = Color_DarkBlue;
 	// 	style.size = {20,20};
 	// 	(item1=uiItemBS(&style))->id=STR8("item1");{
-
+	
 	// 	}uiItemE();
 	// }uiItemE();
-
+	
 	// uiStyle style{};style=*ui_initial_style;
 	// uiItemB();{
 	// 	style.size = {10,10};
 	// 	style.background_color = Color_White;
 	// 	uiItemBS(&style);{
-			
+	
 	// 	}uiItemE();
 	// }uiItemE();
-
+	
 	// uiStyle style{};style=*ui_initial_style;
 	// style.size = {100,100};
 	// style.background_color=Color_Blue;
@@ -356,7 +355,7 @@ int main(){
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
 		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, str8{(u8*)fps.str, fps.count}, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
-
+		
         {
             using namespace UI;
             // Begin(STR8("debuggingUIwithUI"));{
@@ -364,7 +363,7 @@ int main(){
 			// 	// string item1p = toStr("item1 pos: ", item1->style.tl);
 			// 	// Text({(u8*)item0p.str, item0p.count});
 			// 	// Text({(u8*)item1p.str, item1p.count});
-
+			
             // }End();
 			
 			if(g_ui->hovered){
