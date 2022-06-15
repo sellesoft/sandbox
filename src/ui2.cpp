@@ -292,7 +292,7 @@ void ui_init(MemoryContext* memctx, uiContext* uictx){DPZoneScoped;
 	ui_initial_style->     padding_top = 0;
 	ui_initial_style->   padding_right = MAX_F32;
 	ui_initial_style->  padding_bottom = MAX_F32;
-	ui_initial_style->   content_align = 0;
+	ui_initial_style->   content_align = vec2{0,0};
 	ui_initial_style->            font = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
 	ui_initial_style->     font_height = 11;
 	ui_initial_style->background_color = color{0,0,0,0};
@@ -361,7 +361,7 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 	
 	b32 wauto = item->style.width == size_auto;
 	b32 hauto = item->style.height == size_auto;
-	u32 wborder = item->style.border_width;
+	u32 wborder = (item->style.border_style ? item->style.border_width : 0);
     
     if(!hauto){
         if(HasFlag(item->style.sizing, size_percent_y)){
@@ -399,11 +399,10 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 		else item_error(item, "Sizing flag 'size_square' was specifed but width and height are both ", (wauto && hauto ? "unspecified" : "specified."));
 	}
 
-	vec2i cursor = item->style.paddingtl;
+	vec2 cursor = item->style.paddingtl;
 	for_node(item->node.first_child){
 		uiItem* child = uiItemFromNode(it);
 		eval_item_branch(child);    
-		vec2i cursorloc = cursor;
 		switch(child->style.positioning){
 			case pos_static:{
 				child->lpos =  child->style.margintl;
@@ -422,7 +421,14 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 				child->lpos += child->style.tl;
 			}break;
 		}
-		
+
+		//NOTE(sushi) in order to try and avoid excessive jittery-ness when animating objects
+		//            we quantize the floating point precision, so the item doesnt actually move
+		//            as much as it would if we used full precision
+		//            this also fixes some issues like items not touching when they should
+		//TODO(sushi) maybe make a global define for this
+		child->lpos = floor(child->lpos*4)/4;
+
         cursor.x = item->style.padding_left;
         cursor.y = child->lpos.y + child->height;
     }
@@ -438,26 +444,47 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 
     item->width += (wauto ? 1 : 2) * wborder;
     item->height += (hauto ? 1 : 2) * wborder;
+	
+	item->size = ceil(item->size);
 
-    if(item->style.content_align > 0){
+	//TODO(sushi) I'm pretty sure the x part of this can be moved into the child loop above, so we dont have to do a second
+	//            pass if y isnt set
+    if(item->style.content_align.x > 0 || item->style.content_align.y > 0){
         f32 last_static_offset = 0;
         f32 padr = item->style.padding_right;
         f32 padl = item->style.padding_left;
-        f32 child_space = (item->width - (padr==MAX_F32?padl:padr)) - padl;
+		f32 padt = item->style.padding_top;
+		f32 padb = item->style.padding_bottom;
+		//space that children may actually occupy
+        vec2 child_space = vec2(
+			(item->width-(padr==MAX_F32?padl:padr))-padl, 
+			(item->height-(padb==MAX_F32?padt:padb))-padt
+		);
+		f32 y_offset = item->style.content_align.y*(child_space.y - cursor.y);
         for_node(item->node.first_child){
             uiItem* child = uiItemFromNode(it);
             if(child->style.positioning == pos_static){
                 last_static_offset = child->lpos.x;
                 f32 marr = child->style.margin_right;
                 f32 marl = child->style.margin_left;
-                f32 true_width = child->width + (marr==MAX_F32?marl:marr) + marl;
-                child->lpos.x = item->style.padding_left+ child->style.margin_left + item->style.content_align * (child_space - true_width);
+                f32 mart = child->style.margin_left;
+                f32 marb = child->style.margin_left;
+				//the actual size the child occupies
+				//TODO(sushi) probably cache this
+                vec2 true_size = vec2(
+					child->width + (marr==MAX_F32?marl:marr) + marl,
+					child->height + (marb==MAX_F32?mart:marb) +mart
+				);
+                child->lx = item->style.padding_left + child->style.margin_left + item->style.content_align.x * (child_space.y - true_size.x);
                 last_static_offset = child->lpos.x - last_static_offset;
+				child->ly += y_offset;
             }else if(child->style.positioning==pos_relative){
                 child->lpos.x += last_static_offset;
+				child->ly += y_offset;
             }
         }
     }
+	item->lpos = round(item->lpos);
 }
 
 void drag_item(uiItem* item){DPZoneScoped;
@@ -517,45 +544,46 @@ pair<vec2,vec2> ui_recur(TNode* node){DPZoneScoped;
 	
 	
 	//render item
-	forI(item->draw_cmd_count){
-		render_set_active_surface_idx(0);
-		Texture* tex = 0;
-		if(item->node.type == uiItemType_Text){
-			tex = item->style.font->tex;
-		}else if(item->style.background_image){
-			tex = item->style.background_image;
-		}
-		vec2 scoff;
-		vec2 scext;
-		if(parent->style.overflow == overflow_hidden){
-			scoff = Max(vec2{0,0}, Max(parent->visible_start, Min(item->spos, parent->visible_start+parent->visible_size)));
-			vec2 br = Max(parent->visible_start, Min(item->spos+item->size, parent->visible_start+parent->visible_size));
 
-			scext = Max(vec2{0,0}, br-scoff);
-			//scoff = Clamp(item->spos, parent->visible_start, parent->visible_start+parent->visible_size);
-			//scext = Clamp(item->size, scoff-parent->visible_start, item->size);
-			item->visible_start = scoff;
-			item->visible_size = scext; 
-		}else{
-            scoff = Max(vec2::ZERO, item->spos); scext = Max(vec2::ZERO, Min(item->spos+item->size, vec2(DeshWindow->dimensions))-scoff);
-			item->visible_size = item->size;
-			item->visible_start = item->spos;
-		}
-		if(scoff.x < DeshWindow->dimensions.x && scoff.y < DeshWindow->dimensions.y &&
-		   scext.x != 0                       && scext.y != 0                       &&
-		   scoff.x + scext.x > 0              && scoff.y + scext.y > 0){
-			render_start_cmd2(5, tex, scoff, scext);
-			render_add_vertices2(5, 
-        	    (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
-        	    item->drawcmds[i].counts.vertices, 
-        	    (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
-        	    item->drawcmds[i].counts.indices
-        	);
-		}
-		
-		
+	//determine scissoring for overflow_hidden items
+	vec2 scoff;
+	vec2 scext;
+	if(parent && parent->style.overflow == overflow_hidden){
+		scoff = Max(vec2{0,0}, Max(parent->visible_start, Min(item->spos, parent->visible_start+parent->visible_size)));
+		vec2 br = Max(parent->visible_start, Min(item->spos+item->size, parent->visible_start+parent->visible_size));
+
+		scext = Max(vec2{0,0}, br-scoff);
+		//scoff = Clamp(item->spos, parent->visible_start, parent->visible_start+parent->visible_size);
+		//scext = Clamp(item->size, scoff-parent->visible_start, item->size);
+		item->visible_start = scoff;
+		item->visible_size = scext; 
+	}else{
+		scoff = Max(vec2::ZERO, item->spos); scext = Max(vec2::ZERO, Min(item->spos+item->size, vec2(DeshWindow->dimensions))-scoff);
+		item->visible_size = item->size;
+		item->visible_start = item->spos;
 	}
 
+	//if the scissor is offscreen or outside of the item it resides in, dont render it.
+	if(scoff.x < DeshWindow->dimensions.x && scoff.y < DeshWindow->dimensions.y &&
+	   scext.x != 0                       && scext.y != 0                       &&
+	   scoff.x + scext.x > 0              && scoff.y + scext.y > 0){
+		forI(item->draw_cmd_count){
+			render_set_active_surface_idx(0);
+			Texture* tex = 0;
+			if(item->node.type == uiItemType_Text){
+				tex = item->style.font->tex;
+			}else if(item->style.background_image){
+				tex = item->style.background_image;
+			}
+			render_start_cmd2(5, tex, scoff, scext);
+			render_add_vertices2(5, 
+				(Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
+				item->drawcmds[i].counts.vertices, 
+				(u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
+				item->drawcmds[i].counts.indices
+			);
+		}
+	}
 
 	vec2 pos = item->spos, siz = item->size;
     for_node(node->first_child){

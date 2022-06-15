@@ -283,30 +283,6 @@ int main(){
 
 	// item0->id = STR8("item0");
 	// item1->id = STR8("item1");
-
-	//container
-	uiStyle style{};style=*ui_initial_style;
-	style.size = DeshWindow->dimensions;
-	style.content_align = 0.5;
-	style.overflow = overflow_hidden;
-	const u32 n = 10;
-	uiItem* items[n];
-	uiItemBS(&style);{
-		style=*ui_initial_style;
-		style.overflow = overflow_hidden;
-		style.sizing = size_percent_y | size_square;
-		style.height = 80;
-		style.margintl = {2,2};
-		style.content_align = 0.5;
-		forI(n){
-			style.background_color = color(0,100,f32(i)/n*255);
-			items[i]=uiItemBS(&style);
-		}
-
-		forI(n){
-			uiItemE();
-		}
-	}uiItemE();
 	
 	// uiStyle style{}; style=*ui_initial_style;
 	// style.overflow = overflow_hidden;
@@ -321,8 +297,29 @@ int main(){
 	// 	}uiItemE();	
 	// }uiItemE();
 
+	uiStyle style{}; style=*ui_initial_style;
+	style.size = {300,300};
+	style.background_color = Color_Green;
+	style.positioning = pos_draggable_relative;
+	style.content_align = {0.5,1};
+	uiItem* items[10];
+	uiItemBS(&style);{
+		style.positioning = pos_static;
+		style.size = {300/20,300/20};
+		style.margintl = {10,10};
+		forI(10){
+			style.background_color = color(255*f32(i)/10, 100, 100);
+			items[i]=uiItemMS(&style);
+		}
+	}uiItemE();
+
+
 	//start main loop
 	while(platform_update()){DPZoneScoped;
+		f32 t = DeshTotalTime/1000;
+
+
+
 
 		//item0->style.border_width = BoundTimeOsc(1, 10);
 		//render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
@@ -407,8 +404,18 @@ int main(){
 
 			// item2->style.positioning = pos_relative;
 			// item2->style.top = BoundTimeOsc(-100,400);
-			forI(n){
-				items[i]->style.margin_top = BoundTimeOsc(0, 50);
+			//item1->style.margintl = vec2::ONE * 10 * (sin(t)+1)/2;
+			forI(10){
+				items[i]->style.margintl = vec2::ONE * 10 * (sin(t)+1)/2;
+			}
+
+			if(g_ui->hovered){
+				Font* f = g_ui->base.style.font;
+				render_start_cmd2(6, f->tex, vec2::ZERO, DeshWindow->dimensions);
+				string s = toStr("p: ", g_ui->hovered->spos, "s: ", g_ui->hovered->size);
+				vec2 siz = font_visual_size(f, {(u8*)s.str, s.count});
+				render_quad_filled2(g_ui->hovered->spos, siz, Color_Black);
+				render_text2(f, {(u8*)s.str, s.count}, floor(g_ui->hovered->spos), vec2::ONE, Color_White);
 			}
 
 			//debug display item's child bbx

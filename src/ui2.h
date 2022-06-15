@@ -487,7 +487,7 @@ external struct uiStyle{
 		struct{f32 padding_bottom, padding_right;};
 		vec2 paddingbr;        
 	};
-	f32 content_align; 
+	vec2 content_align; 
 	Font* font;
 	u32 font_height;
 	color background_color;
@@ -508,44 +508,60 @@ template<>
 struct hash<uiStyle> {
 	inline u32 operator()(const uiStyle& s){DPZoneScoped;
 		u32 seed = 2166136261;
-		seed ^= *(u32*)&s.positioning;    seed *= 16777619;
-		seed ^= *(u32*)&s.left;           seed *= 16777619;
-		seed ^= *(u32*)&s.top;            seed *= 16777619;
-		seed ^= *(u32*)&s.right;          seed *= 16777619;
-		seed ^= *(u32*)&s.bottom;         seed *= 16777619;
-		seed ^= *(u32*)&s.width;          seed *= 16777619;
-		seed ^= *(u32*)&s.height;         seed *= 16777619;
-		seed ^= *(u32*)&s.margin_left;    seed *= 16777619;
-		seed ^= *(u32*)&s.margin_top;     seed *= 16777619;
-		seed ^= *(u32*)&s.margin_bottom;  seed *= 16777619;
-		seed ^= *(u32*)&s.margin_right;   seed *= 16777619;
-		seed ^= *(u32*)&s.padding_left;   seed *= 16777619;
-		seed ^= *(u32*)&s.padding_top;    seed *= 16777619;
-		seed ^= *(u32*)&s.padding_bottom; seed *= 16777619;
-		seed ^= *(u32*)&s.padding_right;  seed *= 16777619;
-		seed ^= *(u32*)&s.content_align;  seed *= 16777619;
-		seed ^= (u64)s.font;              seed *= 16777619;
-		seed ^= s.font_height;            seed *= 16777619;
-		seed ^= s.background_color.rgba;  seed *= 16777619;
-		seed ^= (u64)s.background_image;  seed *= 16777619;
-		seed ^= s.border_style;           seed *= 16777619;
-		seed ^= s.border_color.rgba;      seed *= 16777619;
-		seed ^= *(u32*)&s.border_width;   seed *= 16777619;
-		seed ^= s.text_color.rgba;        seed *= 16777619;
-		seed ^= s.overflow;               seed *= 16777619;
+		seed ^= *(u32*)&s.positioning;     seed *= 16777619;
+		seed ^= *(u32*)&s.left;            seed *= 16777619;
+		seed ^= *(u32*)&s.top;             seed *= 16777619;
+		seed ^= *(u32*)&s.right;           seed *= 16777619;
+		seed ^= *(u32*)&s.bottom;          seed *= 16777619;
+		seed ^= *(u32*)&s.width;           seed *= 16777619;
+		seed ^= *(u32*)&s.height;          seed *= 16777619;
+		seed ^= *(u32*)&s.margin_left;     seed *= 16777619;
+		seed ^= *(u32*)&s.margin_top;      seed *= 16777619;
+		seed ^= *(u32*)&s.margin_bottom;   seed *= 16777619;
+		seed ^= *(u32*)&s.margin_right;    seed *= 16777619;
+		seed ^= *(u32*)&s.padding_left;    seed *= 16777619;
+		seed ^= *(u32*)&s.padding_top;     seed *= 16777619;
+		seed ^= *(u32*)&s.padding_bottom;  seed *= 16777619;
+		seed ^= *(u32*)&s.padding_right;   seed *= 16777619;
+		seed ^= *(u32*)&s.content_align.x; seed *= 16777619;
+		seed ^= *(u32*)&s.content_align.y; seed *= 16777619;
+		seed ^= (u64)s.font;               seed *= 16777619;
+		seed ^= s.font_height;             seed *= 16777619;
+		seed ^= s.background_color.rgba;   seed *= 16777619;
+		seed ^= (u64)s.background_image;   seed *= 16777619;
+		seed ^= s.border_style;            seed *= 16777619;
+		seed ^= s.border_color.rgba;       seed *= 16777619;
+		seed ^= *(u32*)&s.border_width;    seed *= 16777619;
+		seed ^= s.text_color.rgba;         seed *= 16777619;
+		seed ^= s.overflow;                seed *= 16777619;
 		return seed;
 	}
 };
 
+typedef Flags uiFlags; enum{
+
+	uiFlag_ActOnMouseHover    =1<<0, // call action when the mouse is positioned over the item
+	uiFlag_ActOnMousePressed  =1<<1, // call action when the mouse is pressed over the item
+	uiFlag_ActOnMouseReleased =1<<2, // call action when the mouse is released over the item
+	uiFlag_ActOnMouseDown     =1<<3, // call action when the mouse is down over the item
+	uiFlag_ActAlways          =1<<4, // call action every frame
+
+};
+
 struct uiItem{
 	TNode node;
+	str8 id; //NOTE(sushi) mostly for debugging, not sure if this will have any other use in the interface
 	uiStyle style;
 	u64 style_hash;
-	str8 id; //NOTE(sushi) mostly for debugging, not sure if this will have any other use in the interface
 	
+	//an items action call back function 
+	//this function is called in situations defined by the flags in the uiFlags enum
+	//and is always called before anything happens to the item in ui_update
+	//NOTE(sushi) remember that to actually affect the item, you must change its style NOT the variables below
+	s32 (*action)(uiItem*);
+
 	//// state ////
 	b32 hovered;
-	b32 clicked;
 	
 	//// INTERNAL ////
 	union{ // position relative to parent
