@@ -455,13 +455,19 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
         cursor.x = item->style.padding_left;
         cursor.y = child->lpos.y + child->height;
     }
-	
-    //extend bottom and right padding if they arent explicitly set
-    if(item->style.padding_bottom == MAX_S32) item->height += item->style.padding_top;
-    else if(item->style.padding_bottom > 0) item->height += item->style.padding_bottom;
-    if(item->style.padding_right == MAX_S32) item->width += item->style.padding_left;
-    else if(item->style.padding_right > 0) item->width += item->style.padding_right;
-	
+
+    if(hauto){
+        if(item->style.padding_bottom == MAX_S32) item->height += item->style.padding_top;
+        else if(item->style.padding_bottom > 0) item->height += item->style.padding_bottom;
+    }
+    if(wauto){
+        if(item->style.padding_right == MAX_S32) item->width += item->style.padding_left;
+        else if(item->style.padding_right > 0) item->width += item->style.padding_right;
+    }
+
+    item->width += (wauto ? 1 : 2) * wborder;
+    item->height += (hauto ? 1 : 2) * wborder;
+
     if(item->style.content_align > 0){
         u32 last_static_offset = 0;
         u32 padr = item->style.padding_right;

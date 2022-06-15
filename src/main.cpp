@@ -156,30 +156,48 @@ int main(){
 	
 	
 	
-	//uiStyle style{};
-	//memcpy(&style, ui_initial_style, sizeof(uiStyle));
-	////style.margintl = vec2i(3,3);
-	//style.padding_left = 3;
-	//style.padding_top = 3;
-	//style.positioning = pos_relative;
-	//style.border_style = border_solid;
-	//style.border_color = Color_White;
-	//const u32 n = 50;
-	//uiItem* items[n] = {0};
-	//forI(n){
-	//	style.background_color = color(f32(i)/n*255,40,100);
-	//	items[i] = uiItemBS(&style);
-	//}
-	//
-	//style.height = 10;
-	//style.width = 10;
-	//uiItemBS(&style);
-	//uiItemE();
+	// uiStyle style{};
+	// memcpy(&style, ui_initial_style, sizeof(uiStyle));
+	// //style.margintl = vec2i(3,3);
+	// style.padding_left = 3;
+	// style.padding_top = 3;
+	// style.positioning = pos_relative;
+	// style.border_style = border_solid;
+	// style.border_color = Color_White;
+	// const u32 n = 50;
+	// uiItem* items[n] = {0};
+	// forI(n){
+	// 	style.background_color = color(f32(i)/n*255,40,100);
+	// 	items[i] = uiItemBS(&style);
+	// }
 	
-	//forI(n){
-	//	uiItemE();
-	//}
-	//
+	// style.height = 10;
+	// style.width = 10;
+	// uiItemBS(&style);
+	// uiItemE();
+	
+	// forI(n){
+	// 	uiItemE();
+	// }
+	
+
+	// uiStyle style{}; style=*ui_initial_style;
+	// style.paddingtl = {1,1};
+	// style.tl = {100,100};
+	// style.border_style = border_solid;
+	// style.border_width=1;
+	// style.border_color = Color_White;
+	// const u32 n = 70;
+	// uiItem* items[n+1];
+	// forI(n){
+	// 	items[i]=uiItemBS(&style);
+	// }
+	// style.size={1,1};
+	// items[n]=uiItemMS(&style);
+	// forI(n){
+	// 	uiItemE();
+	// }
+
 	
 	
 	// uiStyle style{};style = *ui_initial_style;
@@ -261,24 +279,25 @@ int main(){
 	// 	uiItemMS(&style);
 	// }uiItemE();
 
-	uiStyle style{}; style=*ui_initial_style;
-	style.background_color = Color_VeryDarkCyan;
-	style.border_style = border_solid;
-	style.size = {300,300};
-	style.positioning = pos_draggable_relative;
-	uiItem* item0;
-	uiItem* item1;
+	// uiStyle style{}; style=*ui_initial_style;
+	// style.background_color = Color_VeryDarkCyan;
+	// style.border_style = border_solid;
+	// style.size = {300,300};
+	// style.positioning = pos_draggable_relative;
+	// uiItem* item0;
+	// uiItem* item1;
 
-	item0 = uiItemBS(&style);{
-		style=*ui_initial_style;
-		style.background_color = Color_Green;
-		style.size = {30,30};
-		item1 = uiItemMS(&style);
-	}uiItemE();
+	// item0 = uiItemBS(&style);{
+	// 	style=*ui_initial_style;
+	// 	style.background_color = Color_Green;
+	// 	style.size = {30,30};
+	// 	item1 = uiItemMS(&style);
+	// }uiItemE();
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
-		item0->style.border_width = BoundTimeOsc(1, 10);
+
+		//item0->style.border_width = BoundTimeOsc(1, 10);
 		//render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
 #if DESHI_RELOADABLE_UI
 		if(key_pressed(Key_F5 | InputMod_AnyAlt)){
@@ -324,8 +343,15 @@ int main(){
 			}
 		}
 #endif //#if DESHI_RELOADABLE_UI
-
-
+		// f64 t = DeshTotalTime/1000;
+		// forI(n){
+		// 	//items[i]->style.margin_top    = 10*(sin(t+1*i*M_PI/5)+1)/2;
+		// 	//items[i]->style.margin_right  = 10*(sin(t+2*i*M_PI/5)+1)/2; 
+		// 	//items[i]->style.margin_bottom = 10*(sin(t+3*i*M_PI/5)+1)/2; 
+		// 	//items[i]->style.margin_left   = 10*(sin(t+4*i*M_PI/5)+1)/2; 
+		// 	items[i]->style.border_width = 10*(sin(t+i)+1)/2; 
+		// 	if(items[i]->style.border_width < 1) items[i]->style.border_width = 0; 
+		// }
 		uiUpdate();
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
