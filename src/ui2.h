@@ -66,6 +66,10 @@ move ui2 to deshi
 			The position values will position the item relative to where it would have 
 			normally been placed. This does not remove the item from the flow.
 
+        pos_absolute  |  absolute
+			The position values will position the item relative to where its parent will
+            be placed.
+
 		pos_fixed  |  fixed
 			The item is positioned relative to the window it is in and does not move.
 
@@ -80,7 +84,28 @@ move ui2 to deshi
 		pos_draggable_fixed | draggable_fixed
 			The item is positioned the same as fixed, but its position may be changed by 
 			dragging it with the mouse
-		
+
+------------------------------------------------------------------------------------------------------------
+*   sizing 
+	---
+    Determines how an item is sized.
+
+-   Inherited: no
+
+-   Values:
+    size_percent_x 
+
+    size_percent_y 
+
+    size_percent   
+
+    size_fill_percent_x 
+
+    size_fill_percent_y 
+
+    size_fill_percent   
+
+
 
 ------------------------------------------------------------------------------------------------------------
 *   top,left,bottom,right
@@ -114,6 +139,9 @@ move ui2 to deshi
 *   size, width, height
 	Determines the size of the item. Note that text is not affected by this property, and its size is always
 	as it appears on the screen. If you want to change text size use font_height.
+
+    This is the size of the area in which items can be placed minus padding. Note that if margins or borders are 
+    specified, this increases the total area an item takes up visually.
 
 -   Inherited: no
 
@@ -367,11 +395,6 @@ sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;
 #  define UI_DEF(x) GLUE(ui_, x)
 #endif //DESHI_RELOADABLE_UI
 
-//NOTE(sushi) only values in between 0 and 100 are supported here
-//            (technically 0 and 127, but the renderer will ignore anything above 100)
-#define UI_PERCENT_MASK 0xffffff80 
-#define percent(x) (s32)(UI_PERCENT_MASK | x)
-
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_item
 enum uiItemType_{
@@ -408,16 +431,22 @@ enum{
 	pos_static=0,
 	pos_relative,
 	pos_fixed,
-	// pos_absolute, TODO(sushi) decide if this is useful to implement
+	pos_absolute,
 	pos_sticky,
 	pos_draggable_relative,
 	pos_draggable_fixed,
+
+	size_auto = -1,
+    size_percent_x = 1 << 0,
+    size_percent_y = 1 << 1,
+    size_percent   = size_percent_x | size_percent_y,
+    size_fill = -2,
+    size_fill_percent_x = 1 << 0,
+    size_fill_percent_y = 1 << 1,
+    size_fill_percent   = size_percent_x | size_percent_y,
 	
 	border_none = 0,
 	border_solid,
-	
-	size_auto = -1,
-	size_fill = -2,
 	
 	overflow_scroll = 0,
 	overflow_scroll_hidden,
@@ -427,34 +456,35 @@ enum{
 
 struct Font;
 external struct uiStyle{
-	Type positioning;  
+	Type positioning;
+    Type sizing;
 	union{
-		struct{s32 left, top;};
-		vec2i tl;
+		struct{f32 left, top;};
+		vec2 tl;
 	};
 	union{
-		struct{s32 right, bottom;};
-		vec2i br;
+		struct{f32 right, bottom;};
+		vec2 br;
 	};
 	union{
-		struct{s32 width, height;};
-		vec2i size;
+		struct{f32 width, height;};
+		vec2 size;
 	};
 	union{
-		struct{s32 margin_left, margin_top;};
-		vec2i margintl;
+		struct{f32 margin_left, margin_top;};
+		vec2 margintl;
 	};
 	union{
-		struct{s32 margin_bottom, margin_right;};
-		vec2i marginbr;        
+		struct{f32 margin_bottom, margin_right;};
+		vec2 marginbr;        
 	};
 	union{
-		struct{s32 padding_left, padding_top;};
-		vec2i paddingtl;
+		struct{f32 padding_left, padding_top;};
+		vec2 paddingtl;
 	};
 	union{
-		struct{s32 padding_bottom, padding_right;};
-		vec2i paddingbr;        
+		struct{f32 padding_bottom, padding_right;};
+		vec2 paddingbr;        
 	};
 	f32 content_align; 
 	Font* font;
@@ -463,7 +493,7 @@ external struct uiStyle{
 	Texture* background_image;
 	Type border_style;
 	color border_color;
-	u32 border_width;
+	f32 border_width;
 	color text_color;
 	Type overflow;
 	
@@ -477,31 +507,31 @@ template<>
 struct hash<uiStyle> {
 	inline u32 operator()(const uiStyle& s){DPZoneScoped;
 		u32 seed = 2166136261;
-		seed ^= s.positioning;           seed *= 16777619;
-		seed ^= s.left;                  seed *= 16777619;
-		seed ^= s.top;                   seed *= 16777619;
-		seed ^= s.right;                 seed *= 16777619;
-		seed ^= s.bottom;                seed *= 16777619;
-		seed ^= s.width;                 seed *= 16777619;
-		seed ^= s.height;                seed *= 16777619;
-		seed ^= s.margin_left;           seed *= 16777619;
-		seed ^= s.margin_top;            seed *= 16777619;
-		seed ^= s.margin_bottom;         seed *= 16777619;
-		seed ^= s.margin_right;          seed *= 16777619;
-		seed ^= s.padding_left;          seed *= 16777619;
-		seed ^= s.padding_top;           seed *= 16777619;
-		seed ^= s.padding_bottom;        seed *= 16777619;
-		seed ^= s.padding_right;         seed *= 16777619;
-		seed ^= *(u32*)&s.content_align; seed *= 16777619;
-		seed ^= (u64)s.font;             seed *= 16777619;
-		seed ^= s.font_height;           seed *= 16777619;
-		seed ^= s.background_color.rgba; seed *= 16777619;
-		seed ^= (u64)s.background_image; seed *= 16777619;
-		seed ^= s.border_style;          seed *= 16777619;
-		seed ^= s.border_color.rgba;     seed *= 16777619;
-		seed ^= s.border_width;          seed *= 16777619;
-		seed ^= s.text_color.rgba;       seed *= 16777619;
-		seed ^= s.overflow;              seed *= 16777619;
+		seed ^= *(u32*)&s.positioning;    seed *= 16777619;
+		seed ^= *(u32*)&s.left;           seed *= 16777619;
+		seed ^= *(u32*)&s.top;            seed *= 16777619;
+		seed ^= *(u32*)&s.right;          seed *= 16777619;
+		seed ^= *(u32*)&s.bottom;         seed *= 16777619;
+		seed ^= *(u32*)&s.width;          seed *= 16777619;
+		seed ^= *(u32*)&s.height;         seed *= 16777619;
+		seed ^= *(u32*)&s.margin_left;    seed *= 16777619;
+		seed ^= *(u32*)&s.margin_top;     seed *= 16777619;
+		seed ^= *(u32*)&s.margin_bottom;  seed *= 16777619;
+		seed ^= *(u32*)&s.margin_right;   seed *= 16777619;
+		seed ^= *(u32*)&s.padding_left;   seed *= 16777619;
+		seed ^= *(u32*)&s.padding_top;    seed *= 16777619;
+		seed ^= *(u32*)&s.padding_bottom; seed *= 16777619;
+		seed ^= *(u32*)&s.padding_right;  seed *= 16777619;
+		seed ^= *(u32*)&s.content_align;  seed *= 16777619;
+		seed ^= (u64)s.font;              seed *= 16777619;
+		seed ^= s.font_height;            seed *= 16777619;
+		seed ^= s.background_color.rgba;  seed *= 16777619;
+		seed ^= (u64)s.background_image;  seed *= 16777619;
+		seed ^= s.border_style;           seed *= 16777619;
+		seed ^= s.border_color.rgba;      seed *= 16777619;
+		seed ^= *(u32*)&s.border_width;   seed *= 16777619;
+		seed ^= s.text_color.rgba;        seed *= 16777619;
+		seed ^= s.overflow;               seed *= 16777619;
 		return seed;
 	}
 };
@@ -518,25 +548,24 @@ struct uiItem{
 	
 	//// INTERNAL ////
 	union{ // position relative to parent
-		struct{ s32 lx, ly; };
-		vec2i lpos;
+		struct{ f32 lx, ly; };
+		vec2 lpos;
 	};
 	union{ // position relative to screen
-		struct{ s32 sx, sy; };
-		vec2i spos;
+		struct{ f32 sx, sy; };
+		vec2 spos;
 	};
 	union{
-		struct{ s32 width, height; };
-		vec2i size;
+		struct{ f32 width, height; };
+		vec2 size;
 	};
 	union{//TODO(sushi) this should probably be on uiStyle, so you can programatically change scroll.
-		struct{s32 scrx, scry;};
-		vec2i scroll;
+		struct{f32 scrx, scry;};
+		vec2 scroll;
 	};
 	
 	u64 draw_cmd_count;
 	uiDrawCmd* drawcmds;
-	
 	
 	str8 file_created;
 	upt  line_created;
@@ -561,19 +590,6 @@ UI_FUNC_API(void, ui_end_item, str8 file, upt line);
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_window
-struct uiWindow{
-	uiItem item;
-	str8 name;
-	union{
-		struct{
-			s32 curx;
-			s32 cury;
-		};
-		vec2i cursor;
-	};
-};
-#define uiWindowFromNode(x) CastFromMember(uiWindow, item, CastFromMember(uiItem, node, x))
-
 // makes a uiItem that by default can be dragged and has a border
 // eventually make flags for automatically having a title bar and buttons, etc. 
 UI_FUNC_API(uiItem*, ui_make_window, str8 name, Flags flags, uiStyle* style, str8 file, upt line);
@@ -610,8 +626,8 @@ struct uiButton{
 //              if 0 is passed, the button will just set it's clicked flag
 // action_data: data passed to the action function 
 //       flags: uiButtonFlags to be given to the button
-UI_FUNC_API(uiButton*, ui_make_button, uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line);
-#define uiMakeButton(window, text, action, action_data, flags) UI_DEF(make_button((window),STR8(text),(action),(action_data),(flags),STR8(__FILE__),__LINE__))
+UI_FUNC_API(uiButton*, ui_make_button, Action action, void* action_data, Flags flags, str8 file, upt line);
+#define uiMakeButton(window, text, action, action_data, flags) UI_DEF(make_button(STR8(text),(action),(action_data),(flags),STR8(__FILE__),__LINE__))
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////

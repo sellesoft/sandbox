@@ -113,6 +113,11 @@ vec2i calc_text_size(uiText* item){DPZoneScoped;
 	return result;
 }
 
+#define item_error(item, ...)\
+LogE("ui","Error on item created in ", item->file_created, " on line ", item->line_created, ":\n",\
+          "\t", __VA_ARGS__)
+
+
 
 //@Functionality
 void ui_gen_item(uiItem* item){DPZoneScoped;
@@ -215,7 +220,7 @@ uiItem* ui_end_window(){
 	return 0;
 }
 
-uiButton* ui_make_button(uiWindow* window, Action action, void* action_data, Flags flags, str8 file, upt line){DPZoneScoped;
+uiButton* ui_make_button(Action action, void* action_data, Flags flags, str8 file, upt line){DPZoneScoped;
 	//uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, flags, 1, file, line);
 	//button->item.lpos   = ui_decide_item_pos(window);
 	//button->item.spos   = button->item.lpos + window->item.spos;
@@ -272,20 +277,21 @@ void ui_init(MemoryContext* memctx, uiContext* uictx){DPZoneScoped;
 	g_ui->index_arena  = memory_create_arena(Megabytes(1));
 	
 	ui_initial_style->     positioning = pos_static;
+	ui_initial_style->          sizing = 0;
 	ui_initial_style->            left = 0;
 	ui_initial_style->             top = 0;
-	ui_initial_style->           right = MAX_S32;
-	ui_initial_style->          bottom = MAX_S32;
-	ui_initial_style->           width = -1;
-	ui_initial_style->          height = -1;
+	ui_initial_style->           right = MAX_F32;
+	ui_initial_style->          bottom = MAX_F32;
+	ui_initial_style->           width = size_auto;
+	ui_initial_style->          height = size_auto;
 	ui_initial_style->     margin_left = 0;
 	ui_initial_style->      margin_top = 0;
-	ui_initial_style->    margin_right = MAX_S32;
-	ui_initial_style->   margin_bottom = MAX_S32;
+	ui_initial_style->    margin_right = MAX_F32;
+	ui_initial_style->   margin_bottom = MAX_F32;
 	ui_initial_style->    padding_left = 0;
 	ui_initial_style->     padding_top = 0;
-	ui_initial_style->   padding_right = MAX_S32;
-	ui_initial_style->  padding_bottom = MAX_S32;
+	ui_initial_style->   padding_right = MAX_F32;
+	ui_initial_style->  padding_bottom = MAX_F32;
 	ui_initial_style->   content_align = 0;
 	ui_initial_style->            font = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
 	ui_initial_style->     font_height = 11;
@@ -357,24 +363,41 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 	b32 wauto = item->style.width == size_auto;
 	b32 hauto = item->style.height == size_auto;
 	u32 wborder = item->style.border_width;
+    
+    if(!hauto){
+        if(HasFlag(item->style.sizing, size_percent_y)){
+            if(item->style.height < 0) 
+                item_error(item, "Sizing value was specified with size_percent_y, but the given value for height '", item->style.height, "' is negative.");
+            if(HasFlag(parent->style.sizing, size_percent_y) || HasFlag(parent->style.sizing, size_fill_percent_y)){
+                item->height = item->style.height/100.f * parent->height;
+            }else if (parent->style.height >= 0){
+                item->height = item->style.height/100.f * parent->style.height;
+            }else{
+                item_error(item, "Sizing value was specified with size_percent_y, but its parent's height is not explicitly sized.");
+                hauto = 1;
+            }
+        }else if(HasFlag(item->style.sizing, size_fill_percent_y)){
+            NotImplemented;
+        }else item->height = item->style.height;
+    }else item->height = 0;
 
+    if(!wauto){
+        if(HasFlag(item->style.sizing, size_percent_x)){
+            if(item->style.width < 0) 
+                item_error(item, "Sizing value was specified with size_percent_x, but the given value for width '", item->style.width, "' is negative.");
+            if(HasFlag(parent->style.sizing, size_percent_x) || HasFlag(parent->style.sizing, size_fill_percent_x)){
+                item->width = item->style.width/100.f * parent->width;
+            }else if (parent->style.width >= 0){
+                item->width = item->style.width/100.f * parent->style.width;
+            }else{
+                item_error(item, "Sizing value was specified with size_percent_x, but its parent's width is not explicitly sized.");
+                hauto = 1;
+            }
+        }else if(HasFlag(item->style.sizing, size_fill_percent_x)){
+            NotImplemented;
+        }else item->width = item->style.width;
+    }else item->width = 0;
 
-	if(!hauto){
-		if((item->style.height & UI_PERCENT_MASK)==UI_PERCENT_MASK){
-			if(parent->style.height > 0){
-				item->height = f32(item->style.height & ~UI_PERCENT_MASK)/100.f * parent->style.height;
-			} else hauto = 1;
-		} else item->height = item->style.height;
-	} else item->height = 0; //always reset size on auto sized items
-	
-	if(!wauto){
-		if((item->style.width & UI_PERCENT_MASK)==UI_PERCENT_MASK){
-			if(parent->style.width > 0){
-				item->width = f32(item->style.width & ~UI_PERCENT_MASK)/100.f * parent->style.width;
-			} else hauto = 1;
-		} else item->width = item->style.width;
-	} else item->width = 0; //always reset size on auto sized items
-	
 	vec2i cursor = item->style.paddingtl;
 	for_node(item->node.first_child){
 		uiItem* child = uiItemFromNode(it);
@@ -384,7 +407,7 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 			case pos_static:{
 				child->lpos =  child->style.margintl;
 				if(item->style.border_style)
-					child->lpos += item->style.border_width * vec2i::ONE;
+					child->lpos += floor(item->style.border_width) * vec2::ONE;
 				child->lpos += item->scroll;
 				child->lpos += cursor;
 			}break;
@@ -392,7 +415,7 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 			case pos_draggable_relative:{
 				child->lpos =  child->style.margintl;
 				if(item->style.border_style)
-					child->lpos += item->style.border_width * vec2i::ONE;
+					child->lpos += floor(item->style.border_width) * vec2::ONE;
 				child->lpos += item->scroll;
 				child->lpos += cursor;
 				child->lpos += child->style.tl;
@@ -404,11 +427,11 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
     }
 
     if(hauto){
-        if(item->style.padding_bottom == MAX_S32) item->height += item->style.padding_top;
+        if(item->style.padding_bottom == MAX_F32) item->height += item->style.padding_top;
         else if(item->style.padding_bottom > 0) item->height += item->style.padding_bottom;
     }
     if(wauto){
-        if(item->style.padding_right == MAX_S32) item->width += item->style.padding_left;
+        if(item->style.padding_right == MAX_F32) item->width += item->style.padding_left;
         else if(item->style.padding_right > 0) item->width += item->style.padding_right;
     }
 
@@ -416,17 +439,17 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
     item->height += (hauto ? 1 : 2) * wborder;
 
     if(item->style.content_align > 0){
-        u32 last_static_offset = 0;
-        u32 padr = item->style.padding_right;
-        u32 padl = item->style.padding_left;
-        u32 child_space = (item->width - (padr==MAX_S32?padl:padr)) - padl;
+        f32 last_static_offset = 0;
+        f32 padr = item->style.padding_right;
+        f32 padl = item->style.padding_left;
+        f32 child_space = (item->width - (padr==MAX_F32?padl:padr)) - padl;
         for_node(item->node.first_child){
             uiItem* child = uiItemFromNode(it);
             if(child->style.positioning == pos_static){
                 last_static_offset = child->lpos.x;
-                u32 marr = child->style.margin_right;
-                u32 marl = child->style.margin_left;
-                u32 true_width = child->width + (marr==MAX_S32?marl:marr) + marl;
+                f32 marr = child->style.margin_right;
+                f32 marl = child->style.margin_left;
+                f32 true_width = child->width + (marr==MAX_F32?marl:marr) + marl;
                 child->lpos.x = item->style.padding_left+ child->style.margin_left + item->style.content_align * (child_space - true_width);
                 last_static_offset = child->lpos.x - last_static_offset;
             }else if(child->style.positioning==pos_relative){
@@ -440,9 +463,9 @@ void drag_item(uiItem* item){DPZoneScoped;
 	if(!item) return;
 	if(item->style.positioning == pos_draggable_fixed || 
 	   item->style.positioning == pos_draggable_relative){
-		vec2i mp_cur = vec2i(DeshInput->mouseX, DeshInput->mouseY); 
+		vec2 mp_cur = input_mouse_position();
 		persist b32 dragging = false;
-		persist vec2i mp_offset;
+		persist vec2 mp_offset;
 		if(key_pressed(Mouse_LEFT) && Math::PointInRectangle(mp_cur, item->spos, item->size)){
 			mp_offset = item->style.tl - mp_cur;
 			dragging = true;
@@ -452,7 +475,6 @@ void drag_item(uiItem* item){DPZoneScoped;
 		
 		if(dragging){
 			item->style.tl = input_mouse_position() + mp_offset;
-			
 		}
 	}
 }
@@ -485,8 +507,6 @@ void ui_recur(TNode* node){DPZoneScoped;
 	
 	//do updates of each item type
 	switch(node->type){
-		case uiItemType_Window:{ uiWindow* item = uiWindowFromNode(node);
-		}break;
 		case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);
 		}break;
 	}
@@ -510,11 +530,11 @@ void ui_recur(TNode* node){DPZoneScoped;
 		}
 		render_start_cmd2(5, tex, scoff, scext);
 		render_add_vertices2(5, 
-							 (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
-							 item->drawcmds[i].counts.vertices, 
-							 (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
-							 item->drawcmds[i].counts.indices
-							 );
+            (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
+            item->drawcmds[i].counts.vertices, 
+            (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
+            item->drawcmds[i].counts.indices
+        );
 		
 		
 	}

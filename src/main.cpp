@@ -35,25 +35,6 @@
 local uiContext deshi_ui{}; uiContext* g_ui = &deshi_ui;
 local uiStyle deshi_ui_initial_style{}; uiStyle* ui_initial_style = &deshi_ui_initial_style;
 
-void action(void* data){
-	
-}
-
-void log_sizes(){
-    Log("logsizes", "\n",
-        "uiItem:    ", sizeof(uiItem), "\n",
-        "uiDrawCmd: ", sizeof(uiDrawCmd), "\n",
-        "uiWindow:  ", sizeof(uiWindow), "\n",
-        "uiButton:  ", sizeof(uiButton), "\n",
-        "vec2i:     ", sizeof(vec2i), "\n",
-        "str8:      ", sizeof(str8), "\n",
-        "TNode:     ", sizeof(TNode), "\n",
-        "uiStyle:   ", sizeof(uiStyle), "\n",
-        "upt:       ", sizeof(upt), "\n",
-        "u64:       ", sizeof(u64), "\n"
-		);
-}
-
 int main(){
 	//init deshi
 	Stopwatch deshi_watch = start_stopwatch();
@@ -278,20 +259,31 @@ int main(){
 	// 	uiItemMS(&style);
 	// }uiItemE();
 
-	// uiStyle style{}; style=*ui_initial_style;
-	// style.background_color = Color_VeryDarkCyan;
-	// style.border_style = border_solid;
-	// style.size = {300,300};
-	// style.positioning = pos_draggable_relative;
-	// uiItem* item0;
-	// uiItem* item1;
+	uiStyle style{}; style=*ui_initial_style;
+	style.background_color = Color_VeryDarkCyan;
+	style.border_style = border_solid;
+	style.border_width = 5;
+	style.size = {300,300};
+	style.positioning = pos_draggable_relative;
+	uiItem* item0;
+	uiItem* item1;
 
-	// item0 = uiItemBS(&style);{
-	// 	style=*ui_initial_style;
-	// 	style.background_color = Color_Green;
-	// 	style.size = {30,30};
-	// 	item1 = uiItemMS(&style);
-	// }uiItemE();
+	item0 = uiItemBS(&style);{
+		style=*ui_initial_style;
+		style.background_color = Color_Green;
+		style.size = {100,100};
+		style.margintl = {3,3};
+		item1 = uiItemBS(&style);{
+			style.background_color = Color_White;
+			style.size = {10,10};
+			uiItemMS(&style);
+		}uiItemE();
+
+	}uiItemE();
+
+	item0->id = STR8("item0");
+	item1->id = STR8("item1");
+
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
@@ -357,6 +349,9 @@ int main(){
 		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, str8{(u8*)fps.str, fps.count}, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
 		
         {
+			//item0->style.border_width = 100*(sin(DeshTotalTime/3000)+1)/2;
+			//item1->style.margintl = vec2::ONE*10*(sin(DeshTotalTime/3000)+1)/2;
+
             using namespace UI;
             // Begin(STR8("debuggingUIwithUI"));{
 			// 	// string item0p = toStr("item0 pos: ", item0->style.tl);
