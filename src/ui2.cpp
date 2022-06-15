@@ -328,6 +328,7 @@ TNode* ui_find_container(TNode* item){DPZoneScoped;
 
 //pass 0 for child on first call
 TNode* ui_find_static_sized_parent(TNode* node, TNode* child){DPZoneScoped;
+	if(node == &g_ui->base.node) return node;
 	uiItem* item = uiItemFromNode(node);
 	if(!child) return ui_find_static_sized_parent(item->node.parent, &item->node);
 	if(item->style.width != size_auto && item->style.height != size_auto){
@@ -349,8 +350,6 @@ void draw_item_branch(uiItem* item){DPZoneScoped;
 		}
 	}
 	
-	//Log("", item->id, " pos: ", item->spos, " size: ", item->size);
-	
 	for_node(item->node.first_child){
 		draw_item_branch(uiItemFromNode(it));
 	}
@@ -366,18 +365,16 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
     
     if(!hauto){
         if(HasFlag(item->style.sizing, size_percent_y)){
-            if(item->style.height < 0) 
-                item_error(item, "Sizing value was specified with size_percent_y, but the given value for height '", item->style.height, "' is negative.");
-            if(HasFlag(parent->style.sizing, size_percent_y) || HasFlag(parent->style.sizing, size_fill_percent_y)){
+            if(item->style.height < 0){
+                item_error(item, "Sizing flag 'size_percent_y' was specified, but the given value for height '", item->style.height, "' is negative.");
+            }else if(HasFlag(parent->style.sizing, size_percent_y)){
                 item->height = item->style.height/100.f * parent->height;
             }else if (parent->style.height >= 0){
                 item->height = item->style.height/100.f * parent->style.height;
             }else{
-                item_error(item, "Sizing value was specified with size_percent_y, but its parent's height is not explicitly sized.");
+                item_error(item, "Sizing flag 'size_percent_y' was specified, but the item's parent's height is not explicitly sized.");
                 hauto = 1;
             }
-        }else if(HasFlag(item->style.sizing, size_fill_percent_y)){
-            NotImplemented;
         }else item->height = item->style.height;
     }else item->height = 0;
 
@@ -385,18 +382,22 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
         if(HasFlag(item->style.sizing, size_percent_x)){
             if(item->style.width < 0) 
                 item_error(item, "Sizing value was specified with size_percent_x, but the given value for width '", item->style.width, "' is negative.");
-            if(HasFlag(parent->style.sizing, size_percent_x) || HasFlag(parent->style.sizing, size_fill_percent_x)){
+            if(HasFlag(parent->style.sizing, size_percent_x)){
                 item->width = item->style.width/100.f * parent->width;
             }else if (parent->style.width >= 0){
                 item->width = item->style.width/100.f * parent->style.width;
             }else{
-                item_error(item, "Sizing value was specified with size_percent_x, but its parent's width is not explicitly sized.");
+                item_error(item, "Sizing flag 'size_percent_x' was specified but the item's parent's width is not explicitly sized.");
                 hauto = 1;
             }
-        }else if(HasFlag(item->style.sizing, size_fill_percent_x)){
-            NotImplemented;
         }else item->width = item->style.width;
     }else item->width = 0;
+
+	if(HasFlag(item->style.sizing, size_square)){
+		if     (!wauto &&  hauto) item->height = item->width;
+		else if( wauto && !hauto) item->width = item->height;
+		else item_error(item, "Sizing flag 'size_square' was specifed but width and height are both ", (wauto && hauto ? "unspecified" : "specified."));
+	}
 
 	vec2i cursor = item->style.paddingtl;
 	for_node(item->node.first_child){
@@ -481,7 +482,9 @@ void drag_item(uiItem* item){DPZoneScoped;
 
 //depth first walk to ensure we find topmost hovered item
 b32 find_hovered_item(uiItem* item){DPZoneScoped;
-	for_node(item->node.first_child){
+    //early out if the mouse is not within the item's known children bbx 
+	if(!Math::PointInRectangle(input_mouse_position(),item->children_bbx_pos,item->children_bbx_size)) return false;
+    for_node(item->node.first_child){
 		if(find_hovered_item(uiItemFromNode(it))) return 1;
 	}
 	if(Math::PointInRectangle(input_mouse_position(), item->spos, item->size)){
@@ -491,7 +494,7 @@ b32 find_hovered_item(uiItem* item){DPZoneScoped;
 	return 0;
 }
 
-void ui_recur(TNode* node){DPZoneScoped;
+pair<vec2,vec2> ui_recur(TNode* node){DPZoneScoped;
 	uiItem* item = uiItemFromNode(node);
 	uiItem* parent = uiItemFromNode(node->parent);
 	
@@ -511,6 +514,8 @@ void ui_recur(TNode* node){DPZoneScoped;
 		}break;
 	}
 	
+	
+	
 	//render item
 	forI(item->draw_cmd_count){
 		render_set_active_surface_idx(0);
@@ -522,34 +527,55 @@ void ui_recur(TNode* node){DPZoneScoped;
 		}
 		vec2 scoff;
 		vec2 scext;
-		uiItem* parent = uiItemFromNode(item->node.parent); 
 		if(parent->style.overflow == overflow_hidden){
-			scoff = parent->spos; scext = parent->size; 
+			scoff = Max(vec2{0,0}, Max(parent->visible_start, Min(item->spos, parent->visible_start+parent->visible_size)));
+			vec2 br = Max(parent->visible_start, Min(item->spos+item->size, parent->visible_start+parent->visible_size));
+
+			scext = Max(vec2{0,0}, br-scoff);
+			//scoff = Clamp(item->spos, parent->visible_start, parent->visible_start+parent->visible_size);
+			//scext = Clamp(item->size, scoff-parent->visible_start, item->size);
+			item->visible_start = scoff;
+			item->visible_size = scext; 
 		}else{
-			scoff = vec2::ZERO; scext = DeshWindow->dimensions;
+            scoff = Max(vec2::ZERO, item->spos); scext = Max(vec2::ZERO, Min(item->spos+item->size, vec2(DeshWindow->dimensions))-scoff);
+			item->visible_size = item->size;
+			item->visible_start = item->spos;
 		}
-		render_start_cmd2(5, tex, scoff, scext);
-		render_add_vertices2(5, 
-            (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
-            item->drawcmds[i].counts.vertices, 
-            (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
-            item->drawcmds[i].counts.indices
-        );
+		if(scoff.x < DeshWindow->dimensions.x && scoff.y < DeshWindow->dimensions.y &&
+		   scext.x != 0                       && scext.y != 0                       &&
+		   scoff.x + scext.x > 0              && scoff.y + scext.y > 0){
+			render_start_cmd2(5, tex, scoff, scext);
+			render_add_vertices2(5, 
+        	    (Vertex2*)g_ui->vertex_arena->start + item->drawcmds[i].vertex_offset, 
+        	    item->drawcmds[i].counts.vertices, 
+        	    (u32*)g_ui->index_arena->start + item->drawcmds[i].index_offset,
+        	    item->drawcmds[i].counts.indices
+        	);
+		}
 		
 		
 	}
-	
-	if(node->child_count){
-		for_node(node->first_child){
-			ui_recur(it);
-		}
-	}
+
+
+	vec2 pos = item->spos, siz = item->size;
+    for_node(node->first_child){
+        auto [cpos, csiz] = ui_recur(it);
+        pos = Min(cpos, item->spos);
+        siz = Max((item->spos - pos)+item->size, (cpos-pos)+csiz); 
+    }
+
+    item->children_bbx_pos=pos;
+    item->children_bbx_size=siz;
+
+    return {pos,siz};
 }
 
 void ui_update(){DPZoneScoped;
 	//Log("test","ayyyye"); //NOTE(delle) uncomment after reloading .dll for testing
 	g_ui->base.style.width = DeshWindow->width;
 	g_ui->base.style.height = DeshWindow->height;
+	g_ui->base.visible_start = vec2::ZERO;
+	g_ui->base.visible_size = DeshWindow->dimensions;
 	
 	//in order to prevent the mouse from entering another window during input
 	//this can probably be moved to only be done on mouse input, but maybe left so 
@@ -560,9 +586,9 @@ void ui_update(){DPZoneScoped;
 	if(g_ui->istate == uiISNone || g_ui->istate == uiISDragging) 
 		drag_item(g_ui->hovered);
 	
-	if(g_ui->base.node.child_count){
-		ui_recur(g_ui->base.node.first_child);
-	}
+	//if(g_ui->base.node.child_count){
+		ui_recur(&g_ui->base.node);
+	//}
 }
 
 #undef ui_alloc

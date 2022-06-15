@@ -259,31 +259,67 @@ int main(){
 	// 	uiItemMS(&style);
 	// }uiItemE();
 
-	uiStyle style{}; style=*ui_initial_style;
-	style.background_color = Color_VeryDarkCyan;
-	style.border_style = border_solid;
-	style.border_width = 5;
-	style.size = {300,300};
-	style.positioning = pos_draggable_relative;
-	uiItem* item0;
-	uiItem* item1;
+	// uiStyle style{}; style=*ui_initial_style;
+	// style.background_color = Color_VeryDarkCyan;
+	// style.border_style = border_solid;
+	// style.border_width = 5;
+	// style.size = {300,300};
+	// style.positioning = pos_draggable_relative;
+	// uiItem* item0;
+	// uiItem* item1;
+	// uiItem* item2;
 
-	item0 = uiItemBS(&style);{
+	// item0 = uiItemBS(&style);{
+	// 	style=*ui_initial_style;
+	// 	style.background_color = Color_Green;
+	// 	style.size = {100,100};
+	// 	style.margintl = {3,3};
+	// 	item1 = uiItemBS(&style);{
+	// 		style.background_color = Color_White;
+	// 		style.size = {10,10};
+	// 		item2 = uiItemMS(&style);
+	// 	}uiItemE();
+	// }uiItemE();
+
+	// item0->id = STR8("item0");
+	// item1->id = STR8("item1");
+
+	//container
+	uiStyle style{};style=*ui_initial_style;
+	style.size = DeshWindow->dimensions;
+	style.content_align = 0.5;
+	style.overflow = overflow_hidden;
+	const u32 n = 10;
+	uiItem* items[n];
+	uiItemBS(&style);{
 		style=*ui_initial_style;
-		style.background_color = Color_Green;
-		style.size = {100,100};
-		style.margintl = {3,3};
-		item1 = uiItemBS(&style);{
-			style.background_color = Color_White;
-			style.size = {10,10};
-			uiItemMS(&style);
-		}uiItemE();
+		style.overflow = overflow_hidden;
+		style.sizing = size_percent_y | size_square;
+		style.height = 80;
+		style.margintl = {2,2};
+		style.content_align = 0.5;
+		forI(n){
+			style.background_color = color(0,100,f32(i)/n*255);
+			items[i]=uiItemBS(&style);
+		}
 
+		forI(n){
+			uiItemE();
+		}
 	}uiItemE();
+	
+	// uiStyle style{}; style=*ui_initial_style;
+	// style.overflow = overflow_hidden;
+	// style.background_color = color(0,155,0);
+	// style.size = {300,300};
+	// style.positioning = pos_draggable_relative;
+	// uiItemBS(&style)->id=STR8("item0");{
+	// 	style.background_color = color(0,0,155);
+	// 	style.size = {100,100};
+	// 	uiItemBS(&style)->id=STR8("item1");{
 
-	item0->id = STR8("item0");
-	item1->id = STR8("item1");
-
+	// 	}uiItemE();	
+	// }uiItemE();
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
@@ -365,6 +401,24 @@ int main(){
 				// render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
 				// render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
 			}
+
+			// item1->style.positioning = pos_relative;
+			// item1->style.left = BoundTimeOsc(-100, 400);
+
+			// item2->style.positioning = pos_relative;
+			// item2->style.top = BoundTimeOsc(-100,400);
+			forI(n){
+				items[i]->style.margin_top = BoundTimeOsc(0, 50);
+			}
+
+			//debug display item's child bbx
+			// Arena* itemA = g_ui->item_list->arena;
+			// render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
+			// forI(itemA->used / sizeof(uiItem)){
+			// 	uiItem* item = (uiItem*)itemA->start + i;
+			// 	render_quad2(item->children_bbx_pos, item->children_bbx_size, Color_Red);
+			// }
+
         }
 		
 		//console_update();

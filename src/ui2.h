@@ -88,24 +88,30 @@ move ui2 to deshi
 ------------------------------------------------------------------------------------------------------------
 *   sizing 
 	---
-    Determines how an item is sized.
+    Determines how an item is sized. This is a flagged value, meaning it can take on multiple of these
+	properties. For example setting 'size_fill_x | size_percent_x' will tell the renderer to interpret
+	the width as a percentage of the remaining space of the item's parent's width.
+
+	Fill only applies when the 
 
 -   Inherited: no
 
 -   Values:
-    size_percent_x 
+		size_percent_x 
 
-    size_percent_y 
+		size_percent_y 
 
-    size_percent   
+		size_percent   
 
-    size_fill_percent_x 
+		size_fill_x
 
-    size_fill_percent_y 
+		size_fill_y   
 
-    size_fill_percent   
+		size_fill
 
-
+		size_square
+			Keeps the item at a 1:1 aspect ratio. This requires that either height or width are set to auto, while
+			the other has a specified value. If both values are specified, then this value is ignored
 
 ------------------------------------------------------------------------------------------------------------
 *   top,left,bottom,right
@@ -152,11 +158,6 @@ move ui2 to deshi
 		-1: equivalent to auto
 			this tells the renderer to automatically size the item based on its content.
 			an enum 'size_auto' is specified
-		
-		-2: fill remaining space
-			this tells the renderer to automatically fill the parent's remaining space after
-			its initial size is determined by its content
-			an enum 'size_fill' is specified
 
 -   Defaults:
 		width and height both default to -1. See above for why.
@@ -440,10 +441,10 @@ enum{
     size_percent_x = 1 << 0,
     size_percent_y = 1 << 1,
     size_percent   = size_percent_x | size_percent_y,
-    size_fill = -2,
-    size_fill_percent_x = 1 << 0,
-    size_fill_percent_y = 1 << 1,
-    size_fill_percent   = size_percent_x | size_percent_y,
+    size_fill_x    = 1 << 2,
+    size_fill_y    = 1 << 3,
+    size_fill      = size_fill_x | size_fill_y,
+	size_square    = 1 << 4,
 	
 	border_none = 0,
 	border_solid,
@@ -563,6 +564,15 @@ struct uiItem{
 		struct{f32 scrx, scry;};
 		vec2 scroll;
 	};
+
+    //screen position and size of the bounding box containing all of an items
+    //children, this is used to optimize things later, such as finding the hovered item
+    vec2 children_bbx_pos;
+    vec2 children_bbx_size;
+
+	//the visible size of the item after being cut by overflow
+	vec2 visible_start;
+	vec2 visible_size; 
 	
 	u64 draw_cmd_count;
 	uiDrawCmd* drawcmds;
