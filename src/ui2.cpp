@@ -356,7 +356,9 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 	
 	b32 wauto = item->style.width == size_auto;
 	b32 hauto = item->style.height == size_auto;
-	
+	u32 wborder = item->style.border_width;
+
+
 	if(!hauto){
 		if((item->style.height & UI_PERCENT_MASK)==UI_PERCENT_MASK){
 			if(parent->style.height > 0){
