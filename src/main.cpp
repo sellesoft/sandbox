@@ -297,22 +297,55 @@ int main(){
 	// 	}uiItemE();	
 	// }uiItemE();
 
+	// uiStyle style{}; style=*ui_initial_style;
+	// style.size = {300,300};
+	// style.background_color = Color_Green;
+	// style.positioning = pos_draggable_relative;
+	// style.content_align = {0.5,1};
+	// uiItem* items[10];
+	// uiItemBS(&style);{
+	// 	style.positioning = pos_static;
+	// 	style.size = {300/20,300/20};
+	// 	style.margintl = {10,10};
+	// 	forI(10){
+	// 		style.background_color = color(255*f32(i)/10, 100, 100);
+	// 		items[i]=uiItemMS(&style);
+	// 	}
+	// }uiItemE();
+
+
 	uiStyle style{}; style=*ui_initial_style;
 	style.size = {300,300};
-	style.background_color = Color_Green;
-	style.positioning = pos_draggable_relative;
-	style.content_align = {0.5,1};
-	uiItem* items[10];
+	style.background_color = color(100,150,200);
 	uiItemBS(&style);{
-		style.positioning = pos_static;
-		style.size = {300/20,300/20};
-		style.margintl = {10,10};
-		forI(10){
-			style.background_color = color(255*f32(i)/10, 100, 100);
-			items[i]=uiItemMS(&style);
-		}
+		style.size = {30,30};
+		style.background_color = color(200,150,100);
+		style.flags = uiFlag_ActAlways;
+		uiItemMS(&style)->action = 
+			[](uiItem* item)->void{
+				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+			};
+		style.flags = uiFlag_ActOnMouseHover;
+		uiItemMS(&style)->action =
+			[](uiItem* item)->void{
+				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+			};
+		style.flags = uiFlag_ActOnMousePressed;
+		uiItemMS(&style)->action =
+			[](uiItem* item)->void{
+				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+			};
+		style.flags = uiFlag_ActOnMouseReleased;
+		uiItemMS(&style)->action =
+			[](uiItem* item)->void{
+				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+			};
+		style.flags = uiFlag_ActOnMouseDown;
+		uiItemMS(&style)->action =
+			[](uiItem* item)->void{
+				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+			};
 	}uiItemE();
-
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
@@ -405,18 +438,18 @@ int main(){
 			// item2->style.positioning = pos_relative;
 			// item2->style.top = BoundTimeOsc(-100,400);
 			//item1->style.margintl = vec2::ONE * 10 * (sin(t)+1)/2;
-			forI(10){
-				items[i]->style.margintl = vec2::ONE * 10 * (sin(t)+1)/2;
-			}
+			// forI(10){
+			// 	items[i]->style.margintl = vec2::ONE * 10 * (sin(t)+1)/2;
+			// }
 
-			if(g_ui->hovered){
-				Font* f = g_ui->base.style.font;
-				render_start_cmd2(6, f->tex, vec2::ZERO, DeshWindow->dimensions);
-				string s = toStr("p: ", g_ui->hovered->spos, "s: ", g_ui->hovered->size);
-				vec2 siz = font_visual_size(f, {(u8*)s.str, s.count});
-				render_quad_filled2(g_ui->hovered->spos, siz, Color_Black);
-				render_text2(f, {(u8*)s.str, s.count}, floor(g_ui->hovered->spos), vec2::ONE, Color_White);
-			}
+			// if(g_ui->hovered){
+			// 	Font* f = g_ui->base.style.font;
+			// 	render_start_cmd2(6, f->tex, vec2::ZERO, DeshWindow->dimensions);
+			// 	string s = toStr("p: ", g_ui->hovered->spos, "s: ", g_ui->hovered->size);
+			// 	vec2 siz = font_visual_size(f, {(u8*)s.str, s.count});
+			// 	render_quad_filled2(g_ui->hovered->spos, siz, Color_Black);
+			// 	render_text2(f, {(u8*)s.str, s.count}, floor(g_ui->hovered->spos), vec2::ONE, Color_White);
+			// }
 
 			//debug display item's child bbx
 			// Arena* itemA = g_ui->item_list->arena;

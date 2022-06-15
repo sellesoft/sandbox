@@ -525,6 +525,23 @@ pair<vec2,vec2> ui_recur(TNode* node){DPZoneScoped;
 	uiItem* item = uiItemFromNode(node);
 	uiItem* parent = uiItemFromNode(node->parent);
 	
+	
+	if(item->action){
+		if(HasFlag(item->style.flags, uiFlag_ActAlways))
+			item->action(item);
+		else if(g_ui->hovered==item){
+			if     (HasFlag(item->style.flags, uiFlag_ActOnMouseHover))
+				item->action(item);
+			else if(HasFlag(item->style.flags, uiFlag_ActOnMousePressed) && input_lmouse_pressed())
+			    item->action(item);
+			else if(HasFlag(item->style.flags, uiFlag_ActOnMouseReleased) && input_lmouse_released())
+				item->action(item);
+			else if(HasFlag(item->style.flags, uiFlag_ActOnMouseDown) && input_lmouse_down())
+			    item->action(item);
+		}
+	}
+
+
 	//check if an item's style was modified, if so reevaluate the item,
 	//its children, and every child of its parents until a manually sized parent is found
 	u32 nuhash = hash<uiStyle>()(item->style);

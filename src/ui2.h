@@ -453,6 +453,12 @@ enum{
 	overflow_scroll_hidden,
 	overflow_hidden,
 	overflow_visible,
+
+	uiFlag_ActOnMouseHover    =1<<0, // call action when the mouse is positioned over the item
+	uiFlag_ActOnMousePressed  =1<<1, // call action when the mouse is pressed over the item
+	uiFlag_ActOnMouseReleased =1<<2, // call action when the mouse is released over the item
+	uiFlag_ActOnMouseDown     =1<<3, // call action when the mouse is down over the item
+	uiFlag_ActAlways          =1<<4, // call action every frame
 };
 
 struct Font;
@@ -497,6 +503,8 @@ external struct uiStyle{
 	f32 border_width;
 	color text_color;
 	Type overflow;
+
+	Flags flags;
 	
 	void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(uiStyle)); }
 	
@@ -538,15 +546,7 @@ struct hash<uiStyle> {
 	}
 };
 
-typedef Flags uiFlags; enum{
 
-	uiFlag_ActOnMouseHover    =1<<0, // call action when the mouse is positioned over the item
-	uiFlag_ActOnMousePressed  =1<<1, // call action when the mouse is pressed over the item
-	uiFlag_ActOnMouseReleased =1<<2, // call action when the mouse is released over the item
-	uiFlag_ActOnMouseDown     =1<<3, // call action when the mouse is down over the item
-	uiFlag_ActAlways          =1<<4, // call action every frame
-
-};
 
 struct uiItem{
 	TNode node;
@@ -558,7 +558,9 @@ struct uiItem{
 	//this function is called in situations defined by the flags in the uiFlags enum
 	//and is always called before anything happens to the item in ui_update
 	//NOTE(sushi) remember that to actually affect the item, you must change its style NOT the variables below
-	s32 (*action)(uiItem*);
+	//NOTE(sushi) some special items (such as buttons, sliders, radios, etc.) reserve this variable
+	//TODO(sushi) maybe store 2 pointers, so that a user can always define an action
+	void (*action)(uiItem*);
 
 	//// state ////
 	b32 hovered;
