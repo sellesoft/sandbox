@@ -71,10 +71,6 @@ void* arena_add(Arena* arena, upt size){DPZoneScoped;
     return cursor;
 }
 
-
-
-
-
 void push_item(uiItem* item){DPZoneScoped;
     g_ui->item_stack.add(item);
 }
@@ -166,17 +162,47 @@ void ui_gen_item(uiItem* item){DPZoneScoped;
     Vertex2* vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
     u32*     ip = (u32*)g_ui->index_arena->start + dc->index_offset;
     RenderDrawCounts counts = {0};
-    if(item->style.background_color.a){
+    if(item->style.background_image){
+        counts+=render_make_texture(vp,ip,counts,item->style.background_image,
+            vec2(item->sx, item->sy),
+            vec2(item->sx+item->width, item->sy),
+            vec2(item->sx+item->width, item->sy+item->height),
+            vec2(item->sx, item->sy+item->height),
+            1,0,0
+        );
+    }
+    else if(item->style.background_color.a){
         counts+=render_make_filledrect(vp, ip, counts, item->spos, item->size, item->style.background_color);
     }
     switch(item->style.border_style){
         case border_none:{}break;
         case border_solid:{
-            counts+=render_make_rect(vp, ip, counts, item->spos + vec2i::ONE*ceil(item->style.border_width / 2.f), item->size - vec2i::ONE*ceil(item->style.border_width / 2.f), item->style.border_width, item->style.border_color);
+            vec2i tl = item->spos;
+            vec2i br = tl+item->size;
+            vec2i tr = vec2i{br.x, tl.y};
+            vec2i bl = vec2i{tl.x, br.y}; 
+            u32 t = item->style.border_width;
+            u32 v = counts.vertices; u32 i = counts.indices;
+            ip[i+ 0] = v+0; ip[i+ 1] = v+1; ip[i+ 2] = v+3; 
+            ip[i+ 3] = v+0; ip[i+ 4] = v+3; ip[i+ 5] = v+2; 
+            ip[i+ 6] = v+2; ip[i+ 7] = v+3; ip[i+ 8] = v+5; 
+            ip[i+ 9] = v+2; ip[i+10] = v+5; ip[i+11] = v+4; 
+            ip[i+12] = v+4; ip[i+13] = v+5; ip[i+14] = v+7; 
+            ip[i+15] = v+4; ip[i+16] = v+7; ip[i+17] = v+6; 
+            ip[i+18] = v+6; ip[i+19] = v+7; ip[i+20] = v+1; 
+            ip[i+21] = v+6; ip[i+22] = v+1; ip[i+23] = v+0;
+            vp[v+0].pos = tl;              vp[v+0].uv = {0,0}; vp[v+0].color = item->style.border_color.rgba;
+            vp[v+1].pos = tl+vec2i( t, t); vp[v+1].uv = {0,0}; vp[v+1].color = item->style.border_color.rgba;
+            vp[v+2].pos = tr;              vp[v+2].uv = {0,0}; vp[v+2].color = item->style.border_color.rgba;
+            vp[v+3].pos = tr+vec2i(-t, t); vp[v+3].uv = {0,0}; vp[v+3].color = item->style.border_color.rgba;
+            vp[v+4].pos = br;              vp[v+4].uv = {0,0}; vp[v+4].color = item->style.border_color.rgba;
+            vp[v+5].pos = br+vec2i(-t,-t); vp[v+5].uv = {0,0}; vp[v+5].color = item->style.border_color.rgba;
+            vp[v+6].pos = bl;              vp[v+6].uv = {0,0}; vp[v+6].color = item->style.border_color.rgba;
+            vp[v+7].pos = bl+vec2i( t,-t); vp[v+7].uv = {0,0}; vp[v+7].color = item->style.border_color.rgba;
+            counts += {8, 24};
         }break;
     }
-    dc->scissorOffset = item->spos;
-    dc->scissorExtent = item->size;
+    int i = 0;
 }
 
 
@@ -309,7 +335,7 @@ void ui_init(Allocator* generic_allocator, Allocator* temp_allocator){DPZoneScop
     ui_initial_style->    border_color = color{180,180,180,255};
     ui_initial_style->    border_width = 1;
     ui_initial_style->      text_color = color{255,255,255,255};
-    ui_initial_style->        overflow = overflow_hidden;
+    ui_initial_style->        overflow = overflow_visible;
 	
     g_ui->base = uiItem{0};
     g_ui->base.style = *ui_initial_style;
@@ -367,7 +393,7 @@ void draw_item_branch(uiItem* item){DPZoneScoped;
 //reevaluates an entire brach of items
 void eval_item_branch(uiItem* item){DPZoneScoped;
     uiItem* parent = uiItemFromNode(item->node.parent);
-	
+
     b32 wauto = item->style.width == size_auto;
     b32 hauto = item->style.height == size_auto;
 

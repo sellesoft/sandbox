@@ -79,7 +79,6 @@ int main(){
 	//counts+=render_make_filledrect(vbuff, ibuff, counts, vec2(300, 300), vec2::ONE*300, Color_Red);
 	//render_update_external_2d_buffer(&buff, vbuff, counts.vertices, ibuff, counts.indices);
 	
-	Assert(false);
 	{ //load UI funcs
 #if DESHI_RELOADABLE_UI
 		if(file_exists(STR8("deshi_temp.dll"))) file_delete(STR8("deshi_temp.dll"));
@@ -217,6 +216,7 @@ int main(){
 	// style.margintl ={1,1};
 	// style.content_align=0.5;
 	// style.positioning = pos_draggable_relative;
+	// style.background_image=Storage::CreateTextureFromFile(STR8("background.png")).second;
 	// forI(n){
 	// 	style.background_color = color(0,u8(f32(i)/n*255),(u8)255-u8(f32(i)/n*255));
 	// 	uiItemBS(&style);
@@ -252,19 +252,33 @@ int main(){
 	// 	}uiItemE();
 	// }uiItemE();
 
-	uiStyle style{};style=*ui_initial_style;
-	style.size = {100,100};
-	style.background_color=Color_Blue;
-	uiItemBS(&style);{
-		style.size = {percent(25), percent(75)};
-		style.background_color = Color_Red;
-		uiItemMS(&style);
+	// uiStyle style{};style=*ui_initial_style;
+	// style.size = {100,100};
+	// style.background_color=Color_Blue;
+	// uiItemBS(&style);{
+	// 	style.size = {percent(25), percent(75)};
+	// 	style.background_color = Color_Red;
+	// 	uiItemMS(&style);
+	// }uiItemE();
+
+	uiStyle style{}; style=*ui_initial_style;
+	style.background_color = Color_VeryDarkCyan;
+	style.border_style = border_solid;
+	style.size = {300,300};
+	style.positioning = pos_draggable_relative;
+	uiItem* item0;
+	uiItem* item1;
+
+	item0 = uiItemBS(&style);{
+		style=*ui_initial_style;
+		style.background_color = Color_Green;
+		style.size = {30,30};
+		item1 = uiItemMS(&style);
 	}uiItemE();
-
-
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
+		item0->style.border_width = BoundTimeOsc(1, 10);
 		//render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
 #if DESHI_RELOADABLE_UI
 		if(key_pressed(Key_F5 | InputMod_AnyAlt)){
@@ -316,20 +330,20 @@ int main(){
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
 		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, str8{(u8*)fps.str, fps.count}, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
-		
+
         {
             using namespace UI;
-            Begin(STR8("debuggingUIwithUI"));{
-				// string item0p = toStr("item0 pos: ", item0->style.tl);
-				// string item1p = toStr("item1 pos: ", item1->style.tl);
-				// Text({(u8*)item0p.str, item0p.count});
-				// Text({(u8*)item1p.str, item1p.count});
+            // Begin(STR8("debuggingUIwithUI"));{
+			// 	// string item0p = toStr("item0 pos: ", item0->style.tl);
+			// 	// string item1p = toStr("item1 pos: ", item1->style.tl);
+			// 	// Text({(u8*)item0p.str, item0p.count});
+			// 	// Text({(u8*)item1p.str, item1p.count});
 
-            }End();
+            // }End();
 			
 			if(g_ui->hovered){
-				render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
-				render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
+				// render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
+				// render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
 			}
         }
 		
