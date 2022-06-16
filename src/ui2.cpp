@@ -66,7 +66,7 @@ void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){DPZoneScoped;
 
 //@Helpers
 //fills an item struct and make its a child of the current item
-void ui_fill_item(uiItem* item, str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
+void ui_fill_item(uiItem* item, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiItem* curitem = *g_ui->item_stack.last;
 	
 	insert_last(&curitem->node, &item->node);
@@ -74,8 +74,6 @@ void ui_fill_item(uiItem* item, str8 id, uiStyle* style, str8 file, upt line){DP
 	if(style) memcpy(&item->style, style, sizeof(uiStyle));
 	else      memcpy(&item->style, ui_initial_style, sizeof(uiStyle));
 	
-	//TODO(sushi) if an item has an id put it in a map
-	item->id = id;
 	item->file_created = file;
 	item->line_created = line;
 }
@@ -127,12 +125,12 @@ void ui_gen_item(uiItem* item){DPZoneScoped;
 	RenderDrawCounts counts = {0};
 	if(item->style.background_image){
 		counts+=render_make_texture(vp,ip,counts,item->style.background_image,
-									vec2(item->sx, item->sy),
-									vec2(item->sx+item->width, item->sy),
-									vec2(item->sx+item->width, item->sy+item->height),
-									vec2(item->sx, item->sy+item->height),
-									1,0,0
-									);
+			vec2(item->sx, item->sy),
+			vec2(item->sx+item->width, item->sy),
+			vec2(item->sx+item->width, item->sy+item->height),
+			vec2(item->sx, item->sy+item->height),
+			1,0,0
+		);
 	}
 	else if(item->style.background_color.a){
 		counts+=render_make_filledrect(vp, ip, counts, item->spos, item->size, item->style.background_color);
@@ -165,13 +163,12 @@ void ui_gen_item(uiItem* item){DPZoneScoped;
 			counts += {8, 24};
 		}break;
 	}
-	int i = 0;
 }
 
 
-uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
+uiItem* ui_make_item(uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
-	ui_fill_item(item, id, style, file, line);
+	ui_fill_item(item, style, file, line);
 	
 	item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
 	
@@ -181,11 +178,12 @@ uiItem* ui_make_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	
 	item->draw_cmd_count = 1;
 	drawcmd_alloc(item->drawcmds, counts);
+	item->__generate = &ui_gen_item;
 	return item;
 }
 
-uiItem* ui_begin_item(str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
-	uiItem* item = ui_make_item(id, style, file, line);
+uiItem* ui_begin_item(uiStyle* style, str8 file, upt line){DPZoneScoped;
+	uiItem* item = ui_make_item(style, file, line);
 	push_item(item);
 	return item;
 }
@@ -195,11 +193,128 @@ void ui_end_item(str8 file, upt line){
 		LogE("ui", 
 			 "In ", file, " at line ", line, " :\n",
 			 "\tAttempted to end base item. Did you call uiItemE too many times? Did you use uiItemM instead of uiItemB?"
-			 );
+		);
 		//TODO(sushi) implement a hint showing what instruction could possibly be wrong 
 	}
 	pop_item();
 	
+}
+
+struct __ui_slider_data{
+	union{
+		u32 maxu32;
+		s32 maxs32;
+		f32 maxf32;
+	};
+	union{
+		u32 minu32;
+		s32 mins32;
+		f32 minf32;
+	};
+	union{
+		u32* varu32;
+		s32* vars32;
+		f32* varf32;
+	};
+	Type type; //0:f32 1:u32 2:s32
+	vec2 mouse_offset;
+	b32 active;
+	f32 pos;
+};
+
+void ui_gen_slider(uiItem* item){DPZoneScoped;
+	uiDrawCmd* dc = item->drawcmds;
+	Vertex2*   vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
+	u32*       ip = (u32*)g_ui->index_arena->start + dc->index_offset;
+	RenderDrawCounts counts = {0};
+
+	if(item->style.background_color.a){
+		counts+=render_make_filledrect(vp,ip,counts,item->spos,item->size,item->style.background_color);
+	}
+
+	__ui_slider_data* data = (__ui_slider_data*)item->action_data;
+}
+
+void __ui_slider_callback(uiItem* item){DPZoneScoped;
+	//no need to update anything if item is not hovered
+	if(g_ui->hovered != item) return;
+	__ui_slider_data* data = (__ui_slider_data*)item->action_data;
+	vec2 mp = input_mouse_position();
+	vec2 lmp = mp - item->spos;
+	switch(data->type){
+		case 0:{
+			f32 dragpos;
+			f32 dragwidth;
+			f32  min = data->minf32;
+			f32  max = data->maxf32;
+			f32* var = data->varf32;
+			*var = Clamp(*var, min, max);
+			dragpos = Remap(*var, 0.f, item->width, min, max);
+			dragwidth = item->width/8;
+			
+			if(input_lmouse_down() && Math::PointInRectangle(lmp, vec2(dragpos,0), vec2(item->width, item->height))){
+				Log("", "is this working");
+			}
+
+		}break;
+	}
+}
+
+uiItem* __ui_make_slider(uiStyle* style, str8 file, upt line){DPZoneScoped;
+	uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem) + sizeof(__ui_slider_data));
+	ui_fill_item(item, style, file, line);
+
+	item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd));
+
+	RenderDrawCounts counts = //reserve enough room for slider background, dragger, and outline
+		render_make_filledrect_counts()*2+
+		render_make_rect_counts();
+
+	item->draw_cmd_count = 1;
+	drawcmd_alloc(item->drawcmds, counts);
+
+	item->action_data = item+sizeof(uiItem);
+	item->style.flags = uiFlag_ActAlways;
+
+	item->__generate = &ui_gen_slider;
+	return item;
+}
+
+uiItem* ui_make_slider_f32(f32 min, f32 max, f32* var, uiStyle* style, str8 file, upt line){DPZoneScoped;
+	uiItem* item = __ui_make_slider(style, file, line);
+	
+	item->action = &__ui_slider_callback;
+	((__ui_slider_data*)item->action_data)->minf32 = min;
+	((__ui_slider_data*)item->action_data)->maxf32 = max;
+	((__ui_slider_data*)item->action_data)->varf32 = var;
+	((__ui_slider_data*)item->action_data)->type = 0;
+
+
+	return item;
+}
+
+uiItem* ui_make_slider_u32(u32 min, u32 max, u32* var, uiStyle* style, str8 file, upt line){DPZoneScoped;
+	uiItem* item = __ui_make_slider(style, file, line);
+
+	item->action = &__ui_slider_callback;
+	((__ui_slider_data*)item->action_data)->minu32 = min;
+	((__ui_slider_data*)item->action_data)->maxu32 = max;
+	((__ui_slider_data*)item->action_data)->varu32 = var;
+	((__ui_slider_data*)item->action_data)->type = 1;
+
+	return item;
+}
+
+uiItem* ui_make_slider_s32(s32 min, s32 max, s32* var, uiStyle* style, str8 file, upt line){DPZoneScoped;
+	uiItem* item = __ui_make_slider(style, file, line);
+
+	item->action = &__ui_slider_callback;
+	((__ui_slider_data*)item->action_data)->mins32 = max;
+	((__ui_slider_data*)item->action_data)->maxs32 = max;
+	((__ui_slider_data*)item->action_data)->vars32 = var;
+	((__ui_slider_data*)item->action_data)->type = 2;
+
+	return item;
 }
 
 uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){DPZoneScoped;
@@ -249,7 +364,7 @@ void ui_gen_text(uiItem* item){DPZoneScoped;
 
 uiText* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiText* item = (uiText*)arena_add(item_arena, sizeof(uiText));
-	ui_fill_item(&item->item, id, style, file, line);
+	ui_fill_item(&item->item, style, file, line);
 	
 	item->item.node.type = uiItemType_Text;
 	item->item.drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
@@ -343,16 +458,14 @@ void draw_item_branch(uiItem* item){DPZoneScoped;
 		item->spos = uiItemFromNode(item->node.parent)->spos + item->lpos;
 	
 	if(item->draw_cmd_count){
-		switch(item->node.type){
-			case uiItemType_Item: ui_gen_item(item); break;
-			case uiItemType_Text: ui_gen_text(item); break;
-			default: Assert(!"unhandled uiItem type"); break;
-		}
+		Assert(item->__generate, "item wtih no generate function");
+		item->__generate(item);
 	}
 	
-	for_node(item->node.first_child){
-		draw_item_branch(uiItemFromNode(it));
-	}
+	if(item->node.first_child)
+		for_node(item->node.first_child){
+			draw_item_branch(uiItemFromNode(it));
+		}
 }
 
 //reevaluates an entire brach of items

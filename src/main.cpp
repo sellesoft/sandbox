@@ -314,38 +314,49 @@ int main(){
 	// }uiItemE();
 
 
-	uiStyle style{}; style=*ui_initial_style;
-	style.size = {300,300};
-	style.background_color = color(100,150,200);
-	uiItemBS(&style);{
-		style.size = {30,30};
-		style.background_color = color(200,150,100);
-		style.flags = uiFlag_ActAlways;
-		uiItemMS(&style)->action = 
-			[](uiItem* item)->void{
-				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
-			};
-		style.flags = uiFlag_ActOnMouseHover;
-		uiItemMS(&style)->action =
-			[](uiItem* item)->void{
-				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
-			};
-		style.flags = uiFlag_ActOnMousePressed;
-		uiItemMS(&style)->action =
-			[](uiItem* item)->void{
-				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
-			};
-		style.flags = uiFlag_ActOnMouseReleased;
-		uiItemMS(&style)->action =
-			[](uiItem* item)->void{
-				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
-			};
-		style.flags = uiFlag_ActOnMouseDown;
-		uiItemMS(&style)->action =
-			[](uiItem* item)->void{
-				item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
-			};
-	}uiItemE();
+	// uiStyle style{}; style=*ui_initial_style;
+	// style.size = {300,300};
+	// style.background_color = color(100,150,200);
+	// uiItemBS(&style);{
+	// 	style.size = {30,30};
+	// 	style.background_color = color(200,150,100);
+	// 	style.flags = uiFlag_ActAlways;
+	// 	uiItemMS(&style)->action = 
+	// 		[](uiItem* item)->void{
+	// 			item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+	// 		};
+	// 	style.flags = uiFlag_ActOnMouseHover;
+	// 	uiItemMS(&style)->action =
+	// 		[](uiItem* item)->void{
+	// 			item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+	// 		};
+	// 	style.flags = uiFlag_ActOnMousePressed;
+	// 	uiItemMS(&style)->action =
+	// 		[](uiItem* item)->void{
+	// 			item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+	// 		};
+	// 	style.flags = uiFlag_ActOnMouseReleased;
+	// 	uiItemMS(&style)->action =
+	// 		[](uiItem* item)->void{
+	// 			item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+	// 		};
+	// 	style.flags = uiFlag_ActOnMouseDown;
+	// 	uiItemMS(&style)->action =
+	// 		[](uiItem* item)->void{
+	// 			item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
+	// 		};
+	// }uiItemE();
+
+	f32 a = 2;
+	{uiItem* item0 = uiItemB();
+		item0->style.background_color = color(100,100,100);
+		item0->style.size = {100,100};
+
+		uiItem* item = uiSliderf32(0, 10, &a);
+		item->style.background_color = Color_White;
+		item->style.size = {80,10};
+	}
+
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;

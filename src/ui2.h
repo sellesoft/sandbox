@@ -307,6 +307,7 @@ TODO(sushi) example
 			style.font_height = 200;
 		in string:
 			font_height: 200;
+
 ------------------------------------------------------------------------------------------------------------
 *   background_color
 	---
@@ -315,7 +316,18 @@ TODO(sushi) example
 -   Inherited: no
 
 -   Defaults:
-		Defaults to (14,14,14,255)
+		Defaults to (0,0,0,0)
+
+------------------------------------------------------------------------------------------------------------
+*   foreground_color
+	---
+	Determines the color of some premade items elements.
+
+-   Inherited: no
+
+-   Defaults:
+		Defaults to (0,0,0,0)
+
 
 ------------------------------------------------------------------------------------------------------------
 *   border_style
@@ -395,6 +407,12 @@ sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;
 #  define UI_FUNC_API(sig__return_type, sig__name, ...) external sig__return_type sig__name(__VA_ARGS__)
 #  define UI_DEF(x) GLUE(ui_, x)
 #endif //DESHI_RELOADABLE_UI
+
+//NOTE(sushi) idea to allow custom prefixing of ui stuff at compile time
+#ifndef UI_PREFIX
+#define UI_PREFIX 
+#endif
+#define UI_PRE(x) GLUE(UI_PREFIX, x)
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_item
@@ -493,16 +511,20 @@ external struct uiStyle{
 		struct{f32 padding_bottom, padding_right;};
 		vec2 paddingbr;        
 	};
-	vec2 content_align; 
-	Font* font;
-	u32 font_height;
-	color background_color;
+	vec2     content_align; 
+	Font*    font;
+	u32      font_height;
+	color    background_color;
 	Texture* background_image;
-	Type border_style;
-	color border_color;
-	f32 border_width;
-	color text_color;
-	Type overflow;
+	color    foreground_color;
+	Type     border_style;
+	color    border_color;
+	f32      border_width;
+	color    text_color;
+	Type     overflow;
+
+	color* colors;
+	Type*  types;
 
 	Flags flags;
 	
@@ -546,8 +568,6 @@ struct hash<uiStyle> {
 	}
 };
 
-
-
 struct uiItem{
 	TNode node;
 	str8 id; //NOTE(sushi) mostly for debugging, not sure if this will have any other use in the interface
@@ -555,18 +575,16 @@ struct uiItem{
 	u64 style_hash;
 	
 	//an items action call back function 
-	//this function is called in situations defined by the flags in the uiFlags enum
+	//this function is called in situations defined by the flags in the in the uiStyle enum
 	//and is always called before anything happens to the item in ui_update
 	//NOTE(sushi) remember that to actually affect the item, you must change its style NOT the variables below
 	//NOTE(sushi) some special items (such as buttons, sliders, radios, etc.) reserve this variable
 	//TODO(sushi) maybe store 2 pointers, so that a user can always define an action
 	void (*action)(uiItem*);
-
-	//// state ////
-	b32 hovered;
+	void* action_data; //a pointer to arbitrary data to be accessed in the action callback
 	
 	//// INTERNAL ////
-	union{ // position relative to parent
+	union{ // position relative to parent/*  */
 		struct{ f32 lx, ly; };
 		vec2 lpos;
 	};
@@ -595,25 +613,40 @@ struct uiItem{
 	u64 draw_cmd_count;
 	uiDrawCmd* drawcmds;
 	
+	//DO NOT TOUCH!!!!
+	//I'm assuming this wont work with dlls, or something
+	void (*__generate)(uiItem*);
+	
 	str8 file_created;
 	upt  line_created;
+
+
 	
 	void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(uiItem));}
 };
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
 
-UI_FUNC_API(uiItem*, ui_make_item, str8 id, uiStyle* style, str8 file, upt line);
-#define uiItemM() UI_DEF(make_item({0}, 0,STR8(__FILE__),__LINE__)))
+UI_FUNC_API(uiItem*, ui_make_item, uiStyle* style, str8 file, upt line);
+#define uiItemM()       UI_DEF(make_item({0}, 0,STR8(__FILE__),__LINE__)))
 #define uiItemMS(style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__))
-#define uiItemMSI(id, style) UI_DEF(make_item({0},(style),STR8(__FILE__),__LINE__))
 
-UI_FUNC_API(uiItem*, ui_begin_item, str8 id, uiStyle* style, str8 file, upt line);
-#define uiItemB() UI_DEF(begin_item({0,0},0,STR8(__FILE__),__LINE__))
-#define uiItemBS(style) UI_DEF(begin_item({0,0},(style),STR8(__FILE__),__LINE__))
-#define uiItemBSI(id,style) UI_DEF(begin_item((id),(style),STR8(__FILE__),__LINE__))
+UI_FUNC_API(uiItem*, ui_begin_item, uiStyle* style, str8 file, upt line);
+#define uiItemB()       UI_DEF(begin_item(0,STR8(__FILE__),__LINE__))
+#define uiItemBS(style) UI_DEF(begin_item((style),STR8(__FILE__),__LINE__))
 
 UI_FUNC_API(void, ui_end_item, str8 file, upt line);
 #define uiItemE() UI_DEF(end_item(STR8(__FILE__),__LINE__))
+
+
+UI_FUNC_API(uiItem*, ui_make_slider_f32, f32 min, f32 max, f32* var, uiStyle* style, str8 file, upt line);
+#define uiSliderf32(min,max,var)        UI_DEF(make_slider_f32(min,max,var,0,STR8(__FILE__),__LINE__));
+#define uiSliderf32S(min,max,var,style) UI_DEF(make_slider_f32(min,max,var,(style),STR8(__FILE__),__LINE__));
+UI_FUNC_API(uiItem*, ui_make_slider_u32, u32 min, u32 max, u32* var, uiStyle* style, str8 file, upt line);
+#define uiSlideru32(min,max,var)        UI_DEF(make_slider_u32(min,max,var,0,STR8(__FILE__),__LINE__));
+#define uiSlideru32S(min,max,var,style) UI_DEF(make_slider_u32(min,max,var,(style),STR8(__FILE__),__LINE__));
+UI_FUNC_API(uiItem*, ui_make_slider_s32, s32 min, s32 max, s32* var, uiStyle* style, str8 file, upt line);
+#define uiSliders32(min,max,var)        UI_DEF(make_slider_s32(min,max,var,0,STR8(__FILE__),__LINE__));
+#define uiSliders32S(min,max,var,style) UI_DEF(make_slider_s32(min,max,var,(style),STR8(__FILE__),__LINE__));
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
@@ -630,6 +663,7 @@ UI_FUNC_API(uiItem*, ui_begin_window, str8 name, Flags flags, uiStyle* style, st
 
 UI_FUNC_API(uiItem*, ui_end_window);
 #define uiWindowE() UI_DEF(window_end())
+
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_button
