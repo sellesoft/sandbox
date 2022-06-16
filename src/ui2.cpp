@@ -65,6 +65,10 @@ void drawcmd_alloc(uiDrawCmd* drawcmd, RenderDrawCounts counts){DPZoneScoped;
 //@Functions
 
 //@Helpers
+#define item_error(item, ...)\
+LogE("ui","Error on item created in ", item->file_created, " on line ", item->line_created, ":\n",\
+          "\t", __VA_ARGS__)
+
 //fills an item struct and make its a child of the current item
 void ui_fill_item(uiItem* item, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiItem* curitem = *g_ui->item_stack.last;
@@ -78,10 +82,15 @@ void ui_fill_item(uiItem* item, uiStyle* style, str8 file, upt line){DPZoneScope
 	item->line_created = line;
 }
 
-vec2i calc_text_size(uiText* item){DPZoneScoped;
-	uiStyle* style = &item->item.style;
-	str8 text = item->text;
-	vec2i result = vec2i{0, (s32)style->font_height};
+//TODO(sushi) make an option for this to take into account wrapping
+vec2 calc_text_size(uiItem* item){DPZoneScoped;
+	if(item->tag != uiTextTag){
+		item_error(item, "calc_text_size() was called on an item whose tag is not uiTextTag.");
+		return vec2{0,0};
+	}
+	uiStyle* style = &item->style;
+	str8 text = uiGetTextData(item)->text;
+	vec2 result = vec2{0, (f32)style->font_height};
 	f32 line_width = 0;
 	switch(style->font->type){
 		case FontType_BDF: case FontType_NONE:{
@@ -111,10 +120,6 @@ vec2i calc_text_size(uiText* item){DPZoneScoped;
 	return result;
 }
 
-#define item_error(item, ...)\
-LogE("ui","Error on item created in ", item->file_created, " on line ", item->line_created, ":\n",\
-          "\t", __VA_ARGS__)
-
 
 
 //@Functionality
@@ -138,10 +143,10 @@ void ui_gen_item(uiItem* item){DPZoneScoped;
 	switch(item->style.border_style){
 		case border_none:{}break;
 		case border_solid:{
-			vec2i tl = item->spos;
-			vec2i br = tl+item->size;
-			vec2i tr = vec2i{br.x, tl.y};
-			vec2i bl = vec2i{tl.x, br.y}; 
+			vec2 tl = item->spos;
+			vec2 br = tl+item->size;
+			vec2 tr = vec2{br.x, tl.y};
+			vec2 bl = vec2{tl.x, br.y}; 
 			u32 t = item->style.border_width;
 			u32 v = counts.vertices; u32 i = counts.indices;
 			ip[i+ 0] = v+0; ip[i+ 1] = v+1; ip[i+ 2] = v+3; 
@@ -170,6 +175,7 @@ uiItem* ui_make_item(uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
 	ui_fill_item(item, style, file, line);
 	
+	item->memsize = sizeof(uiItem);
 	item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
 	
 	RenderDrawCounts counts = //reserve enough room for a background and border 
@@ -200,29 +206,15 @@ void ui_end_item(str8 file, upt line){
 	
 }
 
-struct __ui_slider_data{
-	union{
-		u32 maxu32;
-		s32 maxs32;
-		f32 maxf32;
-	};
-	union{
-		u32 minu32;
-		s32 mins32;
-		f32 minf32;
-	};
-	union{
-		u32* varu32;
-		s32* vars32;
-		f32* varf32;
-	};
-	Type type; //0:f32 1:u32 2:s32
-	vec2 mouse_offset;
-	b32 active;
-	f32 pos;
-};
+//-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// @Slider
 
 void ui_gen_slider(uiItem* item){DPZoneScoped;
+	if(item->tag != uiSliderTag){
+		item_error(item, "Slider generate function was called on an item whose tag is not uiSliderTag.");
+		return;
+	}
+
 	uiDrawCmd* dc = item->drawcmds;
 	Vertex2*   vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
 	u32*       ip = (u32*)g_ui->index_arena->start + dc->index_offset;
@@ -231,14 +223,21 @@ void ui_gen_slider(uiItem* item){DPZoneScoped;
 	if(item->style.background_color.a){
 		counts+=render_make_filledrect(vp,ip,counts,item->spos,item->size,item->style.background_color);
 	}
+	uiSliderData* data = uiGetSliderData(item);
+	vec2 dragp = vec2(item->spos.x+data->pos, item->spos.y);
+	vec2 drags = vec2(data->width, item->height);
+	counts+=render_make_filledrect(vp,ip,counts,dragp,drags,Color_Blue);
 
-	__ui_slider_data* data = (__ui_slider_data*)item->action_data;
 }
 
 void __ui_slider_callback(uiItem* item){DPZoneScoped;
 	//no need to update anything if item is not hovered
 	if(g_ui->hovered != item) return;
-	__ui_slider_data* data = (__ui_slider_data*)item->action_data;
+	if(item->tag != uiSliderTag){
+		item_error(item, "Slider callback was called on an item whose tag is not uiSliderTag.");
+		return;
+	}
+	uiSliderData* data = uiGetSliderData(item);
 	vec2 mp = input_mouse_position();
 	vec2 lmp = mp - item->spos;
 	switch(data->type){
@@ -251,9 +250,20 @@ void __ui_slider_callback(uiItem* item){DPZoneScoped;
 			*var = Clamp(*var, min, max);
 			dragpos = Remap(*var, 0.f, item->width, min, max);
 			dragwidth = item->width/8;
-			
-			if(input_lmouse_down() && Math::PointInRectangle(lmp, vec2(dragpos,0), vec2(item->width, item->height))){
-				Log("", "is this working");
+			data->width = dragwidth;
+			data->pos = dragpos;
+			if(input_lmouse_pressed() && Math::PointInRectangle(lmp, vec2(dragpos,0), vec2(dragwidth, item->height))){
+				data->active = 1;
+				data->mouse_offset = -lmp.x + dragpos;
+			}
+			if(data->active){
+				*var = Remap(Clamp(lmp.x + data->mouse_offset, 0.f, item->width-dragwidth), min, max, 0.f, item->width);
+				item->dirty = 1;
+				item->style.flags = uiFlag_ActAlways;
+			}
+			if(input_lmouse_released()){
+				data->active = 0;
+				item->style.flags = uiFlag_ActOnMouseHover;
 			}
 
 		}break;
@@ -261,34 +271,51 @@ void __ui_slider_callback(uiItem* item){DPZoneScoped;
 }
 
 uiItem* __ui_make_slider(uiStyle* style, str8 file, upt line){DPZoneScoped;
-	uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem) + sizeof(__ui_slider_data));
+	uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem) + sizeof(uiSliderData));
 	ui_fill_item(item, style, file, line);
 
+	item->tag = uiSliderTag;
+	item->memsize = sizeof(uiItem) + sizeof(uiSliderData);
 	item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd));
+	item->__generate = &ui_gen_slider;
+	item->trailing_data = item+sizeof(uiItem);
 
-	RenderDrawCounts counts = //reserve enough room for slider background, dragger, and outline
+	uiSliderData* data = uiGetSliderData(item);
+
+	RenderDrawCounts counts = //reserve enough room for slider rail, dragger, and outline
 		render_make_filledrect_counts()*2+
 		render_make_rect_counts();
 
 	item->draw_cmd_count = 1;
 	drawcmd_alloc(item->drawcmds, counts);
 
-	item->action_data = item+sizeof(uiItem);
-	item->style.flags = uiFlag_ActAlways;
+	item->style.flags = uiFlag_ActOnMouseHover;
 
-	item->__generate = &ui_gen_slider;
+	//setup trailing data 
+
+	item->style.colors = data->colors;
+	item->style.ncolors = slider_color_COUNT;
+
+	item->style.types = data->types;
+	item->style.ntypes = slider_type_COUNT;
+
+	data->colors[slider_color_dragger] = color(100,100,100);
+	
+	data->types[slider_type_dragger] = slider_dragger_rect;
+	data->types[slider_type_rail] = slider_rail_thick;
+
 	return item;
 }
 
 uiItem* ui_make_slider_f32(f32 min, f32 max, f32* var, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiItem* item = __ui_make_slider(style, file, line);
 	
+	item->tag = uiSliderTag;
 	item->action = &__ui_slider_callback;
-	((__ui_slider_data*)item->action_data)->minf32 = min;
-	((__ui_slider_data*)item->action_data)->maxf32 = max;
-	((__ui_slider_data*)item->action_data)->varf32 = var;
-	((__ui_slider_data*)item->action_data)->type = 0;
-
+	uiGetSliderData(item)->minf32 = min;
+	uiGetSliderData(item)->maxf32 = max;
+	uiGetSliderData(item)->varf32 = var;
+	uiGetSliderData(item)->type = 0;
 
 	return item;
 }
@@ -296,23 +323,25 @@ uiItem* ui_make_slider_f32(f32 min, f32 max, f32* var, uiStyle* style, str8 file
 uiItem* ui_make_slider_u32(u32 min, u32 max, u32* var, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiItem* item = __ui_make_slider(style, file, line);
 
+	item->tag = uiSliderTag;
 	item->action = &__ui_slider_callback;
-	((__ui_slider_data*)item->action_data)->minu32 = min;
-	((__ui_slider_data*)item->action_data)->maxu32 = max;
-	((__ui_slider_data*)item->action_data)->varu32 = var;
-	((__ui_slider_data*)item->action_data)->type = 1;
-
+	uiGetSliderData(item)->minu32 = min;
+	uiGetSliderData(item)->maxu32 = max;
+	uiGetSliderData(item)->varu32 = var;
+	uiGetSliderData(item)->type = 1;
+	
 	return item;
 }
 
 uiItem* ui_make_slider_s32(s32 min, s32 max, s32* var, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	uiItem* item = __ui_make_slider(style, file, line);
 
+	item->tag = uiSliderTag;
 	item->action = &__ui_slider_callback;
-	((__ui_slider_data*)item->action_data)->mins32 = max;
-	((__ui_slider_data*)item->action_data)->maxs32 = max;
-	((__ui_slider_data*)item->action_data)->vars32 = var;
-	((__ui_slider_data*)item->action_data)->type = 2;
+	uiGetSliderData(item)->mins32 = max;
+	uiGetSliderData(item)->maxs32 = max;
+	uiGetSliderData(item)->vars32 = var;
+	uiGetSliderData(item)->type = 2;
 
 	return item;
 }
@@ -320,60 +349,63 @@ uiItem* ui_make_slider_s32(s32 min, s32 max, s32* var, uiStyle* style, str8 file
 uiItem* ui_make_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	//uiBeginItem(uiWindow, win, &g_ui->base, uiItemType_Window, flags, 1, file, line);
 	uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem));
-	item->node.type = uiItemType_Window;
-	
+	NotImplemented;	
 	return 0;
 }
 
 uiItem* ui_begin_window(str8 name, Flags flags, uiStyle* style, str8 file, upt line){DPZoneScoped;
 	ui_make_window(name, flags, style, file, line);
-	
+	NotImplemented;
 	return 0;
 }
 
 uiItem* ui_end_window(){
+	NotImplemented;
 	return 0;
 }
+
+//-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// @Button
 
 uiButton* ui_make_button(Action action, void* action_data, Flags flags, str8 file, upt line){DPZoneScoped;
-	//uiBeginItem(uiButton, button, &window->item.node, uiItemType_Button, flags, 1, file, line);
-	//button->item.lpos   = ui_decide_item_pos(window);
-	//button->item.spos   = button->item.lpos + window->item.spos;
-	//button->action      = action;
-	//button->action_data = action_data;
-	//
-	////ui_gen_button(button->item);
-	//
-	//return button;
+	NotImplemented;
 	return 0;
 }
 
+//-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// @Text
 void ui_gen_text(uiItem* item){DPZoneScoped;
-	uiText* t = uiTextFromItem(item);
+	if(item->tag != uiItemTag){
+		item_error(item, "ui_gen_text() was called on an item whose tag is not uiTextTag");
+		return;
+	}
+
 	RenderDrawCounts counts = {0};
-	uiDrawCmd* dc = t->item.drawcmds;
+	uiDrawCmd* dc = item->drawcmds;
 	Vertex2* vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
 	u32*     ip = (u32*)g_ui->index_arena->start + dc->index_offset;
-	render_make_text(vp, ip, counts, t->text, t->item.style.font, t->item.spos, t->item.style.text_color, vec2::ONE * t->item.style.font_height / t->item.style.font->max_height);
+	uiTextData* data = uiGetTextData(item);
+	render_make_text(vp, ip, counts, data->text, item->style.font, item->spos, item->style.text_color, vec2::ONE * item->style.font_height / item->style.font->max_height);
 	//NOTE(sushi) text size is always determined here and NEVER set by the user
 	//TODO(sushi) text sizing should probably be moved to eval_item_branch and made to take into account wrapping
-	t->item.style.size = calc_text_size(t);
+	item->style.size = calc_text_size(item);
 	dc->scissorOffset = item->spos;
 	dc->scissorExtent = item->style.size;
 }
 
-uiText* ui_make_text(str8 text, str8 id, uiStyle* style, str8 file, upt line){DPZoneScoped;
-	uiText* item = (uiText*)arena_add(item_arena, sizeof(uiText));
-	ui_fill_item(&item->item, style, file, line);
+uiItem* ui_make_text(str8 text, uiStyle* style, str8 file, upt line){DPZoneScoped;
+	uiItem* item = (uiItem*)arena_add(item_arena, sizeof(uiItem) + sizeof(uiTextData));
+	ui_fill_item(item, style, file, line);
 	
-	item->item.node.type = uiItemType_Text;
-	item->item.drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
-	item->text = text;
-	
+	item->tag = uiTextTag;
+	item->memsize = sizeof(uiItem) + sizeof(uiTextData);
+	item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
+	item->__generate = &ui_gen_text;
+
 	RenderDrawCounts counts = render_make_text_counts(str8_length(text));
 	
-	item->item.draw_cmd_count = 1;
-	drawcmd_alloc(item->item.drawcmds, counts);
+	item->draw_cmd_count = 1;
+	drawcmd_alloc(item->drawcmds, counts);
 	return item;
 }
 
@@ -420,25 +452,16 @@ void ui_init(MemoryContext* memctx, uiContext* uictx){DPZoneScoped;
 	
 	g_ui->base = uiItem{0};
 	g_ui->base.style = *ui_initial_style;
-	g_ui->base.node.type = uiItemType_Item;
 	g_ui->base.file_created = STR8(__FILE__);
 	g_ui->base.line_created = __LINE__;
 	g_ui->base.style.width = DeshWindow->width;
 	g_ui->base.style.height = DeshWindow->height;
 	g_ui->base.id = STR8("base");
+	g_ui->base.tag = uiItemTag;
 	g_ui->base.style_hash = hash<uiStyle>()(g_ui->base.style);
 	push_item(&g_ui->base);
 	
 	//g_ui->render_buffer = render_create_external_2d_buffer(Megabytes(1), Megabytes(1));
-}
-
-//finds the container of an item eg. a window, child window, or section
-//probably
-TNode* ui_find_container(TNode* item){DPZoneScoped;
-	if(item->type == uiItemType_Window || 
-	   item->type == uiItemType_ChildWindow) return item;
-	if(item->parent) return ui_find_container(item->parent);
-	return 0;
 }
 
 //pass 0 for child on first call
@@ -658,20 +681,13 @@ pair<vec2,vec2> ui_recur(TNode* node){DPZoneScoped;
 	//check if an item's style was modified, if so reevaluate the item,
 	//its children, and every child of its parents until a manually sized parent is found
 	u32 nuhash = hash<uiStyle>()(item->style);
-	if(nuhash!=item->style_hash){
+	if(item->dirty || nuhash!=item->style_hash){
+		item->dirty = 0;
 		item->style_hash = nuhash; 
 		uiItem* sspar = uiItemFromNode(ui_find_static_sized_parent(&item->node, 0));
 		eval_item_branch(sspar);
 		draw_item_branch(sspar);
-	} 
-	
-	//do updates of each item type
-	switch(node->type){
-		case uiItemType_Button:{ uiButton* item = uiButtonFromNode(node);
-		}break;
 	}
-	
-	
 	
 	//render item
 
@@ -700,7 +716,7 @@ pair<vec2,vec2> ui_recur(TNode* node){DPZoneScoped;
 		forI(item->draw_cmd_count){
 			render_set_active_surface_idx(0);
 			Texture* tex = 0;
-			if(item->node.type == uiItemType_Text){
+			if(item->tag == uiTextTag){
 				tex = item->style.font->tex;
 			}else if(item->style.background_image){
 				tex = item->style.background_image;
@@ -747,6 +763,57 @@ void ui_update(){DPZoneScoped;
 	//if(g_ui->base.node.child_count){
 		ui_recur(&g_ui->base.node);
 	//}
+}
+
+struct __ui_debug_win_info{
+	uiItem* text;
+
+}__ui_dwi;
+
+void ui_debug(){
+	{uiItem* window = uiItemB();
+		uiStyle* style = &window->style;
+		style->positioning = pos_draggable_relative;
+		style->background_color = color(14,14,14);
+		style->border_style = border_solid;
+		__ui_dwi.text = uiTextM((str8{0,0}));
+		window->action=[](uiItem* item){
+			uiTextData* text = uiGetTextData(((__ui_debug_win_info*)(item->trailing_data))->text);
+			uiItem* hov = g_ui->hovered;
+			if(!hov) return;
+			string s = toStr(
+				"id:   ", hov->id, "\n"
+				"lpos: ", hov->lpos, "\n"
+				"spos: ", hov->spos, "\n"
+				"size: ", hov->size, "\n"
+				"dcc:  ", hov->draw_cmd_count, "\n"
+				"style:", "\n"
+				"     positioning: ", hov->style.positioning, "\n"
+				"          sizing: ", hov->style.sizing, "\n"
+				"              tl: ", hov->style.tl, "\n"
+				"              br: ", hov->style.br, "\n"
+				"            size: ", hov->style.size, "\n"
+				"        margintl: ", hov->style.margintl, "\n"
+				"        marginbr: ", hov->style.marginbr, "\n"
+				"       paddingtl: ", hov->style.paddingtl, "\n"
+				"       paddingbr: ", hov->style.paddingbr, "\n"
+				"   content_align: ", hov->style.content_align,  "\n"
+				"            font: ", hov->style.font, "\n"
+				"     font_height: ", hov->style.font_height, "\n"
+				"background_color: ", hov->style.background_color, "\n"
+				"background_image: ", hov->style.background_image, "\n"
+				"foreground_color: ", hov->style.foreground_color, "\n"
+				"    border_style: ", hov->style.border_style, "\n"
+				"    border_color: ", hov->style.border_color, "\n"
+				"    border_width: ", hov->style.border_width, "\n"
+				"      text_color: ", hov->style.text_color, "\n"
+				"        overflow: ", hov->style.overflow, "\n"
+			);
+
+			
+
+		};
+	}
 }
 
 #undef ui_alloc

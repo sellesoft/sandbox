@@ -414,31 +414,13 @@ sig__return_type GLUE(sig__name,__stub)(__VA_ARGS__){return (sig__return_type)0;
 #endif
 #define UI_PRE(x) GLUE(UI_PREFIX, x)
 
+#define UI_UNIQUE_ID(str) str8_static_hash64({str,sizeof(str)})
+
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_item
-enum uiItemType_{
-	uiItemType_Item = 0, //a normal item, doesnt have any special data associated with it
-	uiItemType_Section,
-	uiItemType_Window, 
-	uiItemType_ChildWindow,
-	uiItemType_Button,
-	uiItemType_Text,
-	uiItemType_COUNT
-};typedef u32 uiItemType;
-
-struct primcount{
-	u32 n;
-	vec2i* counts;
-	vec2i* sums;
-};
-
 struct Texture;
-struct Vertex2;
 struct uiDrawCmd{
 	Texture* texture;
-	//offsets into the vertex and index arenas
-	// these must be offsets now that the arenas must be contiguous and therefore
-	// must move if overfilled
 	u32 vertex_offset; 
 	u32 index_offset;
 	RenderDrawCounts counts;
@@ -523,14 +505,14 @@ external struct uiStyle{
 	color    text_color;
 	Type     overflow;
 
-	color* colors;
-	Type*  types;
+	//arrays of external style vars defined by items that have trailing data
+	color* colors; u64 ncolors;
+	Type*  types;  u64 ntypes;
+	vec2*  vecs;   u64 nvecs;
 
 	Flags flags;
 	
 	void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(uiStyle)); }
-	
-	
 };
 extern uiStyle* ui_initial_style;
 
@@ -572,7 +554,6 @@ struct uiItem{
 	TNode node;
 	str8 id; //NOTE(sushi) mostly for debugging, not sure if this will have any other use in the interface
 	uiStyle style;
-	u64 style_hash;
 	
 	//an items action call back function 
 	//this function is called in situations defined by the flags in the in the uiStyle enum
@@ -584,7 +565,9 @@ struct uiItem{
 	void* action_data; //a pointer to arbitrary data to be accessed in the action callback
 	
 	//// INTERNAL ////
-	union{ // position relative to parent/*  */
+	u64 style_hash;
+	
+	union{ // position relative to parent
 		struct{ f32 lx, ly; };
 		vec2 lpos;
 	};
@@ -592,7 +575,7 @@ struct uiItem{
 		struct{ f32 sx, sy; };
 		vec2 spos;
 	};
-	union{
+	union{ 
 		struct{ f32 width, height; };
 		vec2 size;
 	};
@@ -613,6 +596,9 @@ struct uiItem{
 	u64 draw_cmd_count;
 	uiDrawCmd* drawcmds;
 	
+	//set to manually force the item to regenerate
+	b32 dirty;
+
 	//DO NOT TOUCH!!!!
 	//I'm assuming this wont work with dlls, or something
 	void (*__generate)(uiItem*);
@@ -620,11 +606,29 @@ struct uiItem{
 	str8 file_created;
 	upt  line_created;
 
+	//size of the item in memory, used for iterating the item arena
+	//and for some checks that items are being used properly
+	u64 memsize;
+	
+	//a unique identifier giving what kind of type this item is
+	//NOTE(sushi) I dont want to use an enum, because in this way I can just define 
+	//            ui{NAME}Tag at the place where the item is defined and it still
+	//            works at compile time
+	//NOTE(sushi) these tags are created using PackU32, using characters to give it a unique id
+	//            for ex uiItemTag = PackU32('i','t','e','m')
+	//            I wish it could be more dyanamic than this, but since we are supporting
+	//            C, we really can't
+	u32 tag;
+	//any extra data that a uiItem can allocate beyond its size
+	//this data is used by special items such as uiText and uiSlider
+	void* trailing_data;
+	u64 trailing_data_size;
 
 	
 	void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(uiItem));}
 };
 #define uiItemFromNode(x) CastFromMember(uiItem, node, x)
+#define uiItemTag PackU32('i','t','e','m')
 
 UI_FUNC_API(uiItem*, ui_make_item, uiStyle* style, str8 file, upt line);
 #define uiItemM()       UI_DEF(make_item({0}, 0,STR8(__FILE__),__LINE__)))
@@ -637,7 +641,6 @@ UI_FUNC_API(uiItem*, ui_begin_item, uiStyle* style, str8 file, upt line);
 UI_FUNC_API(void, ui_end_item, str8 file, upt line);
 #define uiItemE() UI_DEF(end_item(STR8(__FILE__),__LINE__))
 
-
 UI_FUNC_API(uiItem*, ui_make_slider_f32, f32 min, f32 max, f32* var, uiStyle* style, str8 file, upt line);
 #define uiSliderf32(min,max,var)        UI_DEF(make_slider_f32(min,max,var,0,STR8(__FILE__),__LINE__));
 #define uiSliderf32S(min,max,var,style) UI_DEF(make_slider_f32(min,max,var,(style),STR8(__FILE__),__LINE__));
@@ -647,6 +650,59 @@ UI_FUNC_API(uiItem*, ui_make_slider_u32, u32 min, u32 max, u32* var, uiStyle* st
 UI_FUNC_API(uiItem*, ui_make_slider_s32, s32 min, s32 max, s32* var, uiStyle* style, str8 file, upt line);
 #define uiSliders32(min,max,var)        UI_DEF(make_slider_s32(min,max,var,0,STR8(__FILE__),__LINE__));
 #define uiSliders32S(min,max,var,style) UI_DEF(make_slider_s32(min,max,var,(style),STR8(__FILE__),__LINE__));
+
+
+enum{
+	slider_color_dragger = 0,
+	//color_slider_dragger_outline,
+	slider_color_COUNT,
+
+	slider_type_dragger = 0,
+	slider_type_rail,
+	slider_type_COUNT,
+
+	slider_dragger_rect = 0,
+	slider_dragger_round,
+
+	slider_rail_thick = 0,
+	slider_rail_thin,
+};
+
+//extra slider data
+//access using uiSliderData on a uiItem* that was made as a slider
+//NOTE(sushi) this and other Data structs can probably just be called by the items name
+//            so this would just be uiSlider
+struct uiSliderData{
+	union{
+		u32 maxu32;
+		s32 maxs32;
+		f32 maxf32;
+	};
+	union{
+		u32 minu32;
+		s32 mins32;
+		f32 minf32;
+	};
+	union{
+		u32* varu32;
+		s32* vars32;
+		f32* varf32;
+	};
+	Type type; //0:f32 1:u32 2:s32
+	f32 mouse_offset;
+	b32 active;
+	f32 pos;
+	f32 width;
+
+	//
+	color colors[slider_color_COUNT];
+	Type  types[slider_type_COUNT];
+
+};
+#define uiSliderTag PackU32('s','l','d','r')
+//NOTE(sushi) be careful when using this as it does no type checking
+//            if you want to check if an item is a slider, use tag
+#define uiGetSliderData(item) ((uiSliderData*)((item)->trailing_data))
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
@@ -694,19 +750,22 @@ UI_FUNC_API(uiButton*, ui_make_button, Action action, void* action_data, Flags f
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_text
-struct uiText{
-	uiItem item;
-	str8 text; 
-};
-#define uiTextFromItem(x) CastFromMember(uiText, item, x)
 
-UI_FUNC_API(uiText*, ui_make_text, str8 text, str8 id, uiStyle* style, str8 file, upt line);
+UI_FUNC_API(uiItem*, ui_make_text, str8 text, uiStyle* style, str8 file, upt line);
 //NOTE(sushi) does not automatically make a str8, use uiTextML for that.
-#define uiTextM(text)         UI_DEF(make_text((text),     {0},       0, STR8(__FILE__),__LINE__))
-#define uiTextMS(text, style) UI_DEF(make_text((text),     {0}, (style), STR8(__FILE__),__LINE__))
+#define uiTextM(text)         UI_DEF(make_text((text),       0, STR8(__FILE__),__LINE__))
+#define uiTextMS(text, style) UI_DEF(make_text((text), (style), STR8(__FILE__),__LINE__))
 //NOTE(sushi) this automatically applies STR8() to text, so you can only use literals with this macro
-#define uiTextML(text)        UI_DEF(make_text(STR8(text), {0},       0, STR8(__FILE__),__LINE__))
-#define uiTextMLS(text,style) UI_DEF(make_text(STR8(text), {0}, (style), STR8(__FILE__),__LINE__))
+#define uiTextML(text)        UI_DEF(make_text(STR8(text),       0, STR8(__FILE__),__LINE__))
+#define uiTextMLS(text,style) UI_DEF(make_text(STR8(text), (style), STR8(__FILE__),__LINE__))
+
+struct uiTextData{
+	str8 text;
+};
+#define uiTextTag PackU32('t','e','x','t')
+//NOTE(sushi) be careful when using this as it does no type checking
+//            if you want to check if an item is a slider, use tag
+#define uiGetTextData(item) ((uiTextData*)((item)->trailing_data))
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////
 // @ui_context
@@ -772,5 +831,7 @@ struct uiContext{
 
 //global UI pointer
 extern uiContext* g_ui;
+
+void ui_debug();
 
 #endif //DESHI_UI2_H

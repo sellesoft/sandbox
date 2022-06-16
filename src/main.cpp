@@ -349,20 +349,21 @@ int main(){
 
 	f32 a = 2;
 	{uiItem* item0 = uiItemB();
+		item0->id=STR8("item0");
 		item0->style.background_color = color(100,100,100);
 		item0->style.size = {100,100};
-
+		item0->style.paddingtl = {10,10};
+		item0->style.positioning = pos_draggable_relative;
 		uiItem* item = uiSliderf32(0, 10, &a);
 		item->style.background_color = Color_White;
 		item->style.size = {80,10};
+		item->id=STR8("slider");
 	}
 
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		f32 t = DeshTotalTime/1000;
-
-
 
 
 		//item0->style.border_width = BoundTimeOsc(1, 10);
@@ -420,6 +421,8 @@ int main(){
 		// 	items[i]->style.border_width = 10*(sin(t+i)+1)/2; 
 		// 	if(items[i]->style.border_width < 1) items[i]->style.border_width = 0; 
 		// }
+
+		//ui_debug();
 		uiUpdate();
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
@@ -461,13 +464,19 @@ int main(){
 			// 	render_quad_filled2(g_ui->hovered->spos, siz, Color_Black);
 			// 	render_text2(f, {(u8*)s.str, s.count}, floor(g_ui->hovered->spos), vec2::ONE, Color_White);
 			// }
+			
 
 			//debug display item's child bbx
 			// Arena* itemA = g_ui->item_list->arena;
 			// render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
 			// forI(itemA->used / sizeof(uiItem)){
 			// 	uiItem* item = (uiItem*)itemA->start + i;
-			// 	render_quad2(item->children_bbx_pos, item->children_bbx_size, Color_Red);
+			// 	//render_quad2(item->children_bbx_pos, item->children_bbx_size, Color_Red);
+			// 	Vertex2* ver = (Vertex2*)g_ui->vertex_arena->start + item->drawcmds->vertex_offset;
+			// 	u32* ind = (u32*)g_ui->index_arena->start + item->drawcmds->index_offset;
+			// 	for(u32 i = 0; i < item->drawcmds[0].counts.indices; i+=3){
+			// 		render_triangle2(ver[ind[i]].pos, ver[ind[i+1]].pos, ver[ind[i+2]].pos, Color_Red);
+			// 	}
 			// }
 
         }
