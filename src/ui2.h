@@ -12,7 +12,8 @@ Notes
 	There are extensions to uiItems called widgets. These extensions may define extra data and style properties. 
 	A widgets data is allocated after the uiItem struct it extends and their behavoir is defined through an action 
 	function pointer on uiItem. When you use a normal uiItem, this function pointer is free to be used. The function
-	is called at certain times depending on what the uiItem's action_trigger variable is set to.
+	is called at certain times depending on what the uiItem's action_trigger variable is set to. This function is called 
+	before the item is evaluated. 
 
 	In order for ui to understand how to render widgets, they must define the '__generate' function pointer on uiItem.
 	This takes in the uiItem* after it has been evaluated and its screen position and size information has been set.
