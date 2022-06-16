@@ -9,10 +9,30 @@ Notes
 	interface to changing uiItems. When a property is changed ui detects it and reevaluates the item, and any other item
 	that would be affected by that item changing.
 
-	All items may define an optional action function pointer that is triggered in certain situations, such as when the mouse
-	is hovered over the item, or the mouse clicks the item.
+	There are extensions to uiItems called widgets. These extensions may define extra data and style properties. 
+	A widgets data is allocated after the uiItem struct it extends and their behavoir is defined through an action 
+	function pointer on uiItem. When you use a normal uiItem, this function pointer is free to be used. The function
+	is called at certain times depending on what the uiItem's action_trigger variable is set to.
 
+	In order for ui to understand how to render widgets, they must define the '__generate' function pointer on uiItem.
+	This takes in the uiItem* after it has been evaluated and its screen position and size information has been set.
+	And in order for an extensions' custom style properties to be recognized by ui, the widget must define the 
+	'__hash' function on uiItem, telling ui how to hash any properties of the custom data the user may change.
 
+	The basic uiItem, and some widgets, may be told to begin and end. This allows you to nest items within other items
+	much like HTML. However, everything supports just being made. This tells ui that the item is not going to have any children.
+	Items such as uiText and uiSlider cannot be made using begin, because they cannot reasonably render any other items.
+	
+	Nothing in ui's internals or in a widget's internals may edit uiStyle properties. uiStyle is the user's interface
+	for deciding how an item looks and so should never be changed without the user's knowledge. 
+	An exception to this may be scrolling, though I havent gotten to that yet.
+
+	The only thing ui's internals know about is the uiItem and uiStyle structs. Style properties defined by widgets 
+	cannot be used by ui's internals to evaluate anything, but the information in uiStyle should be enough already.
+
+	All of ui is interfaced to through uiItem pointers. In order to access data of a widget you must get it
+	through the widget's function for doing so (eg. uiGetSliderData(uiItem*)). This is to keep the interface from using
+	many different types, unless the user explicitly asks for them.
 
 
 Index
