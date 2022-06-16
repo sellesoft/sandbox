@@ -1,4 +1,7 @@
+#include "core/memory.h"
+
 //// kigu includes ////
+#define KIGU_STRING_ALLOCATOR deshi_temp_allocator
 #include "kigu/profiling.h"
 #include "kigu/array.h"
 #include "kigu/array_utils.h"
@@ -15,7 +18,6 @@
 #include "core/graphing.h"
 #include "core/input.h"
 #include "core/logger.h"
-#include "core/memory.h"
 #include "core/networking.h"
 #include "core/platform.h"
 #include "core/render.h"
@@ -105,9 +107,9 @@ int main(){
 	// uiItem* item3 = 0;
 	// uiStyle style{};
 	// memcpy(&style, ui_initial_style, sizeof(uiStyle));
-	// style.paddingtl = vec2i(20,20);
+	// style.padding = vec2i(20,20);
 	// style.positioning = pos_draggable_relative;
-	// style.margintl = vec2i(20,20); 
+	// style.margin = vec2i(20,20); 
 	// (item0=uiItemBS(&style))->id = STR8("item0");{
 	// 	memcpy(&style, ui_initial_style, sizeof(uiStyle));
 	// 	style.height = 50;
@@ -138,7 +140,7 @@ int main(){
 	
 	// uiStyle style{};
 	// memcpy(&style, ui_initial_style, sizeof(uiStyle));
-	// //style.margintl = vec2i(3,3);
+	// //style.margin = vec2i(3,3);
 	// style.padding_left = 3;
 	// style.padding_top = 3;
 	// style.positioning = pos_relative;
@@ -162,7 +164,7 @@ int main(){
 	
 
 	// uiStyle style{}; style=*ui_initial_style;
-	// style.paddingtl = {1,1};
+	// style.padding = {1,1};
 	// style.tl = {100,100};
 	// style.border_style = border_solid;
 	// style.border_width=1;
@@ -181,7 +183,7 @@ int main(){
 	
 	
 	// uiStyle style{};style = *ui_initial_style;
-	// style.margintl = {10,10};
+	// style.margin = {10,10};
 	// style.border_style = border_solid;
 	// style.border_color = Color_White;
 	// style.height = 20;
@@ -190,9 +192,9 @@ int main(){
 	// uiItemMS(&style);
 	
 	// uiStyle style{};style=*ui_initial_style;
-	// style.margintl = {100,100};
-	// style.paddingtl = {10,10};
-	// //style.paddingtl = {0};
+	// style.margin = {100,100};
+	// style.padding = {10,10};
+	// //style.padding = {0};
 	// style.background_color = Color_DarkBlue;
 	// style.content_align= 0.5;
 	// style.size = {100,100};
@@ -200,7 +202,7 @@ int main(){
 	// const u32 n = 20;
 	// uiItemBS(&style)->id=STR8("container");{
 	// 	style=*ui_initial_style;
-	// 	style.margintl = {10,10};
+	// 	style.margin = {10,10};
 	// 	uiTextMLS("hello1", &style)->item.id = STR8("text1");
 	// 	uiTextMLS("hello long", &style)->item.id = STR8("text2");
 	// 	uiTextMLS("he", &style)->item.id = STR8("text3");
@@ -210,8 +212,8 @@ int main(){
 	
 	// u32 n = 50;
 	// uiStyle style{};style=*ui_initial_style;
-	// style.paddingtl={1,1};
-	// style.margintl ={1,1};
+	// style.padding={1,1};
+	// style.margin ={1,1};
 	// style.content_align=0.5;
 	// style.positioning = pos_draggable_relative;
 	// style.background_image=Storage::CreateTextureFromFile(STR8("background.png")).second;
@@ -230,7 +232,7 @@ int main(){
 	// uiItem* item0;
 	// uiItem* item1;
 	// uiStyle style{};style=*ui_initial_style;
-	// style.paddingtl={10,10};
+	// style.padding={10,10};
 	// style.background_color = Color_DarkRed;
 	// style.positioning = pos_draggable_relative;
 	// (item0=uiItemBS(&style))->id=STR8("item0");{
@@ -273,7 +275,7 @@ int main(){
 	// 	style=*ui_initial_style;
 	// 	style.background_color = Color_Green;
 	// 	style.size = {100,100};
-	// 	style.margintl = {3,3};
+	// 	style.margin = {3,3};
 	// 	item1 = uiItemBS(&style);{
 	// 		style.background_color = Color_White;
 	// 		style.size = {10,10};
@@ -306,7 +308,7 @@ int main(){
 	// uiItemBS(&style);{
 	// 	style.positioning = pos_static;
 	// 	style.size = {300/20,300/20};
-	// 	style.margintl = {10,10};
+	// 	style.margin = {10,10};
 	// 	forI(10){
 	// 		style.background_color = color(255*f32(i)/10, 100, 100);
 	// 		items[i]=uiItemMS(&style);
@@ -350,25 +352,28 @@ int main(){
 	f32 a = 2;
 	uiItem* item0 = uiItemB();
 		item0->id=STR8("item0");
-		item0->style.background_color = color(100,100,100);
+		item0->style.background_color = color(14,14,14);
+		item0->style.border_style = border_solid;
 		item0->style.size = {100,100};
-		item0->style.paddingtl = {10,10};
+		item0->style.padding = {10,10};
+		item0->style.margin;
 		item0->style.positioning = pos_draggable_relative;
 		uiItem* item = uiSliderf32(0, 10, &a);
 		item->style.background_color = Color_White;
 		item->style.size = {80,10};
 		item->id=STR8("slider");
+		uiGetSliderData(item)->style.rail_thickness = 0.5;
+		item->style.sizing = size_percent_x;
+		item->style.width = 100;
 	
 
 	//ui_debug();
-
-
-
+	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		f32 t = DeshTotalTime/1000;
-
-
+		uiGetSliderData(item)->style.colors.dragger.r = 255*(sin(t)+1)/2;
+		item0->style.padding = vec2::ONE * 10 * (sin(t)+1)/2;
 		//item0->style.border_width = BoundTimeOsc(1, 10);
 		//render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
 #if DESHI_RELOADABLE_UI
@@ -430,9 +435,10 @@ int main(){
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
 		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, str8{(u8*)fps.str, fps.count}, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
 		
+
         {
 			//item0->style.border_width = 100*(sin(DeshTotalTime/3000)+1)/2;
-			//item1->style.margintl = vec2::ONE*10*(sin(DeshTotalTime/3000)+1)/2;
+			//item1->style.margin = vec2::ONE*10*(sin(DeshTotalTime/3000)+1)/2;
 
             using namespace UI;
             // Begin(STR8("debuggingUIwithUI"));{
@@ -453,9 +459,9 @@ int main(){
 
 			// item2->style.positioning = pos_relative;
 			// item2->style.top = BoundTimeOsc(-100,400);
-			//item1->style.margintl = vec2::ONE * 10 * (sin(t)+1)/2;
+			//item1->style.margin = vec2::ONE * 10 * (sin(t)+1)/2;
 			// forI(10){
-			// 	items[i]->style.margintl = vec2::ONE * 10 * (sin(t)+1)/2;
+			// 	items[i]->style.margin = vec2::ONE * 10 * (sin(t)+1)/2;
 			// }
 
 			// if(g_ui->hovered){

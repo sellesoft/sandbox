@@ -1,23 +1,19 @@
 /* deshi UI Module
 Notes
 -----
-  Everything in this new system is a uiItem.
 
-  Retained UI is stored in arenas while immediate UI is temp allocated
+	The basic object of ui is the uiItem struct. uiItems are laid out in memory as they are created and connected by nodes. 
+	These connections determine in what order uiItems are rendered. uiItems never move in memory, except when deleted. 
 
-  Everything in the interface is prefixed with "ui" (always lowercase)
-	type and macro names follow the prefix and are UpperCamelCase
-	function names have a _ after the prefix and are lower_snake_case
+	The way a uiItem appears on screen is determined by uiStyle properties. These properties are the user's 
+	interface to changing uiItems. When a property is changed ui detects it and reevaluates the item, and any other item
+	that would be affected by that item changing.
 
-  Everything in this system is designed to be as dynamic as possible to enable
-	minimal rewriting when it comes to tweaking code. Basically, there should be almost
-	no hardcoding of anything and everything that can be abstracted out to a single function
-	should be.
+	All items may define an optional action function pointer that is triggered in certain situations, such as when the mouse
+	is hovered over the item, or the mouse clicks the item.
 
-  
 
-  Differences from HTML/CSS:
-	Margins do not collapse
+
 
 Index
 -----
@@ -480,7 +476,7 @@ external struct uiStyle{
 	};
 	union{
 		struct{f32 margin_left, margin_top;};
-		vec2 margintl;
+		vec2 margin;
 	};
 	union{
 		struct{f32 margin_bottom, margin_right;};
@@ -488,7 +484,7 @@ external struct uiStyle{
 	};
 	union{
 		struct{f32 padding_left, padding_top;};
-		vec2 paddingtl;
+		vec2 padding;
 	};
 	union{
 		struct{f32 padding_bottom, padding_right;};
@@ -505,49 +501,10 @@ external struct uiStyle{
 	f32      border_width;
 	color    text_color;
 	Type     overflow;
-
-	//arrays of external style vars defined by items that have trailing data
-	color* colors; u64 ncolors;
-	Type*  types;  u64 ntypes;
-	vec2*  vecs;   u64 nvecs;
 	
 	void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(uiStyle)); }
 };
 extern uiStyle* ui_initial_style;
-
-template<>
-struct hash<uiStyle> {
-	inline u32 operator()(const uiStyle& s){DPZoneScoped;
-		u32 seed = 2166136261;
-		seed ^= *(u32*)&s.positioning;     seed *= 16777619;
-		seed ^= *(u32*)&s.left;            seed *= 16777619;
-		seed ^= *(u32*)&s.top;             seed *= 16777619;
-		seed ^= *(u32*)&s.right;           seed *= 16777619;
-		seed ^= *(u32*)&s.bottom;          seed *= 16777619;
-		seed ^= *(u32*)&s.width;           seed *= 16777619;
-		seed ^= *(u32*)&s.height;          seed *= 16777619;
-		seed ^= *(u32*)&s.margin_left;     seed *= 16777619;
-		seed ^= *(u32*)&s.margin_top;      seed *= 16777619;
-		seed ^= *(u32*)&s.margin_bottom;   seed *= 16777619;
-		seed ^= *(u32*)&s.margin_right;    seed *= 16777619;
-		seed ^= *(u32*)&s.padding_left;    seed *= 16777619;
-		seed ^= *(u32*)&s.padding_top;     seed *= 16777619;
-		seed ^= *(u32*)&s.padding_bottom;  seed *= 16777619;
-		seed ^= *(u32*)&s.padding_right;   seed *= 16777619;
-		seed ^= *(u32*)&s.content_align.x; seed *= 16777619;
-		seed ^= *(u32*)&s.content_align.y; seed *= 16777619;
-		seed ^= (u64)s.font;               seed *= 16777619;
-		seed ^= s.font_height;             seed *= 16777619;
-		seed ^= s.background_color.rgba;   seed *= 16777619;
-		seed ^= (u64)s.background_image;   seed *= 16777619;
-		seed ^= s.border_style;            seed *= 16777619;
-		seed ^= s.border_color.rgba;       seed *= 16777619;
-		seed ^= *(u32*)&s.border_width;    seed *= 16777619;
-		seed ^= s.text_color.rgba;         seed *= 16777619;
-		seed ^= s.overflow;                seed *= 16777619;
-		return seed;
-	}
-};
 
 struct uiItem{
 	TNode node;
@@ -566,7 +523,7 @@ struct uiItem{
 
 
 	//// INTERNAL ////
-	u64 style_hash;
+	u32 style_hash;
 	
 	union{ // position relative to parent
 		struct{ f32 lx, ly; };
@@ -600,9 +557,8 @@ struct uiItem{
 	//set to manually force the item to regenerate
 	b32 dirty;
 
-	//DO NOT TOUCH!!!!
-	//I'm assuming this wont work with dlls, or something
 	void (*__generate)(uiItem*);
+	u32  (*__hash)(uiItem*);
 	
 	str8 file_created;
 	upt  line_created;
@@ -624,7 +580,6 @@ struct uiItem{
 	//this data is used by special items such as uiText and uiSlider
 	void* trailing_data;
 	u64 trailing_data_size;
-
 	
 	void operator=(const uiItem& rhs){memcpy(this, &rhs, sizeof(uiItem));}
 };
@@ -642,6 +597,46 @@ UI_FUNC_API(uiItem*, ui_begin_item, uiStyle* style, str8 file, upt line);
 UI_FUNC_API(void, ui_end_item, str8 file, upt line);
 #define uiItemE() UI_DEF(end_item(STR8(__FILE__),__LINE__))
 
+
+inline u32 hash_style(uiItem* item){DPZoneScoped;
+	uiStyle* s = &item->style;
+	u32 seed = 2166136261;
+	seed ^= *(u32*)&s->positioning;     seed *= 16777619;
+	seed ^= *(u32*)&s->left;            seed *= 16777619;
+	seed ^= *(u32*)&s->top;             seed *= 16777619;
+	seed ^= *(u32*)&s->right;           seed *= 16777619;
+	seed ^= *(u32*)&s->bottom;          seed *= 16777619;
+	seed ^= *(u32*)&s->width;           seed *= 16777619;
+	seed ^= *(u32*)&s->height;          seed *= 16777619;
+	seed ^= *(u32*)&s->margin_left;     seed *= 16777619;
+	seed ^= *(u32*)&s->margin_top;      seed *= 16777619;
+	seed ^= *(u32*)&s->margin_bottom;   seed *= 16777619;
+	seed ^= *(u32*)&s->margin_right;    seed *= 16777619;
+	seed ^= *(u32*)&s->padding_left;    seed *= 16777619;
+	seed ^= *(u32*)&s->padding_top;     seed *= 16777619;
+	seed ^= *(u32*)&s->padding_bottom;  seed *= 16777619;
+	seed ^= *(u32*)&s->padding_right;   seed *= 16777619;
+	seed ^= *(u32*)&s->content_align.x; seed *= 16777619;
+	seed ^= *(u32*)&s->content_align.y; seed *= 16777619;
+	seed ^= (u64)s->font;               seed *= 16777619;
+	seed ^= s->font_height;             seed *= 16777619;
+	seed ^= s->background_color.rgba;   seed *= 16777619;
+	seed ^= (u64)s->background_image;   seed *= 16777619;
+	seed ^= s->border_style;            seed *= 16777619;
+	seed ^= s->border_color.rgba;       seed *= 16777619;
+	seed ^= *(u32*)&s->border_width;    seed *= 16777619;
+	seed ^= s->text_color.rgba;         seed *= 16777619;
+	seed ^= s->overflow;                seed *= 16777619;
+	
+	if(item->__hash) { seed ^= item->__hash(item); seed *= 16777619; }
+	
+	return seed;
+}
+
+
+//-////////////////////////////////////////////////////////////////////////////////////////////////
+// @ui_slider
+
 UI_FUNC_API(uiItem*, ui_make_slider_f32, f32 min, f32 max, f32* var, uiStyle* style, str8 file, upt line);
 #define uiSliderf32(min,max,var)        UI_DEF(make_slider_f32(min,max,var,0,STR8(__FILE__),__LINE__));
 #define uiSliderf32S(min,max,var,style) UI_DEF(make_slider_f32(min,max,var,(style),STR8(__FILE__),__LINE__));
@@ -653,21 +648,6 @@ UI_FUNC_API(uiItem*, ui_make_slider_s32, s32 min, s32 max, s32* var, uiStyle* st
 #define uiSliders32S(min,max,var,style) UI_DEF(make_slider_s32(min,max,var,(style),STR8(__FILE__),__LINE__));
 
 
-enum{
-	slider_color_dragger = 0,
-	//color_slider_dragger_outline,
-	slider_color_COUNT,
-
-	slider_type_dragger = 0,
-	slider_type_rail,
-	slider_type_COUNT,
-
-	slider_dragger_rect = 0,
-	slider_dragger_round,
-
-	slider_rail_thick = 0,
-	slider_rail_thin,
-};
 
 //extra slider data
 //access using uiSliderData on a uiItem* that was made as a slider
@@ -695,14 +675,64 @@ struct uiSliderData{
 	f32 pos;
 	f32 width;
 
-	color colors[slider_color_COUNT];
-	Type  types[slider_type_COUNT];
+	struct{
+		struct{
+			color rail;
+			color rail_outline;
+			color dragger;
+		}colors;
+		Type dragger_shape;
+		f32 rail_thickness; //percentage of full thickness, 0-1
+	}style;
 
 };
 #define uiSliderTag PackU32('s','l','d','r')
-//NOTE(sushi) be careful when using this as it does no type checking
-//            if you want to check if an item is a slider, use tag
 #define uiGetSliderData(item) ((uiSliderData*)((item)->trailing_data))
+
+enum{
+	slider_dragger_rect = 0,
+	slider_dragger_round,
+
+	slider_rail_thick = 0,
+	slider_rail_thin,
+};
+
+inline u32 slider_style_hash(uiItem* item){
+	uiSliderData* data = uiGetSliderData(item);
+	u32 seed = 2166136261;
+	
+	seed ^= data->style.colors.rail.rgba;       seed *= 16777619;
+	seed ^= data->style.colors.dragger.rgba;    seed *= 16777619;
+	seed ^= data->style.dragger_shape;          seed *= 16777619;
+	seed ^= *(u32*)&data->style.rail_thickness; seed *= 16777619;
+
+	return seed;
+} 
+
+//-////////////////////////////////////////////////////////////////////////////////////////////////
+// @ui_checkbox
+
+enum{
+	checkbox_fill_box = 0,
+	checkbox_fill_checkmark,
+};
+
+struct uiCheckbox{
+	uiItem item;
+	
+	b32* var;
+
+	struct{
+		struct{
+			color background;
+			color filling;
+		}colors;
+		Type fill_type;
+		b32 show_text;
+	}style;
+};
+#define uiCheckboxTag PackU32('c','b','o','x')
+#define uiCheckboxData(x) CastFromMember(uiCheckbox, item, x)
 
 
 //-////////////////////////////////////////////////////////////////////////////////////////////////

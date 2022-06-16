@@ -41,10 +41,7 @@ uiItem* pop_item(){DPZoneScoped;
 
 //@uiDrawCmd
 
-
-
 //@Item
-
 
 //@Window
 
@@ -181,7 +178,7 @@ uiItem* ui_make_item(uiStyle* style, str8 file, upt line){DPZoneScoped;
 	RenderDrawCounts counts = //reserve enough room for a background and border 
 		render_make_filledrect_counts() +
 		render_make_rect_counts();
-	
+
 	item->draw_cmd_count = 1;
 	drawcmd_alloc(item->drawcmds, counts);
 	item->__generate = &ui_gen_item;
@@ -218,15 +215,25 @@ void ui_gen_slider(uiItem* item){DPZoneScoped;
 	uiDrawCmd* dc = item->drawcmds;
 	Vertex2*   vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
 	u32*       ip = (u32*)g_ui->index_arena->start + dc->index_offset;
-	RenderDrawCounts counts = {0};
-
-	if(item->style.background_color.a){
-		counts+=render_make_filledrect(vp,ip,counts,item->spos,item->size,item->style.background_color);
-	}
+	RenderDrawCounts counts = {0};	
 	uiSliderData* data = uiGetSliderData(item);
-	vec2 dragp = vec2(item->spos.x+data->pos, item->spos.y);
-	vec2 drags = vec2(data->width, item->height);
-	counts+=render_make_filledrect(vp,ip,counts,dragp,drags,Color_Blue);
+
+	counts+=render_make_filledrect(vp,ip,counts,
+		vec2(item->spos.x, item->spos.y + item->size.y * data->style.rail_thickness / 2),
+		vec2(item->size.x, item->size.y * data->style.rail_thickness),
+		data->style.colors.rail
+	);
+
+	if(data->style.dragger_shape == slider_dragger_rect){
+		vec2 dragp = vec2(item->spos.x+data->pos, item->spos.y);
+		vec2 drags = vec2(data->width, item->height);
+		counts+=render_make_filledrect(vp,ip,counts,dragp,drags,data->style.colors.dragger);
+	}else if(data->style.dragger_shape == slider_dragger_round){
+		NotImplemented;
+	}
+
+
+
 
 }
 
@@ -291,17 +298,12 @@ uiItem* __ui_make_slider(uiStyle* style, str8 file, upt line){DPZoneScoped;
 
 	//setup trailing data 
 
-	item->style.colors = data->colors;
-	item->style.ncolors = slider_color_COUNT;
+	data->style.dragger_shape = slider_dragger_rect;
+	data->style.rail_thickness = 1;
+	data->style.colors.rail = color(80,80,80);
+	data->style.colors.dragger = color(14,50,100);
 
-	item->style.types = data->types;
-	item->style.ntypes = slider_type_COUNT;
-
-	data->colors[slider_color_dragger] = color(100,100,100);
-	
-	data->types[slider_type_dragger] = slider_dragger_rect;
-	data->types[slider_type_rail] = slider_rail_thick;
-
+	item->__hash = &slider_style_hash;
 	return item;
 }
 
@@ -387,18 +389,27 @@ void ui_gen_text(uiItem* item){DPZoneScoped;
 	//temp attempt at dynamic text
 	//TODO(sushi) this needs to be heaped
 	RenderDrawCounts nucounts = render_make_text_counts(data->text.count);
-	if(counts.vertices > dc->counts.vertices || counts.indices > dc->counts.vertices){
+	if(nucounts.vertices > dc->counts.vertices || nucounts.indices > dc->counts.indices){
 		drawcmd_alloc(dc, nucounts);
 	    vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
 		ip = (u32*)g_ui->index_arena->start + dc->index_offset;
 	}
 
-	render_make_text(vp, ip, counts, data->text, item->style.font, item->spos, item->style.text_color, vec2::ONE * item->style.font_height / item->style.font->max_height);
+	str8 scan = data->text;
+	str8 start = data->text;
+	f32 y = 0;
+	while(scan){
+		u32 cp = str8_advance(&scan).codepoint;
+		if(cp == U'\n' || !scan){
+			counts+=render_make_text(vp, ip, counts, {start.str, start.count-scan.count}, item->style.font, item->spos + vec2{0, y}, item->style.text_color, vec2::ONE * item->style.font_height / item->style.font->max_height);
+			y+=item->style.font_height;
+			start = scan;
+		}
+	}
+
 	//NOTE(sushi) text size is always determined here and NEVER set by the user
 	//TODO(sushi) text sizing should probably be moved to eval_item_branch and made to take into account wrapping
 	item->style.size = calc_text_size(item);
-	dc->scissorOffset = item->spos;
-	dc->scissorExtent = item->style.size;
 }
 
 uiItem* ui_make_text(str8 text, uiStyle* style, str8 file, upt line){DPZoneScoped;
@@ -507,15 +518,19 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 	b32 wauto = item->style.width == size_auto;
 	b32 hauto = item->style.height == size_auto;
 	u32 wborder = (item->style.border_style ? item->style.border_width : 0);
-    
+
+	vec2 parent_size_padded;
+
     if(!hauto){
         if(HasFlag(item->style.sizing, size_percent_y)){
             if(item->style.height < 0){
                 item_error(item, "Sizing flag 'size_percent_y' was specified, but the given value for height '", item->style.height, "' is negative.");
-            }else if(HasFlag(parent->style.sizing, size_percent_y)){
-                item->height = item->style.height/100.f * parent->height;
-            }else if (parent->style.height >= 0){
-                item->height = item->style.height/100.f * parent->style.height;
+            }else if(HasFlag(parent->style.sizing, size_percent_y)){ //if the parent's sizing is also set to percentage, we know it is already sized
+				parent_size_padded.y = parent->height - (parent->style.padding_bottom==MAX_F32?parent->style.padding_top:parent->style.padding_bottom) - parent->style.padding_top;
+                item->height = item->style.height/100.f * parent_size_padded.x;
+            }else if (parent->style.height >= 0){ 
+				parent_size_padded.y = parent->style.height - (parent->style.padding_bottom==MAX_F32?parent->style.padding_top:parent->style.padding_bottom) - parent->style.padding_top;
+                item->height = item->style.height/100.f * parent_size_padded.y;
             }else{
                 item_error(item, "Sizing flag 'size_percent_y' was specified, but the item's parent's height is not explicitly sized.");
                 hauto = 1;
@@ -528,9 +543,11 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
             if(item->style.width < 0) 
                 item_error(item, "Sizing value was specified with size_percent_x, but the given value for width '", item->style.width, "' is negative.");
             if(HasFlag(parent->style.sizing, size_percent_x)){
-                item->width = item->style.width/100.f * parent->width;
+				parent_size_padded.x = parent->width - (parent->style.padding_right==MAX_F32?parent->style.padding_left:parent->style.padding_right) - parent->style.padding_left;
+                item->width = item->style.width/100.f * parent_size_padded.x;
             }else if (parent->style.width >= 0){
-                item->width = item->style.width/100.f * parent->style.width;
+				parent_size_padded.x = parent->style.width - (parent->style.padding_right==MAX_F32?parent->style.padding_left:parent->style.padding_right) - parent->style.padding_left;
+                item->width = item->style.width/100.f * parent_size_padded.x;
             }else{
                 item_error(item, "Sizing flag 'size_percent_x' was specified but the item's parent's width is not explicitly sized.");
                 hauto = 1;
@@ -544,13 +561,13 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 		else item_error(item, "Sizing flag 'size_square' was specifed but width and height are both ", (wauto && hauto ? "unspecified" : "specified."));
 	}
 
-	vec2 cursor = item->style.paddingtl;
+	vec2 cursor = item->style.padding;
 	for_node(item->node.first_child){
 		uiItem* child = uiItemFromNode(it);
 		eval_item_branch(child);    
 		switch(child->style.positioning){
 			case pos_static:{
-				child->lpos =  child->style.margintl;
+				child->lpos =  child->style.margin;
 				if(item->style.border_style)
 					child->lpos += floor(item->style.border_width) * vec2::ONE;
 				child->lpos += item->scroll;
@@ -558,7 +575,7 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 			}break;
 			case pos_relative:
 			case pos_draggable_relative:{
-				child->lpos =  child->style.margintl;
+				child->lpos =  child->style.margin;
 				if(item->style.border_style)
 					child->lpos += floor(item->style.border_width) * vec2::ONE;
 				child->lpos += item->scroll;
@@ -572,7 +589,7 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
 		//            as much as it would if we used full precision
 		//            this also fixes some issues like items not touching when they should
 		//TODO(sushi) maybe make a global define for this
-		child->lpos = floor(child->lpos*4)/4;
+		child->lpos = floor(child->lpos*1)/1;
 
         cursor.x = item->style.padding_left;
         cursor.y = child->lpos.y + child->height;
@@ -590,7 +607,6 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
     item->width += (wauto ? 1 : 2) * wborder;
     item->height += (hauto ? 1 : 2) * wborder;
 	
-	item->size = ceil(item->size);
 
 	//TODO(sushi) I'm pretty sure the x part of this can be moved into the child loop above, so we dont have to do a second
 	//            pass if y isnt set
@@ -688,7 +704,7 @@ pair<vec2,vec2> ui_recur(TNode* node){DPZoneScoped;
 
 	//check if an item's style was modified, if so reevaluate the item,
 	//its children, and every child of its parents until a manually sized parent is found
-	u32 nuhash = hash<uiStyle>()(item->style);
+	u32 nuhash = hash_style(item);
 	if(item->dirty || nuhash!=item->style_hash){
 		item->dirty = 0;
 		item->style_hash = nuhash; 
@@ -758,7 +774,7 @@ void ui_update(){DPZoneScoped;
 	g_ui->base.style.height = DeshWindow->height;
 	g_ui->base.visible_start = vec2::ZERO;
 	g_ui->base.visible_size = DeshWindow->dimensions;
-	
+
 	//in order to prevent the mouse from entering another window during input
 	//this can probably be moved to only be done on mouse input, but maybe left so 
 	//user can get this info at any time OR make a function for that
@@ -775,8 +791,43 @@ void ui_update(){DPZoneScoped;
 
 struct __ui_debug_win_info{
 	uiItem* text;
-
 }__ui_dwi;
+
+void __ui_debug_callback(uiItem* item){
+	uiTextData* text = uiGetTextData(__ui_dwi.text);
+	uiItem* hov = g_ui->hovered;
+	if(!hov) return;
+	str8b s = toStr8(
+		"id:   ", hov->id, "\n"
+		"lpos: ", hov->lpos, "\n"
+		"spos: ", hov->spos, "\n"
+		"size: ", hov->size, "\n"
+		"dcc:  ", hov->draw_cmd_count, "\n"
+		"style:", "\n"
+		"     positioning: ", hov->style.positioning, "\n"
+		"          sizing: ", hov->style.sizing, "\n"
+		"              tl: ", hov->style.tl, "\n"
+		"              br: ", hov->style.br, "\n"
+		"            size: ", hov->style.size, "\n"
+		"        margintl: ", hov->style.margin, "\n"
+		"        marginbr: ", hov->style.marginbr, "\n"
+		"       padding: ", hov->style.padding, "\n"
+		"       paddingbr: ", hov->style.paddingbr, "\n"
+		"   content_align: ", hov->style.content_align,  "\n"
+		"            font: ", (hov->style.font?hov->style.font->name:STR8("No font")), "\n"
+		"     font_height: ", hov->style.font_height, "\n"
+		"background_color: ", hov->style.background_color, "\n"
+		"background_image: ", (hov->style.background_image?hov->style.background_image->name:"No background"), "\n"
+		"foreground_color: ", hov->style.foreground_color, "\n"
+		"    border_style: ", hov->style.border_style, "\n"
+		"    border_color: ", hov->style.border_color, "\n"
+		"    border_width: ", hov->style.border_width, "\n"
+		"      text_color: ", hov->style.text_color, "\n"
+		"        overflow: ", hov->style.overflow, "\n"
+	);
+	text->text = s.fin;
+	item->dirty = 1;
+}
 
 void ui_debug(){
 	{uiItem* window = uiItemB();
@@ -787,41 +838,8 @@ void ui_debug(){
 		window->id = STR8("_ui_ debug win");
 		__ui_dwi.text = uiTextM((str8{0,0}));
 		__ui_dwi.text->id = STR8("_ui_ debug win text");
-		window->action=[](uiItem* item){
-			uiTextData* text = uiGetTextData(((__ui_debug_win_info*)(item->trailing_data))->text);
-			uiItem* hov = g_ui->hovered;
-			if(!hov) return;
-			string s = toStr(
-				"id:   ", hov->id, "\n"
-				"lpos: ", hov->lpos, "\n"
-				"spos: ", hov->spos, "\n"
-				"size: ", hov->size, "\n"
-				"dcc:  ", hov->draw_cmd_count, "\n"
-				"style:", "\n"
-				"     positioning: ", hov->style.positioning, "\n"
-				"          sizing: ", hov->style.sizing, "\n"
-				"              tl: ", hov->style.tl, "\n"
-				"              br: ", hov->style.br, "\n"
-				"            size: ", hov->style.size, "\n"
-				"        margintl: ", hov->style.margintl, "\n"
-				"        marginbr: ", hov->style.marginbr, "\n"
-				"       paddingtl: ", hov->style.paddingtl, "\n"
-				"       paddingbr: ", hov->style.paddingbr, "\n"
-				"   content_align: ", hov->style.content_align,  "\n"
-				"            font: ", hov->style.font, "\n"
-				"     font_height: ", hov->style.font_height, "\n"
-				"background_color: ", hov->style.background_color, "\n"
-				"background_image: ", hov->style.background_image, "\n"
-				"foreground_color: ", hov->style.foreground_color, "\n"
-				"    border_style: ", hov->style.border_style, "\n"
-				"    border_color: ", hov->style.border_color, "\n"
-				"    border_width: ", hov->style.border_width, "\n"
-				"      text_color: ", hov->style.text_color, "\n"
-				"        overflow: ", hov->style.overflow, "\n"
-			);
-			text->text = str8{(u8*)s.str, s.count};
-			item->dirty = 1;
-		};
+		window->action_trigger = action_act_always;
+		window->action = &__ui_debug_callback;
 	}
 }
 
