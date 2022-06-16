@@ -454,11 +454,12 @@ enum{
 	overflow_hidden,
 	overflow_visible,
 
-	uiFlag_ActOnMouseHover    =1<<0, // call action when the mouse is positioned over the item
-	uiFlag_ActOnMousePressed  =1<<1, // call action when the mouse is pressed over the item
-	uiFlag_ActOnMouseReleased =1<<2, // call action when the mouse is released over the item
-	uiFlag_ActOnMouseDown     =1<<3, // call action when the mouse is down over the item
-	uiFlag_ActAlways          =1<<4, // call action every frame
+	action_act_never = 0,
+	action_act_mouse_hover,    // call action when the mouse is positioned over the item
+	action_act_mouse_pressed,  // call action when the mouse is pressed over the item
+	action_act_mouse_released, // call action when the mouse is released over the item
+	action_act_mouse_down,     // call action when the mouse is down over the item
+	action_act_always,         // call action every frame
 };
 
 struct Font;
@@ -509,8 +510,6 @@ external struct uiStyle{
 	color* colors; u64 ncolors;
 	Type*  types;  u64 ntypes;
 	vec2*  vecs;   u64 nvecs;
-
-	Flags flags;
 	
 	void operator=(const uiStyle& rhs){ memcpy(this, &rhs, sizeof(uiStyle)); }
 };
@@ -563,7 +562,9 @@ struct uiItem{
 	//TODO(sushi) maybe store 2 pointers, so that a user can always define an action
 	void (*action)(uiItem*);
 	void* action_data; //a pointer to arbitrary data to be accessed in the action callback
-	
+	Type action_trigger; //how the action is triggered
+
+
 	//// INTERNAL ////
 	u64 style_hash;
 	
@@ -694,7 +695,6 @@ struct uiSliderData{
 	f32 pos;
 	f32 width;
 
-	//
 	color colors[slider_color_COUNT];
 	Type  types[slider_type_COUNT];
 

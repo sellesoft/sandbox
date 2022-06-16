@@ -348,7 +348,7 @@ int main(){
 	// }uiItemE();
 
 	f32 a = 2;
-	{uiItem* item0 = uiItemB();
+	uiItem* item0 = uiItemB();
 		item0->id=STR8("item0");
 		item0->style.background_color = color(100,100,100);
 		item0->style.size = {100,100};
@@ -358,7 +358,10 @@ int main(){
 		item->style.background_color = Color_White;
 		item->style.size = {80,10};
 		item->id=STR8("slider");
-	}
+	
+
+	//ui_debug();
+
 
 
 	//start main loop
@@ -422,7 +425,6 @@ int main(){
 		// 	if(items[i]->style.border_width < 1) items[i]->style.border_width = 0; 
 		// }
 
-		//ui_debug();
 		uiUpdate();
 		string fps = toStr(1000/DeshTime->deltaTime);
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
@@ -442,8 +444,8 @@ int main(){
             // }End();
 			
 			if(g_ui->hovered){
-				// render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
-				// render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
+				render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
+				render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
 			}
 
 			// item1->style.positioning = pos_relative;

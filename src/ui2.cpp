@@ -231,8 +231,6 @@ void ui_gen_slider(uiItem* item){DPZoneScoped;
 }
 
 void __ui_slider_callback(uiItem* item){DPZoneScoped;
-	//no need to update anything if item is not hovered
-	if(g_ui->hovered != item) return;
 	if(item->tag != uiSliderTag){
 		item_error(item, "Slider callback was called on an item whose tag is not uiSliderTag.");
 		return;
@@ -259,11 +257,11 @@ void __ui_slider_callback(uiItem* item){DPZoneScoped;
 			if(data->active){
 				*var = Remap(Clamp(lmp.x + data->mouse_offset, 0.f, item->width-dragwidth), min, max, 0.f, item->width);
 				item->dirty = 1;
-				item->style.flags = uiFlag_ActAlways;
+				item->action_trigger = action_act_always;
 			}
 			if(input_lmouse_released()){
 				data->active = 0;
-				item->style.flags = uiFlag_ActOnMouseHover;
+				item->action_trigger = action_act_mouse_hover;
 			}
 
 		}break;
@@ -289,7 +287,7 @@ uiItem* __ui_make_slider(uiStyle* style, str8 file, upt line){DPZoneScoped;
 	item->draw_cmd_count = 1;
 	drawcmd_alloc(item->drawcmds, counts);
 
-	item->style.flags = uiFlag_ActOnMouseHover;
+	item->action_trigger = action_act_mouse_hover;
 
 	//setup trailing data 
 
@@ -375,16 +373,26 @@ uiButton* ui_make_button(Action action, void* action_data, Flags flags, str8 fil
 //-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // @Text
 void ui_gen_text(uiItem* item){DPZoneScoped;
-	if(item->tag != uiItemTag){
+	if(item->tag != uiTextTag){
 		item_error(item, "ui_gen_text() was called on an item whose tag is not uiTextTag");
 		return;
 	}
 
 	RenderDrawCounts counts = {0};
 	uiDrawCmd* dc = item->drawcmds;
-	Vertex2* vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
-	u32*     ip = (u32*)g_ui->index_arena->start + dc->index_offset;
+	Vertex2*   vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
+	u32*       ip = (u32*)g_ui->index_arena->start + dc->index_offset;
 	uiTextData* data = uiGetTextData(item);
+
+	//temp attempt at dynamic text
+	//TODO(sushi) this needs to be heaped
+	RenderDrawCounts nucounts = render_make_text_counts(data->text.count);
+	if(counts.vertices > dc->counts.vertices || counts.indices > dc->counts.vertices){
+		drawcmd_alloc(dc, nucounts);
+	    vp = (Vertex2*)g_ui->vertex_arena->start + dc->vertex_offset;
+		ip = (u32*)g_ui->index_arena->start + dc->index_offset;
+	}
+
 	render_make_text(vp, ip, counts, data->text, item->style.font, item->spos, item->style.text_color, vec2::ONE * item->style.font_height / item->style.font->max_height);
 	//NOTE(sushi) text size is always determined here and NEVER set by the user
 	//TODO(sushi) text sizing should probably be moved to eval_item_branch and made to take into account wrapping
@@ -401,6 +409,7 @@ uiItem* ui_make_text(str8 text, uiStyle* style, str8 file, upt line){DPZoneScope
 	item->memsize = sizeof(uiItem) + sizeof(uiTextData);
 	item->drawcmds = (uiDrawCmd*)arena_add(drawcmd_arena, sizeof(uiDrawCmd)); 
 	item->__generate = &ui_gen_text;
+	item->trailing_data = item + sizeof(uiItem);
 
 	RenderDrawCounts counts = render_make_text_counts(str8_length(text));
 	
@@ -620,7 +629,7 @@ void eval_item_branch(uiItem* item){DPZoneScoped;
             }
         }
     }
-	item->lpos = round(item->lpos);
+	//item->lpos = round(item->lpos);
 }
 
 void drag_item(uiItem* item){DPZoneScoped;
@@ -661,18 +670,17 @@ pair<vec2,vec2> ui_recur(TNode* node){DPZoneScoped;
 	uiItem* item = uiItemFromNode(node);
 	uiItem* parent = uiItemFromNode(node->parent);
 	
-	
-	if(item->action){
-		if(HasFlag(item->style.flags, uiFlag_ActAlways))
+	if(item->action && item->action_trigger){
+		if(item->action_trigger == action_act_always)
 			item->action(item);
 		else if(g_ui->hovered==item){
-			if     (HasFlag(item->style.flags, uiFlag_ActOnMouseHover))
+			if     (item->action_trigger == action_act_mouse_hover)
 				item->action(item);
-			else if(HasFlag(item->style.flags, uiFlag_ActOnMousePressed) && input_lmouse_pressed())
+			else if(item->action_trigger == action_act_mouse_pressed && input_lmouse_pressed())
 			    item->action(item);
-			else if(HasFlag(item->style.flags, uiFlag_ActOnMouseReleased) && input_lmouse_released())
+			else if(item->action_trigger == action_act_mouse_released && input_lmouse_released())
 				item->action(item);
-			else if(HasFlag(item->style.flags, uiFlag_ActOnMouseDown) && input_lmouse_down())
+			else if(item->action_trigger == action_act_mouse_down && input_lmouse_down())
 			    item->action(item);
 		}
 	}
@@ -776,7 +784,9 @@ void ui_debug(){
 		style->positioning = pos_draggable_relative;
 		style->background_color = color(14,14,14);
 		style->border_style = border_solid;
+		window->id = STR8("_ui_ debug win");
 		__ui_dwi.text = uiTextM((str8{0,0}));
+		__ui_dwi.text->id = STR8("_ui_ debug win text");
 		window->action=[](uiItem* item){
 			uiTextData* text = uiGetTextData(((__ui_debug_win_info*)(item->trailing_data))->text);
 			uiItem* hov = g_ui->hovered;
@@ -809,9 +819,8 @@ void ui_debug(){
 				"      text_color: ", hov->style.text_color, "\n"
 				"        overflow: ", hov->style.overflow, "\n"
 			);
-
-			
-
+			text->text = str8{(u8*)s.str, s.count};
+			item->dirty = 1;
 		};
 	}
 }
