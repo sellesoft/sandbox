@@ -27,6 +27,7 @@
 #include "core/threading.h"
 #include "core/time.h"
 #include "core/ui.h"
+#include "core/ui2.h"
 #include "core/window.h"
 #include "core/file.h"
 #include "math/math.h"
@@ -47,6 +48,7 @@ int main(){
 	Storage::Init();
 	UI::Init();
 	cmd_init();
+	uiInit(0,0);
 	window_show(DeshWindow);
 	render_use_default_camera();
 	DeshThreadManager->init();
@@ -58,6 +60,7 @@ int main(){
 		update_editor();
 		console_update();
 		UI::Update();
+		uiUpdate();
 		render_update();
 		logger_update();
 		memory_clear_temp();
