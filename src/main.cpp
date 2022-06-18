@@ -423,39 +423,39 @@ int main(){
 
 
 	
-	{uiItem* container = uiItemB();
-		container->style.size = DeshWindow->dimensions;
-		container->style.content_align = {0,0};
-		container->id = STR8("container");
-		container->style.positioning = pos_draggable_relative;
-		{uiItem* win = uiItemB();
-			win->id = STR8("win");
-			win->style.background_color = color(14,14,14);
-			win->style.sizing = size_percent_y | size_square;
-			win->style.height = 92;
-			win->style.padding = {2,2};
-			win->style.content_align = {0,0};
+	// {uiItem* container = uiItemB();
+	// 	container->style.size = DeshWindow->dimensions;
+	// 	container->style.content_align = {0,0};
+	// 	container->id = STR8("container");
+	// 	container->style.positioning = pos_draggable_relative;
+	// 	{uiItem* win = uiItemB();
+	// 		win->id = STR8("win");
+	// 		win->style.background_color = color(14,14,14);
+	// 		win->style.sizing = size_percent_y | size_square;
+	// 		win->style.height = 92;
+	// 		win->style.padding = {2,2};
+	// 		win->style.content_align = {0,0};
 			
-			const u64 n = 100;
+	// 		const u64 n = 100;
 	
-			forI(n){
-				uiItem* item = uiItemBS(&win->style);
-				item->style.background_color = color((i%2?255:0), 100, 100);
-				item->style.border_style = border_solid;
-				item->style.border_width = 2;
-				item->action = [](uiItem* item){
-					item->style.content_align.x = 0;//(sin(DeshTotalTime/1000 + (u64)item)+1)/2;
-					item->style.content_align.y = 0;//(cos(DeshTotalTime/1000 + (u64)item)+1)/2;
-					item->style.height = Math::BoundedOscillation(90, 95, DeshTotalTime/500 + (u64)item*2*M_PI);
-				};
-				item->action_trigger = action_act_always;
-			}
+	// 		forI(n){
+	// 			uiItem* item = uiItemBS(&win->style);
+	// 			item->style.background_color = color((i%2?255:0), 100, 100);
+	// 			item->style.border_style = border_solid;
+	// 			item->style.border_width = 2;
+	// 			item->action = [](uiItem* item){
+	// 				item->style.content_align.x = 0;//(sin(DeshTotalTime/1000 + (u64)item)+1)/2;
+	// 				item->style.content_align.y = 0;//(cos(DeshTotalTime/1000 + (u64)item)+1)/2;
+	// 				item->style.height = Math::BoundedOscillation(90, 95, DeshTotalTime/500 + (u64)item*2*M_PI);
+	// 			};
+	// 			item->action_trigger = action_act_always;
+	// 		}
 
-			forI(n){
-				uiItemE();
-			} 
-		}uiItemE();
-	}uiItemE();
+	// 		forI(n){
+	// 			uiItemE();
+	// 		} 
+	// 	}uiItemE();
+	// }uiItemE();
 
 	// {uiItem* item = uiItemB();
 	// 	item->style.border_style = border_solid;
@@ -474,6 +474,28 @@ int main(){
 	// 	uiItemM()->style.size = {250,250};
 
 	// }
+
+
+	// uiItem* item0 = uiItemB();
+	// item0->style.size = {300,300};
+	// item0->style.background_color = Color_VeryDarkCyan;
+	// item0->style.padding = {10,10};
+	// item0->style.positioning = pos_draggable_relative;
+	// 	uiItem* item1 = uiItemB();
+	// 		item1->style.background_color = Color_Red;
+	// 		item1->style.size = {100,100};
+	// 		uiItem* item2 = uiItemB();
+	// 			item2->style.background_color = Color_Blue;
+	// 			item2->style.size = {50,50};
+	// 		uiItemE();
+	// 	uiItemE();
+	// 	uiItem* item3 = uiItemB();
+	// 		item3->style.background_color = Color_Green;
+	// 		item3->style.size = {100,100};
+	// 	uiItemE();
+	// uiItemE();
+
+	ui_demo();
 	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
@@ -539,6 +561,10 @@ int main(){
 
 		//item0->style.scry = 
 		//item0->dirty = 1;
+
+		//if(key_pressed(Key_SPACE)) item1->style.hidden = true;
+		//if(key_released(Key_SPACE)) item1->style.hidden = false;
+
 		
 		uiUpdate();
 		str8 fps = toStr8(avg_fps_v, " ", 1000/DeshTime->deltaTime).fin;
@@ -587,14 +613,16 @@ int main(){
 			//debug display item's child bbx
 			// Arena* itemA = g_ui->item_list->arena;
 			// render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
-			// forI(itemA->used / sizeof(uiItem)){
-			// 	uiItem* item = (uiItem*)itemA->start + i;
-			// 	//render_quad2(item->children_bbx_pos, item->children_bbx_size, Color_Red);
-			// 	Vertex2* ver = (Vertex2*)g_ui->vertex_arena->start + item->drawcmds->vertex_offset;
-			// 	u32* ind = (u32*)g_ui->index_arena->start + item->drawcmds->index_offset;
-			// 	for(u32 i = 0; i < item->drawcmds[0].counts.indices; i+=3){
-			// 		render_triangle2(ver[ind[i]].pos, ver[ind[i+1]].pos, ver[ind[i+2]].pos, Color_Red);
-			// 	}
+			// u8* cursor = itemA->start;
+			// while(cursor < itemA->start + itemA->used){
+			// 	uiItem* item = (uiItem*)cursor;
+			// 	render_quad2(item->children_bbx_pos, item->children_bbx_size, Color_Red);
+			// 	cursor+=item->memsize;
+			// 	//Vertex2* ver = (Vertex2*)g_ui->vertex_arena->start + item->drawcmds->vertex_offset;
+			// 	//u32* ind = (u32*)g_ui->index_arena->start + item->drawcmds->index_offset;
+			// 	//for(u32 i = 0; i < item->drawcmds[0].counts.indices; i+=3){
+			// 	//	render_triangle2(ver[ind[i]].pos, ver[ind[i+1]].pos, ver[ind[i+2]].pos, Color_Red);
+			// 	//}
 			// }
 
         }
