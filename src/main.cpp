@@ -54,7 +54,7 @@ int main(){
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
-	ui_demo();
+	//ui_demo();
 
 	init_editor();
 	//start main loop

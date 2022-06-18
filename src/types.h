@@ -111,9 +111,8 @@ struct Line{
 	str8 raw;
 	u64  index;
 	u64  count; //count of codepoints in line
-	//pointer to the first text chunk that occurs in the line
-	//NOTE(sushi) this chunk may not be aligned to the line
-	TextChunk* chunk; 
+	TextChunk* chunk; //pointer to the first text chunk that occurs in the line
+	u64 chunk_start;
 };	
 #define LineFromNode(x) CastFromMember(Line, node, x)
 #define NextLine(x) LineFromNode((x)->node.next)
@@ -134,6 +133,7 @@ struct Cursor{
 	s64   count;  //selection size, signed for selections in either direction
 	Line* line;
 	u64   line_start; //byte offset
+	u64   line_startcp;
 	TextChunk* chunk;
 	u64   chunk_start; //byte offset
 };

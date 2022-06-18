@@ -310,6 +310,8 @@ void load_file(str8 filepath){DPZoneScoped;
 		l->raw = line;
 		l->count = str8_length(line);
 		l->index = index++;
+		l->chunk = initial;
+		l->chunk_start = line.str - buffer.str;
 		NodeInsertPrev(&root_line, &l->node);
 		
 		static_arena->cursor += line.count;
@@ -334,6 +336,7 @@ void init_editor(){DPZoneScoped;
 	main_cursor.chunk = 0;
 	main_cursor.chunk_start = 0;
 	main_cursor.line_start = 0;
+	main_cursor.line_startcp = 0;
 	main_cursor.count = 0;
 	
 	load_config();
@@ -357,8 +360,13 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 		if(dc.codepoint == line_end_char){
 			dc.advance = line_end_length;
 			cursor->line_start = 0;
+			cursor->line_startcp = 0;
 			cursor->line = NextLine(cursor->line);
-		} else cursor->line_start += dc.advance;
+		} else{
+			cursor->line_start += dc.advance;
+			cursor->line_startcp++;
+		} 
+
 		if(cursor->chunk_start < cursor->chunk->raw.count){
 			cursor->chunk_start += dc.advance;
 		}else if(!IsRootChunk(cursor->chunk->node.next)){
@@ -370,20 +378,28 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 		count += dc.advance;
 	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
 		if(!cursor->chunk->offset && !cursor->chunk_start) return 0;
+		//NOTE(sushi) chunk must be evaluated first here becuase the cursor represents the character to its right
+		//            so it must be moved back first
 		count += utf8_move_back(cursor->chunk->raw.str+cursor->chunk_start);
 		count++;
-		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-		if(!IsRootLine(cursor->line->node.prev) && dc.codepoint == '\n'){//we can only hit a \n from here
-			count = line_end_length;
-			cursor->line = PrevLine(cursor->line);
-			cursor->line_start = cursor->line->raw.count - line_end_length;
-		} else cursor->line_start -= count;
 		if(cursor->chunk_start > 0){
 			cursor->chunk_start -= count;
 		}else if(!IsRootChunk(cursor->chunk->node.prev)){
 			cursor->chunk = PrevTextChunk(cursor->chunk);
 			cursor->chunk_start = cursor->chunk->raw.count;
-		}	
+		}
+
+		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		if(!IsRootLine(cursor->line->node.prev) && dc.codepoint == '\n'){//we can only hit a \n from here
+			count = line_end_length;
+			cursor->line = PrevLine(cursor->line);
+			cursor->line_start = cursor->line->raw.count - line_end_length;
+			cursor->line_startcp = cursor->line->count-1;
+		} else {
+			cursor->line_start -= count;
+			cursor->line_startcp--;
+		}
+			
 		cursor->count = 0;
 	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
 		u32 punc_codepoint;
@@ -395,7 +411,7 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
  			if(!move) break; //end of file
 			count+=move;
 			DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-			if      ( punc_codepoint && dc.codepoint != punc_codepoint) {break;}
+			if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
 			else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
 		}
 	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
@@ -409,10 +425,62 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 			if(!move) break; //beginning of file
 			count += move;
 			DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-			if     ( punc_codepoint && dc.codepoint != punc_codepoint) {break;}
+			if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
 			else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
 		}
 		if(count) move_cursor(cursor, binds.cursorRight);
+	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){
+		if(!IsRootLine(cursor->line->node.prev)){
+			Line* prev = PrevLine(cursor->line);
+			if(cursor->line_start > prev->count){
+				count += cursor->line_start;
+				cursor->line = prev;
+				cursor->line_start = prev->count;
+				cursor->chunk = prev->chunk;
+				cursor->chunk_start = prev->chunk_start + prev->raw.count - line_end_length; 
+			}else{
+				u32 codepoints = 0;
+				while(cursor->line_start){
+					count+=move_cursor(cursor, binds.cursorLeft);
+					codepoints++;
+				}
+				cursor->line = prev;
+				cursor->chunk = prev->chunk;
+				cursor->chunk_start = prev->chunk_start;
+				u64 sum = 0;
+				while(codepoints--){
+					sum+=move_cursor(cursor, binds.cursorRight);
+				}
+				count += prev->raw.count - sum;
+			}
+		}
+
+	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){
+		if(!IsRootLine(cursor->line->node.next)){
+			Line* next = NextLine(cursor->line);
+			if(cursor->line_start > next->count){
+				count += cursor->line_start;
+				cursor->line = next;
+				cursor->line_start = next->count;
+				cursor->chunk = next->chunk;
+				cursor->chunk_start = next->chunk_start + next->raw.count - line_end_length; 
+			}else{
+				u32 codepoints = 0;
+				while(cursor->line_start){
+					count+=move_cursor(cursor, binds.cursorLeft);
+					codepoints++;
+				}
+				cursor->line = next;
+				cursor->chunk = next->chunk;
+				cursor->chunk_start = next->chunk_start;
+				u64 sum = 0;
+				while(codepoints--){
+					sum+=move_cursor(cursor, binds.cursorRight);
+				}
+				count += next->raw.count - sum;
+			}
+		}
+
 	}
 	// u64 count = 0;
 	// if      (match_any(bind, binds.cursorLeft, binds.selectLeft)){////////////////////////////////////  Move/Select Left
@@ -1101,4 +1169,29 @@ void update_editor(){DPZoneScoped;
 			
         }
     }
+
+	{//cursor debug
+		render_start_cmd2(6, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+		str8 out = toStr8(
+			"chunk:        ", str8{main_cursor.chunk->raw.str, Min(main_cursor.chunk->raw.count, 10)}, "\n",
+			"chunk start:  ", main_cursor.chunk_start,                                                 "\n",
+			"line:         ", str8{main_cursor.line->raw.str,  Min(main_cursor.line->raw.count,  10)}, "\n",
+			"line start:   ", main_cursor.line_start,                                                  "\n",
+			"line startcp: ", main_cursor.line_startcp,                                                "\n",
+			"select count: ", main_cursor.count
+		).fin;
+		vec2 size = font_visual_size(config.font, out);
+		vec2 pos = DeshWindow->dimensions - size;
+		render_quad_filled2(DeshWindow->dimensions-size, size, Color_Black);
+		str8 scan = out;
+		f32 y = 0;
+		while(scan){
+			DecodedCodepoint dc = str8_advance(&scan);
+			if(dc.codepoint == U'\n'){
+				render_text2(config.font, str8{out.str, out.count - scan.count}, vec2{pos.x, pos.y+y}, vec2::ONE, Color_White);
+				out = scan;
+				y+=config.font->max_height;
+			}
+		}
+	}
 }
