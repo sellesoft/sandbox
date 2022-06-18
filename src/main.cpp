@@ -34,8 +34,6 @@
 // #  include "ui2.cpp"
 // #endif
 
-local uiContext deshi_ui{}; uiContext* g_ui = &deshi_ui;
-local uiStyle deshi_ui_initial_style{}; uiStyle* ui_initial_style = &deshi_ui_initial_style;
 f64 avg_fps_v;
 mutex avgfps_lock;
 void avg_fps(void* in){
@@ -74,7 +72,7 @@ int main(){
 	
 	DeshThreadManager->spawn_thread();
 	
-
+	
 	//Vertex2* vbuff = (Vertex2*)memalloc(sizeof(Vertex2)*100);
 	//RenderTwodIndex* ibuff = (RenderTwodIndex*)memalloc(sizeof(RenderTwodIndex)*300);
 	//RenderDrawCounts counts{0};
@@ -121,7 +119,7 @@ int main(){
 	}
 	uiInit(g_memory, g_ui);
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
-
+	
 	// uiItem* fpstext;
 	// uiItem* fpswin = uiItemB();{
 	// 	fpswin->style.background_color = color(14,14,14);
@@ -196,7 +194,7 @@ int main(){
 	// 	uiItemE();
 	// }
 	
-
+	
 	// uiStyle style{}; style=*ui_initial_style;
 	// style.padding = {1,1};
 	// style.tl = {100,100};
@@ -213,7 +211,7 @@ int main(){
 	// forI(n){
 	// 	uiItemE();
 	// }
-
+	
 	
 	
 	// uiStyle style{};style = *ui_initial_style;
@@ -294,7 +292,7 @@ int main(){
 	// 	style.background_color = Color_Red;
 	// 	uiItemMS(&style);
 	// }uiItemE();
-
+	
 	// uiStyle style{}; style=*ui_initial_style;
 	// style.background_color = Color_VeryDarkCyan;
 	// style.border_style = border_solid;
@@ -304,7 +302,7 @@ int main(){
 	// uiItem* item0;
 	// uiItem* item1;
 	// uiItem* item2;
-
+	
 	// item0 = uiItemBS(&style);{
 	// 	style=*ui_initial_style;
 	// 	style.background_color = Color_Green;
@@ -316,7 +314,7 @@ int main(){
 	// 		item2 = uiItemMS(&style);
 	// 	}uiItemE();
 	// }uiItemE();
-
+	
 	// item0->id = STR8("item0");
 	// item1->id = STR8("item1");
 	
@@ -329,10 +327,10 @@ int main(){
 	// 	style.background_color = color(0,0,155);
 	// 	style.size = {100,100};
 	// 	uiItemBS(&style)->id=STR8("item1");{
-
+	
 	// 	}uiItemE();	
 	// }uiItemE();
-
+	
 	// uiStyle style{}; style=*ui_initial_style;
 	// style.size = {300,300};
 	// style.background_color = Color_DarkCyan;
@@ -348,8 +346,8 @@ int main(){
 	// 		items[i]=uiItemMS(&style);
 	// 	}
 	// }uiItemE();
-
-
+	
+	
 	// uiStyle style{}; style=*ui_initial_style;
 	// style.size = {300,300};
 	// style.background_color = color(100,150,200);
@@ -382,7 +380,7 @@ int main(){
 	// 			item->style.background_color = color(255*(sin(DeshTotalTime)+1)/2, 100, 255*(cos(DeshTotalTime)+1)/2);
 	// 		};
 	// }uiItemE();
-
+	
 	// f32 a = 2;
 	// uiItem* item0 = uiItemB();
 	// 	item0->id=STR8("item0");
@@ -404,24 +402,24 @@ int main(){
 	// style.focus = true;
 	// style.size = {300,300};
 	// style.positioning = pos_draggable_fixed;
-
+	
 	// uiItem* item0 = uiItemB();{
 	// 	item0->style.size = {300,300};
 	// 	item0->style.background_color = Color_VeryDarkCyan;
 	// 	item0->style.padding = {0,0};
 	// 	item0->style.positioning = pos_draggable_relative;
 	// 	item0->style.overflow = overflow_scroll;
-		
+	
 	// 	forI(301){
 	// 		uiItem* item = uiItemM();
 	// 		item->style.background_color = color(f32(i)/300*255,100,100);
 	// 		item->style.size = {20,1};
 	// 	}	
 	// }uiItemE();
-
+	
 	//ui_debug();
-
-
+	
+	
 	
 	// {uiItem* container = uiItemB();
 	// 	container->style.size = DeshWindow->dimensions;
@@ -435,7 +433,7 @@ int main(){
 	// 		win->style.height = 92;
 	// 		win->style.padding = {2,2};
 	// 		win->style.content_align = {0,0};
-			
+	
 	// 		const u64 n = 100;
 	
 	// 		forI(n){
@@ -450,13 +448,13 @@ int main(){
 	// 			};
 	// 			item->action_trigger = action_act_always;
 	// 		}
-
+	
 	// 		forI(n){
 	// 			uiItemE();
 	// 		} 
 	// 	}uiItemE();
 	// }uiItemE();
-
+	
 	// {uiItem* item = uiItemB();
 	// 	item->style.border_style = border_solid;
 	// 	item->style.positioning = pos_draggable_relative;
@@ -465,17 +463,17 @@ int main(){
 	// 		item->style.border_width = BoundTimeOsc(1, 10);
 	// 	};
 	// }uiItemE();
-
+	
 	// {uiItem* cont = uiItemB();
 	// 	cont->style.size = {500,500};
 	// 	cont->style.content_align = {0.5,0.5};
 	// 	cont->style.background_color = color(50,100,100);
 	// 	cont->style.margin = {100,100};
 	// 	uiItemM()->style.size = {250,250};
-
+	
 	// }
-
-
+	
+	
 	// uiItem* item0 = uiItemB();
 	// item0->style.size = {300,300};
 	// item0->style.background_color = Color_VeryDarkCyan;
@@ -494,7 +492,7 @@ int main(){
 	// 		item3->style.size = {100,100};
 	// 	uiItemE();
 	// uiItemE();
-
+	
 	ui_demo();
 	
 	//start main loop
@@ -502,7 +500,7 @@ int main(){
 		f32 t = DeshTotalTime/1000;
 		//DeshThreadManager->add_job({avg_fps,0});
 		//DeshThreadManager->wake_threads();
-
+		
 		//item0->style.border_width = BoundTimeOsc(1, 10);
 		//render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
 #if DESHI_RELOADABLE_UI
@@ -558,24 +556,24 @@ int main(){
 		// 	items[i]->style.border_width = 10*(sin(t+i)+1)/2; 
 		// 	if(items[i]->style.border_width < 1) items[i]->style.border_width = 0; 
 		// }
-
+		
 		//item0->style.scry = 
 		//item0->dirty = 1;
-
+		
 		//if(key_pressed(Key_SPACE)) item1->style.hidden = true;
 		//if(key_released(Key_SPACE)) item1->style.hidden = false;
-
+		
 		
 		uiUpdate();
 		str8 fps = toStr8(avg_fps_v, " ", 1000/DeshTime->deltaTime).fin;
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
 		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, fps, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
 		
-
+		
         {
 			//item0->style.border_width = 100*(sin(DeshTotalTime/3000)+1)/2;
 			//item1->style.margin = vec2::ONE*10*(sin(DeshTotalTime/3000)+1)/2;
-
+			
             using namespace UI;
             // Begin(STR8("debuggingUIwithUI"));{
 			// 	// string item0p = toStr("item0 pos: ", item0->style.tl);
@@ -589,17 +587,17 @@ int main(){
 				render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
 				render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
 			}
-
+			
 			// item1->style.positioning = pos_relative;
 			// item1->style.left = BoundTimeOsc(-100, 400);
-
+			
 			// item2->style.positioning = pos_relative;
 			// item2->style.top = BoundTimeOsc(-100,400);
 			//item1->style.margin = vec2::ONE * 10 * (sin(t)+1)/2;
 			// forI(10){
 			// 	items[i]->style.margin = vec2::ONE * 10 * (sin(t)+1)/2;
 			// }
-
+			
 			// if(g_ui->hovered){
 			// 	Font* f = g_ui->base.style.font;
 			// 	render_start_cmd2(6, f->tex, vec2::ZERO, DeshWindow->dimensions);
@@ -609,7 +607,7 @@ int main(){
 			// 	render_text2(f, {(u8*)s.str, s.count}, floor(g_ui->hovered->spos), vec2::ONE, Color_White);
 			// }
 			
-
+			
 			//debug display item's child bbx
 			// Arena* itemA = g_ui->item_list->arena;
 			// render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
@@ -624,7 +622,7 @@ int main(){
 			// 	//	render_triangle2(ver[ind[i]].pos, ver[ind[i+1]].pos, ver[ind[i+2]].pos, Color_Red);
 			// 	//}
 			// }
-
+			
         }
 		
 		//console_update();
