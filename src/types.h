@@ -105,14 +105,25 @@ struct KeyBinds{
     KeyCode reloadConfig;
 };
 
+struct Buffer{
+	str8 upperbloc;
+	str8 lowerbloc;
+	u64  gap_size;
+	u64  capacity;
+
+	u64* line_starts;
+	u64  line_starts_count;
+};
+
+#define UserToGapSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count?(idx)+(buffer)->gap_size:(idx))
+#define GapToUserSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count+(buffer)->gap_size?(idx)-(buffer)->gap_size:idx)
+
 struct TextChunk;
 struct Line{
 	Node node;
 	str8 raw;
 	u64  index;
 	u64  count; //count of codepoints in line
-	TextChunk* chunk; //pointer to the first text chunk that occurs in the line
-	u64 chunk_start;
 };	
 #define LineFromNode(x) CastFromMember(Line, node, x)
 #define NextLine(x) LineFromNode((x)->node.next)
