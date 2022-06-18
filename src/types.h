@@ -21,7 +21,7 @@ struct Config{
 	b32 show_symbol_whitespace; //spaces and tabs
 	b32 show_symbol_eol; //carraige return and newline
 	b32 show_symbol_wordwrap; //word wrap symbol
-
+	
 	f32 repeat_hold;     //ms time to wait before allowing an input to repeat
 	f32 repeat_throttle; //ms time between repeating a held input
 	
@@ -46,11 +46,11 @@ typedef KeyCode Bind; enum{
     Bind_SelectLeft  = Key_LEFT  | InputMod_AnyShift,
     Bind_SelectWordLeft  = Key_LEFT  | InputMod_AnyShift | InputMod_AnyCtrl,
     Bind_SelectWordPartLeft  = Key_LEFT  | InputMod_AnyShift | InputMod_AnyAlt,
-
+	
     Bind_SelectRight = Key_RIGHT | InputMod_AnyShift,
     Bind_SelectWordRight = Key_RIGHT | InputMod_AnyShift | InputMod_AnyCtrl,
     Bind_SelectWordPartRight = Key_RIGHT | InputMod_AnyShift | InputMod_AnyAlt,
-
+	
     Bind_SelectUp    = Key_UP    | InputMod_AnyShift,
     Bind_SelectDown  = Key_DOWN  | InputMod_AnyShift,
 	
@@ -63,7 +63,7 @@ typedef KeyCode Bind; enum{
 	Bind_DeleteWordPartRight = Key_DELETE | InputMod_AnyAlt,
 	
     Bind_SaveBuffer = Key_S | InputMod_AnyCtrl,
-
+	
     Bind_ReloadConfig = Key_F5 | InputMod_AnyCtrl,
 };
 
@@ -84,11 +84,11 @@ struct KeyBinds{
     KeyCode selectLeft;
     KeyCode selectWordLeft;
     KeyCode selectWordPartLeft;
-
+	
     KeyCode selectRight;
     KeyCode selectWordRight;
     KeyCode selectWordPartRight;
-
+	
     KeyCode selectUp;
     KeyCode selectDown;
 	
@@ -101,7 +101,7 @@ struct KeyBinds{
 	KeyCode deleteWordPartRight;
 	
     KeyCode saveBuffer;
-
+	
     KeyCode reloadConfig;
 };
 
@@ -146,7 +146,7 @@ enum{
 	CursorShape_FilledRectangle,
 };
 
-global_ str8 CursorShapeStrs[] = {
+global str8 CursorShapeStrs[] = {
 	STR8("VerticalLine"),
 	STR8("VerticalLineThick"),
 	STR8("Underline"),

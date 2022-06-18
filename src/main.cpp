@@ -31,14 +31,9 @@
 #include "core/file.h"
 #include "math/math.h"
 
-#if BUILD_INTERNAL
-#include "misc_testing.cpp"
-#endif
-
 //// text editor includes ////
 #include "types.h"
 #include "textedit.cpp"
-
 
 int main(){
 	//init deshi
@@ -56,7 +51,7 @@ int main(){
 	render_use_default_camera();
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
-
+	
 	init_editor();
 	//start main loop
 	while(platform_update()){DPZoneScoped;

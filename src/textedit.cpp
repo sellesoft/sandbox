@@ -38,7 +38,7 @@ u32 line_end_length; //either 1 or 2, so we dont have to keep checking what buff
 Config config;
 KeyBinds binds;
 #define CMI(name, type, var) ConfigMapItem{STR8(name), (type), (var)}
-global_ ConfigMapItem ConfigMap[] = {
+global ConfigMapItem ConfigMap[] = {
 	CMI("#---------------------------------#", ConfigValueType_NONE, 0),
 	CMI("////////// Buffer Config //////////", ConfigValueType_NONE, 0),
 	CMI("#---------------------------------#", ConfigValueType_NONE, 0),
@@ -101,7 +101,7 @@ global_ ConfigMapItem ConfigMap[] = {
 	CMI("\n",                     ConfigValueType_PADSECTION, (void*)14),
     CMI("save_buffer",            ConfigValueType_KeyMod, &binds.saveBuffer),
     CMI("reload_config",          ConfigValueType_KeyMod, &binds.reloadConfig),
-
+	
 };
 #undef CMI
 
@@ -138,43 +138,43 @@ void load_config(){DPZoneScoped;
 		
 		config.font                   = Storage::CreateFontFromFile(STR8("gohufont-11.bdf"), 11).second;
 		config.font_height            = 11; 
-
+		
 		binds.cursorLeft          = Key_LEFT | InputMod_None;
 		binds.cursorWordLeft      = Key_LEFT | InputMod_AnyCtrl;
 		binds.cursorWordPartLeft  = Key_LEFT | InputMod_AnyAlt;
-    
+		
 		binds.cursorRight         = Key_RIGHT | InputMod_None;
 		binds.cursorWordRight     = Key_RIGHT | InputMod_AnyCtrl;
 		binds.cursorWordPartRight = Key_RIGHT | InputMod_AnyAlt;
-    
+		
 		binds.cursorUp            = Key_UP    | InputMod_None;
 		binds.cursorDown          = Key_DOWN  | InputMod_None;
-	
+		
 		binds.cursorAnchor        = Key_SPACE | InputMod_AnyCtrl;
-	
+		
 		binds.selectLeft          = Key_LEFT  | InputMod_AnyShift;
 		binds.selectWordLeft      = Key_LEFT  | InputMod_AnyShift | InputMod_AnyCtrl;
 		binds.selectWordPartLeft  = Key_LEFT  | InputMod_AnyShift | InputMod_AnyAlt;
-
+		
 		binds.selectRight         = Key_RIGHT | InputMod_AnyShift;
 		binds.selectWordRight     = Key_RIGHT | InputMod_AnyShift | InputMod_AnyCtrl;
 		binds.selectWordPartRight = Key_RIGHT | InputMod_AnyShift | InputMod_AnyAlt;
-
+		
 		binds.selectUp            = Key_UP    | InputMod_AnyShift;
 		binds.selectDown          = Key_DOWN  | InputMod_AnyShift;
-	
+		
 		binds.deleteLeft          = Key_BACKSPACE | InputMod_None;
 		binds.deleteWordLeft      = Key_BACKSPACE | InputMod_AnyCtrl;
 		binds.deleteWordPartLeft  = Key_BACKSPACE | InputMod_AnyAlt;
-	
+		
 		binds.deleteRight         = Key_DELETE | InputMod_None;
 		binds.deleteWordRight     = Key_DELETE | InputMod_AnyCtrl;
 		binds.deleteWordPartRight = Key_DELETE | InputMod_AnyAlt;
-	
+		
 		binds.saveBuffer          = Key_S | InputMod_AnyCtrl;
-
+		
 		binds.reloadConfig        = Key_F5 | InputMod_AnyCtrl;
-
+		
 		config_save(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
 	}
 	else{
@@ -255,7 +255,7 @@ void load_file(str8 filepath){DPZoneScoped;
 	initial->raw = buffer;
 	initial->offset = 0;
 	NodeInsertPrev(&root_chunk, &initial->node);
-
+	
 	u32 index = 0;
 	str8 remaining = buffer;
     while(remaining){
@@ -312,14 +312,6 @@ void init_editor(){DPZoneScoped;
 //calculates the length of a line that a chunk is currently on in codepoints 
 u64 calc_line_length(TextChunk* chunk){
 	return 0;
-}
-
-u64 utf8_move_back(u8* start){DPZoneScoped;
-	u64 count = 0;
-	while(utf8_continuation_byte(*(start-1))){
-		start--; count++;
-	}
-	return count;
 }
 
 //returns the number of bytes the cursor moved
@@ -395,7 +387,7 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	// 	for(;;){
 	// 		if(cursor->start > 0){
 	// 			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-				
+	
 	// 			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
 	// 				cursor->start -= 1;
 	// 				count++;
@@ -403,16 +395,16 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	// 			count++;
 	// 			cursor->start -= 1;
 	// 			cursor->count  = 0;
-				
+	
 	// 			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
 	// 			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
 	// 			if(cursor->start == 0 && cursor->chunk->node.prev != &root_chunk && TextChunkFromNode(cursor->chunk->node.prev)->newline) break;
 	// 		}else if(cursor->chunk->node.prev != &root_chunk){
 	// 			cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
 	// 			cursor->start = cursor->chunk->raw.count;
-				
+	
 	// 			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-				
+	
 	// 			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
 	// 				cursor->start -= 1;
 	// 				count++;
@@ -420,7 +412,7 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	// 			count++;
 	// 			cursor->start -= 1;
 	// 			cursor->count  = 0;
-				
+	
 	// 			if(cursor->chunk->newline){ cursor->start += 1; break; }
 	// 			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
 	// 			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
@@ -452,11 +444,11 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	// 		if(cursor->start < cursor->chunk->raw.count){
 	// 			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
 	// 			if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-				
+	
 	// 			cursor->start += dc.advance;
 	// 			cursor->count  = 0;
 	// 			count += dc.advance;
-				
+	
 	// 			if(cursor->start >= cursor->chunk->raw.count){
 	// 				if(cursor->chunk->newline) break;
 	// 			}else{
@@ -468,10 +460,10 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	// 			cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
 	// 			cursor->start = 0;
 	// 			cursor->count = 0;
-				
+	
 	// 			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
 	// 			if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-				
+	
 	// 			if(prev_chunk->newline) break;
 	// 			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
 	// 			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
@@ -558,18 +550,18 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 void index_lines(){
 	linelock.lock();
 	Cursor cursor;
-
+	
 	if(!root_line_chunks.next){//initialize
 		TextChunk* init = new_chunk();
 		NodeInsertNext(&root_line_chunks, &init->node);
 	}
-
+	
 	TextChunk* curline = TextChunkFromNode(root_line_chunks.next);
 	TextChunk* line_start = TextChunkFromNode(root_chunk.next);
 	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
 		
 	}
-
+	
 	linelock.unlock();
 	platform_sleep(100);
 }
@@ -578,7 +570,7 @@ void index_lines(){
 void text_insert(str8 text){DPZoneScoped;
 	Arena* edit_arena = *edit_arenas.last;
 	TextChunk* curchunk = main_cursor.chunk;
-
+	
 	if(main_cursor.chunk_start != curchunk->raw.count || curchunk != current_edit_chunk){
 		if(main_cursor.chunk_start == curchunk->raw.count){
 			TextChunk* prev = new_chunk();
@@ -592,7 +584,7 @@ void text_insert(str8 text){DPZoneScoped;
 			TextChunk* prev = new_chunk();
 			TextChunk* next = new_chunk();
 			prev->raw = {curchunk->raw.str, (s64)main_cursor.chunk_start};
-			next->raw = {curchunk->raw.str + main_cursor.chunk_start, curchunk->raw.count - (s64)main_cursor.start};
+			next->raw = {curchunk->raw.str + main_cursor.chunk_start, curchunk->raw.count - (s64)main_cursor.chunk_start};
 			NodeInsertPrev(&curchunk->node, &prev->node);
 			NodeInsertNext(&curchunk->node, &next->node);	
 		}
@@ -604,10 +596,10 @@ void text_insert(str8 text){DPZoneScoped;
 	while(text){
 		DecodedCodepoint dc = str8_advance(&text);
 		if(dc.codepoint == '\b'){
-
+			
 		}else if(dc.codepoint == 0x1b){}//do nothing on ESC
 		else{
-
+			
 		}
 		
 	}
@@ -617,7 +609,7 @@ void text_insert(str8 text){DPZoneScoped;
 	// 		TextChunk* next = new_chunk();
 	// 		memcpy(next, curchunk, sizeof(TextChunk));
 	// 		NodeInsertNext(&curchunk->node,&next->node);
-			
+	
 	// 		curchunk->newline = 0;
 	// 	}
 	// 	else if (main_cursor.start == main_cursor.chunk->raw.count){
@@ -639,10 +631,10 @@ void text_insert(str8 text){DPZoneScoped;
 	// 		next->fg = curchunk->fg;
 	// 		next->offset = curchunk->offset + main_cursor.start;
 	// 		next->newline = curchunk->newline;
-			
+	
 	// 		NodeInsertPrev(&curchunk->node, &prev->node);
 	// 		NodeInsertNext(&curchunk->node, &next->node);
-			
+	
 	// 		curchunk->newline = 0;
 	// 	}
 	// 	current_edit_chunk = curchunk;
@@ -681,7 +673,7 @@ void text_delete_left(){DPZoneScoped;
 	// 		curchunk->raw.str = edit_arena->cursor;
 	// 		edit_arena->cursor += curchunk->raw.count;
 	// 		edit_arena->used += curchunk->raw.count;
-			
+	
 	// 		current_edit_chunk = curchunk;
 	// 	}
 	// 	else{ //split chunk 
@@ -691,12 +683,12 @@ void text_delete_left(){DPZoneScoped;
 	// 		next->fg = curchunk->fg;
 	// 		next->offset = curchunk->offset + main_cursor.start;
 	// 		next->newline = curchunk->newline;
-			
+	
 	// 		curchunk->raw.count = main_cursor.start;
 	
-			
+	
 	// 		NodeInsertNext(&curchunk->node, &next->node);
-			
+	
 	// 		if(edit_arena->used + DeshInput->charCount > edit_arena->size){
 	// 			edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	// 			edit_arena = *edit_arenas.last;
@@ -741,7 +733,7 @@ void text_delete_right(){DPZoneScoped;
 	// 		curchunk->raw.str = edit_arena->cursor;
 	// 		edit_arena->cursor += curchunk->raw.count;
 	// 		edit_arena->used += curchunk->raw.count;
-			
+	
 	// 		current_edit_chunk = curchunk;
 	// 	}
 	// 	else{ //split chunk 
@@ -751,14 +743,14 @@ void text_delete_right(){DPZoneScoped;
 	// 		prev->fg = curchunk->fg;
 	// 		prev->offset = curchunk->offset;
 	// 		prev->newline = 0;
-			
+	
 	// 		curchunk->raw.str += main_cursor.start;
 	// 		curchunk->raw.count = curchunk->raw.count - main_cursor.start;
-			
+	
 	// 		main_cursor.start = 0;
-			
+	
 	// 		NodeInsertPrev(&curchunk->node, &prev->node);
-			
+	
 	// 		if(edit_arena->used + DeshInput->charCount > edit_arena->size){
 	// 			edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	// 			edit_arena = *edit_arenas.last;
@@ -918,8 +910,8 @@ void update_editor(){DPZoneScoped;
 		reset_stopwatch(&repeat_throttle);
 		repeat = 1;
 	}
-	#define CanDoInput(x) (key_pressed(x) || key_down(x) && repeat)
-
+#define CanDoInput(x) (key_pressed(x) || key_down(x) && repeat)
+	
 	//// cursor movement ////
 	if(CanDoInput(binds.cursorLeft))          { move_cursor(&main_cursor, binds.cursorLeft);}
 	if(CanDoInput(binds.cursorWordLeft))      { move_cursor(&main_cursor, binds.cursorWordLeft); }
@@ -929,7 +921,7 @@ void update_editor(){DPZoneScoped;
 	if(CanDoInput(binds.cursorWordPartRight)) { move_cursor(&main_cursor, binds.cursorWordPartRight); }
 	if(CanDoInput(binds.cursorUp))            { move_cursor(&main_cursor, binds.cursorUp); }
 	if(CanDoInput(binds.cursorDown))          { move_cursor(&main_cursor, binds.cursorDown); }
-
+	
 	//// text input ////
 	if(DeshInput->charCount){ 
         text_insert({DeshInput->charIn, (s64)DeshInput->charCount});
