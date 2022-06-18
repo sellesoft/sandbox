@@ -29,13 +29,32 @@
 #include "core/file.h"
 #include "math/math.h"
 
-#include "ui2.h"
-#if !DESHI_RELOADABLE_UI
-#  include "ui2.cpp"
-#endif
+#include "core/ui2.h"
+// #if !DESHI_RELOADABLE_UI
+// #  include "ui2.cpp"
+// #endif
 
 local uiContext deshi_ui{}; uiContext* g_ui = &deshi_ui;
 local uiStyle deshi_ui_initial_style{}; uiStyle* ui_initial_style = &deshi_ui_initial_style;
+f64 avg_fps_v;
+mutex avgfps_lock;
+void avg_fps(void* in){
+	const u64 nframes = 1000;
+	static f64 fpsarr[nframes] = {0};
+	static u32 idx = 0;
+	if(avgfps_lock.try_lock()){
+		//uiTextData* text = uiGetTextData((uiItem*)in);
+		fpsarr[idx++] = DeshTime->deltaTime;
+		idx %= nframes;
+		f64 sum = 0;
+		forI(nframes){
+			sum += fpsarr[i];
+		}
+		//text->text = toStr8(sum/100).fin;
+		avg_fps_v = sum/nframes;
+		avgfps_lock.unlock();
+	}
+}
 
 int main(){
 	//init deshi
@@ -51,8 +70,11 @@ int main(){
 	cmd_init();
 	window_show(DeshWindow);
     render_use_default_camera();
-	DeshThreadManager->init();
+	DeshThreadManager->init(1);
 	
+	DeshThreadManager->spawn_thread();
+	
+
 	//Vertex2* vbuff = (Vertex2*)memalloc(sizeof(Vertex2)*100);
 	//RenderTwodIndex* ibuff = (RenderTwodIndex*)memalloc(sizeof(RenderTwodIndex)*300);
 	//RenderDrawCounts counts{0};
@@ -99,7 +121,19 @@ int main(){
 	}
 	uiInit(g_memory, g_ui);
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
-	
+
+	// uiItem* fpstext;
+	// uiItem* fpswin = uiItemB();{
+	// 	fpswin->style.background_color = color(14,14,14);
+	// 	fpswin->style.padding = {10,10};
+	// 	fpswin->style.border_style = border_solid;
+	// 	fpstext = uiTextML("                 "); //space to reserve room for vertices
+	// 	fpstext->action = [](uiItem* item){
+	// 		DeshThreadManager->add_job({avg_fps,item});
+	// 		DeshThreadManager->wake_threads();
+	// 	};
+	// 	fpstext->action_trigger = action_act_always;
+	// }uiItemE();
 	
 	// uiItem* item0 = 0;
 	// uiItem* item1 = 0;
@@ -301,9 +335,9 @@ int main(){
 
 	// uiStyle style{}; style=*ui_initial_style;
 	// style.size = {300,300};
-	// style.background_color = Color_Green;
+	// style.background_color = Color_DarkCyan;
 	// style.positioning = pos_draggable_relative;
-	// style.content_align = {0.5,1};
+	// style.content_align = {0.5,0.5};
 	// uiItem* items[10];
 	// uiItemBS(&style);{
 	// 	style.positioning = pos_static;
@@ -349,31 +383,104 @@ int main(){
 	// 		};
 	// }uiItemE();
 
-	f32 a = 2;
-	uiItem* item0 = uiItemB();
-		item0->id=STR8("item0");
-		item0->style.background_color = color(14,14,14);
-		item0->style.border_style = border_solid;
-		item0->style.size = {100,100};
-		item0->style.padding = {10,10};
-		item0->style.margin;
-		item0->style.positioning = pos_draggable_relative;
-		uiItem* item = uiSliderf32(0, 10, &a);
-		item->style.background_color = Color_White;
-		item->style.size = {80,10};
-		item->id=STR8("slider");
-		uiGetSliderData(item)->style.rail_thickness = 0.5;
-		item->style.sizing = size_percent_x;
-		item->style.width = 100;
+	// f32 a = 2;
+	// uiItem* item0 = uiItemB();
+	// 	item0->id=STR8("item0");
+	// 	item0->style.background_color = color(14,14,14);
+	// 	item0->style.border_style = border_solid;
+	// 	item0->style.size = {100,100};
+	// 	item0->style.padding = {10,10};
+	// 	item0->style.margin;
+	// 	item0->style.positioning = pos_draggable_relative;
+	// 	uiItem* item = uiSliderf32(0, 10, &a);
+	// 	item->style.background_color = Color_White;
+	// 	item->style.size = {80,10};
+	// 	item->id=STR8("slider");
+	// 	uiGetSliderData(item)->style.rail_thickness = 0.5;
+	// 	item->style.sizing = size_percent_x;
+	// 	item->style.width = 100;
 	
+	// uiStyle style{}; style=*ui_initial_style;
+	// style.focus = true;
+	// style.size = {300,300};
+	// style.positioning = pos_draggable_fixed;
+
+	// uiItem* item0 = uiItemB();{
+	// 	item0->style.size = {300,300};
+	// 	item0->style.background_color = Color_VeryDarkCyan;
+	// 	item0->style.padding = {0,0};
+	// 	item0->style.positioning = pos_draggable_relative;
+	// 	item0->style.overflow = overflow_scroll;
+		
+	// 	forI(301){
+	// 		uiItem* item = uiItemM();
+	// 		item->style.background_color = color(f32(i)/300*255,100,100);
+	// 		item->style.size = {20,1};
+	// 	}	
+	// }uiItemE();
 
 	//ui_debug();
+
+
+	
+	{uiItem* container = uiItemB();
+		container->style.size = DeshWindow->dimensions;
+		container->style.content_align = {0,0};
+		container->id = STR8("container");
+		container->style.positioning = pos_draggable_relative;
+		{uiItem* win = uiItemB();
+			win->id = STR8("win");
+			win->style.background_color = color(14,14,14);
+			win->style.sizing = size_percent_y | size_square;
+			win->style.height = 92;
+			win->style.padding = {2,2};
+			win->style.content_align = {0,0};
+			
+			const u64 n = 100;
+	
+			forI(n){
+				uiItem* item = uiItemBS(&win->style);
+				item->style.background_color = color((i%2?255:0), 100, 100);
+				item->style.border_style = border_solid;
+				item->style.border_width = 2;
+				item->action = [](uiItem* item){
+					item->style.content_align.x = 0;//(sin(DeshTotalTime/1000 + (u64)item)+1)/2;
+					item->style.content_align.y = 0;//(cos(DeshTotalTime/1000 + (u64)item)+1)/2;
+					item->style.height = Math::BoundedOscillation(90, 95, DeshTotalTime/500 + (u64)item*2*M_PI);
+				};
+				item->action_trigger = action_act_always;
+			}
+
+			forI(n){
+				uiItemE();
+			} 
+		}uiItemE();
+	}uiItemE();
+
+	// {uiItem* item = uiItemB();
+	// 	item->style.border_style = border_solid;
+	// 	item->style.positioning = pos_draggable_relative;
+	// 	item->style.size = {100,100};
+	// 	item->action = [](uiItem* item){
+	// 		item->style.border_width = BoundTimeOsc(1, 10);
+	// 	};
+	// }uiItemE();
+
+	// {uiItem* cont = uiItemB();
+	// 	cont->style.size = {500,500};
+	// 	cont->style.content_align = {0.5,0.5};
+	// 	cont->style.background_color = color(50,100,100);
+	// 	cont->style.margin = {100,100};
+	// 	uiItemM()->style.size = {250,250};
+
+	// }
 	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		f32 t = DeshTotalTime/1000;
-		uiGetSliderData(item)->style.colors.dragger.r = 255*(sin(t)+1)/2;
-		item0->style.padding = vec2::ONE * 10 * (sin(t)+1)/2;
+		//DeshThreadManager->add_job({avg_fps,0});
+		//DeshThreadManager->wake_threads();
+
 		//item0->style.border_width = BoundTimeOsc(1, 10);
 		//render_start_cmd2_exbuff(buff, 0, counts.indices, vbuff, ibuff, 5, 0, vec2::ZERO, DeshWindow->dimensions);
 #if DESHI_RELOADABLE_UI
@@ -430,10 +537,13 @@ int main(){
 		// 	if(items[i]->style.border_width < 1) items[i]->style.border_width = 0; 
 		// }
 
+		//item0->style.scry = 
+		//item0->dirty = 1;
+		
 		uiUpdate();
-		string fps = toStr(1000/DeshTime->deltaTime);
+		str8 fps = toStr8(avg_fps_v, " ", 1000/DeshTime->deltaTime).fin;
 		render_start_cmd2(5, Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second->tex, vec2::ZERO, DeshWindow->dimensions);
-		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, str8{(u8*)fps.str, fps.count}, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
+		render_text2(Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second, fps, vec2(0,DeshWindow->dimensions.y / 2), vec2::ONE, Color_White);
 		
 
         {
