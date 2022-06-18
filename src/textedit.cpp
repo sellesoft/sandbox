@@ -15,6 +15,41 @@ buffer memory is NOT contiguous and is stitched together when we save the file
 
 */
 
+//NOTE(sushi) i define this locally for my IDE so the unity build issue doesnt happen, dont actually define this in a build
+#ifdef FIX_MY_IDE_PLEASE
+#include "kigu/profiling.h"
+#include "kigu/array.h"
+#include "kigu/array_utils.h"
+#include "kigu/common.h"
+#include "kigu/cstring.h"
+#include "kigu/map.h"
+#include "kigu/string.h"
+
+//// deshi includes ////
+#define DESHI_DISABLE_IMGUI
+#include "core/commands.h"
+#include "core/console.h"
+#include "core/config.h"
+#include "core/graphing.h"
+#include "core/file.h"
+#include "core/input.h"
+#include "core/logger.h"
+#include "core/memory.h"
+#include "core/platform.h"
+#include "core/render.h"
+#include "core/storage.h"
+#include "core/threading.h"
+#include "core/time.h"
+#include "core/ui.h"
+#include "core/ui2.h"
+#include "core/window.h"
+#include "core/file.h"
+#include "math/math.h"
+
+//// text editor includes ////
+#include "types.h"
+#endif
+
 Arena* static_arena;
 array<Arena*> edit_arenas;
 TextChunk* current_edit_chunk = 0;
@@ -333,7 +368,7 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 		}
 		cursor->count = 0;
 		count += dc.advance;
-	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left
+	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
 		if(!cursor->chunk->offset && !cursor->chunk_start) return 0;
 		count += utf8_move_back(cursor->chunk->raw.str+cursor->chunk_start);
 		count++;
@@ -350,6 +385,34 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 			cursor->chunk_start = cursor->chunk->raw.count;
 		}	
 		cursor->count = 0;
+	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
+		u32 punc_codepoint;
+		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		else                       { punc_codepoint = 0; }
+		while(1){
+			u32 move = move_cursor(cursor, binds.cursorRight);
+ 			if(!move) break; //end of file
+			count+=move;
+			DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+			if      ( punc_codepoint && dc.codepoint != punc_codepoint) {break;}
+			else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
+		}
+	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
+		u32 punc_codepoint;
+		count += move_cursor(cursor, binds.cursorLeft);
+		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		else                       { punc_codepoint = 0; }
+		while(count){
+			u32 move = move_cursor(cursor, binds.cursorLeft);
+			if(!move) break; //beginning of file
+			count += move;
+			DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+			if     ( punc_codepoint && dc.codepoint != punc_codepoint) {break;}
+			else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
+		}
+		if(count) move_cursor(cursor, binds.cursorRight);
 	}
 	// u64 count = 0;
 	// if      (match_any(bind, binds.cursorLeft, binds.selectLeft)){////////////////////////////////////  Move/Select Left
