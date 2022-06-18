@@ -117,6 +117,8 @@ struct Buffer{
 
 #define UserToGapSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count?(idx)+(buffer)->gap_size:(idx))
 #define GapToUserSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count+(buffer)->gap_size?(idx)-(buffer)->gap_size:idx)
+#define LineLength(buffer, idx) (((idx==(buffer)->line_starts_count?(buffer)->upperbloc.count+(buffer)->lowerbloc.count:(buffer)->line_starts[idx+1]))-((buffer)->line_starts[idx]))
+
 
 struct TextChunk;
 struct Line{
@@ -142,11 +144,7 @@ struct TextChunk{
 
 struct Cursor{
 	s64   count;  //selection size, signed for selections in either direction
-	Line* line;
-	u64   line_start; //byte offset
-	u64   line_startcp;
-	TextChunk* chunk;
-	u64   chunk_start; //byte offset
+	u64   pos; //position in user space in bytes
 };
 
 enum{

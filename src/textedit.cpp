@@ -50,18 +50,6 @@ buffer memory is NOT contiguous and is stitched together when we save the file
 #include "types.h"
 #endif
 
-Arena* buffer_arena;
-array<Arena*> edit_arenas;
-TextChunk* current_edit_chunk = 0;
-
-Node root_chunk;
-#define IsRootChunk(x) ((x) == &root_chunk)
-Node root_line;
-#define IsRootLine(x) ((x) == &root_line)
-
-mutex linelock; //locks following node
-Node root_line_chunks; // maintained indexing of lines
-
 Cursor main_cursor;
 array<Cursor> extra_cursors;
 
@@ -268,13 +256,7 @@ Line* new_line(){DPZoneScoped;
 
 //inserts line and updates all following lines's indexes
 void insert_line(Node* dest, Node* src){DPZoneScoped;
-	NodeInsertNext(dest, src);
-	Line* destl = LineFromNode(dest);
-	Line* srcl = LineFromNode(src);
-	srcl->index = destl->index + 1;
-	for(Node* n = src->next; !IsRootLine(n); n = n->next){
-		LineFromNode(n)->index++;
-	}
+
 }
 
 //loads a file and creates one TextChunk encompassing the entire file
@@ -287,8 +269,8 @@ void load_file(str8 filepath){DPZoneScoped;
 	buffer = (Buffer*)memalloc(sizeof(Buffer));
 
 	buffer->capacity = RoundUpTo(file->bytes*2, Kilobytes(4));
-	buffer->upperbloc.count = file->bytes/2;
-	buffer->lowerbloc.count = file->bytes - buffer->upperbloc.count;
+	buffer->upperbloc.count = (file->bytes/2)+1;
+	buffer->lowerbloc.count = (file->bytes - buffer->upperbloc.count)+1;
 	buffer->gap_size = buffer->capacity - file->bytes;
 	buffer->upperbloc.str = (u8*)memalloc(buffer->capacity);
 	
@@ -296,34 +278,30 @@ void load_file(str8 filepath){DPZoneScoped;
 	file_cursor(file, buffer->upperbloc.count);
 	buffer->lowerbloc = file_read(file,buffer->upperbloc.str+buffer->upperbloc.count+buffer->gap_size,buffer->lowerbloc.count);
 	
+	buffer->upperbloc.count--;	
+	buffer->lowerbloc.count--;
+
 	buffer->line_starts = (u64*)memalloc(file->bytes);
 	u64 idx = 0;
 	str8 scan = buffer->upperbloc;
 	b32 pass = 0;	
 	while(1){
 		DecodedCodepoint dc = str8_advance(&scan);
-		if(dc.codepoint==U'\n'){
-			buffer->line_starts[idx++] = buffer->upperbloc.count - scan.count;
+		if(dc.codepoint==U'\n' || !scan){ 
+			buffer->line_starts[idx++] = (pass?buffer->lowerbloc.count:buffer->upperbloc.count) - scan.count;
 		}
 		if(pass&&!scan) break;
 		if(!scan) scan = buffer->lowerbloc, pass = 1;
 	}
 	buffer->line_starts_count = idx;
-	buffer->line_starts = (u64*)memrealloc(buffer->line_starts, buffer->line_starts_count*sizeof(u64));
+	buffer->line_starts = (u64*)memrealloc(buffer->line_starts, idx*sizeof(u64));
 }
 
 
 void init_editor(){DPZoneScoped;
-	edit_arenas = array<Arena*>(deshi_allocator);
-	edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	extra_cursors = array<Cursor>(deshi_allocator);
 	
-	root_chunk.next = root_chunk.prev = &root_chunk;
-	root_line.next = root_line.prev = &root_line;
-	main_cursor.chunk = 0;
-	main_cursor.chunk_start = 0;
-	main_cursor.line_start = 0;
-	main_cursor.line_startcp = 0;
+	main_cursor.pos = 0;
 	main_cursor.count = 0;
 	
 	load_config();
@@ -331,7 +309,7 @@ void init_editor(){DPZoneScoped;
 	init_editor_commands();
 	
     //load_file(STR8(__FILE__));
-	load_file(STR8("data/cfg/editor.cfg"));
+	load_file(STR8("src/test.txt"));
 }
 
 //calculates the length of a line that a chunk is currently on in codepoints 
@@ -472,27 +450,6 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	return count;
 }
 
-//TODO(sushi) do this (for fun)
-void index_lines(){
-	linelock.lock();
-	Cursor cursor;
-	
-	if(!root_line_chunks.next){//initialize
-		TextChunk* init = new_chunk();
-		NodeInsertNext(&root_line_chunks, &init->node);
-	}
-	
-	TextChunk* curline = TextChunkFromNode(root_line_chunks.next);
-	TextChunk* line_start = TextChunkFromNode(root_chunk.next);
-	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
-		
-	}
-	
-	linelock.unlock();
-	platform_sleep(100);
-}
-
-
 void text_insert(str8 text){DPZoneScoped;
 	// Arena* edit_arena = *edit_arenas.last;
 	// TextChunk* curchunk = main_cursor.chunk;
@@ -523,6 +480,16 @@ void text_insert(str8 text){DPZoneScoped;
 	// 		NodeInsertNext(&curchunk->node, &next->node);	
 	// 	}
 	// }
+
+	if      (main_cursor.pos == buffer->upperbloc.count){
+		//cursor is already at the gap
+
+	}else if(main_cursor.pos < buffer->upperbloc.count){
+		//cursor is before the gap and we must move it 
+		u64 movesize = buffer->upperbloc.count - main_cursor.pos;
+		memmove(buffer->lowerbloc.str - movesize,  buffer->upperbloc.str + buffer->upperbloc.count, movesize);
+
+	}
 	
 	
 
@@ -821,6 +788,10 @@ void update_editor(){DPZoneScoped;
 	//if(file->path == 0) DebugBreakpoint;
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
+	str8b out; str8_builder_init(&out, STR8(""), deshi_temp_allocator);
+	forI(buffer->upperbloc.count + buffer->lowerbloc.count){
+		str8_builder_append(&out, str8{&buffer->upperbloc.str[UserToGapSpace(buffer, i)], 1});
+	}
 	
 	//// repeat timer ////
 	persist Stopwatch repeat_hold = start_stopwatch();
@@ -858,132 +829,46 @@ void update_editor(){DPZoneScoped;
 	if(key_pressed(binds.saveBuffer)){ save_buffer(); }
 	if(key_pressed(binds.reloadConfig)){ load_config(); }
 	
-	
-	//-////////////////////////////////////////////////////////////////////////////////////////////
-	//// render
-	render_start_cmd2(0, 0, vec2::ZERO, DeshWindow->dimensions);
-    //buffer background
-    render_quad_filled2(config.buffer_margin, DeshWindow->dimensions-config.buffer_margin*2, config.buffer_color);
-    //buffer outline
-    render_quad2(config.buffer_margin, DeshWindow->dimensions-config.buffer_margin*2, color(200,200,200));
-	
-    //text
-    vec2  visual_cursor = config.buffer_margin + config.buffer_padding;
-    vec2  text_space = DeshWindow->dimensions - (config.buffer_margin + config.buffer_padding) * 2;
-    vec2  text_scale = vec2::ONE * config.font_height / (f32)config.font->max_height;
-	Line* line = LineFromNode(root_line.next);
-    
-    render_start_cmd2(0, config.font->tex, config.buffer_padding, text_space);
-	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
-        TextChunk* chunk = TextChunkFromNode(it);
-		vec2 size = CalcTextSize(chunk->raw); //maybe this can be cached?
-		
-        //dont render anything if it goes beyond buffer width
-        //if(visual_cursor.x > text_space.x){ 
-		//	visual_cursor.x = config.buffer_margin.x + config.buffer_padding.x;
-		//	visual_cursor.y += size.y;
-		//	continue;
-		//}
-        //TODO(sushi) word wrapping
-        if(config.word_wrap) NotImplemented;
-        else{
-			//draw chunk text
-			str8 text = chunk->raw;
-			u64 advanced = 0;
-			while(text){
-				vec2 prevcur = visual_cursor;
-				DecodedCodepoint decoded = str8_advance(&text);
-				if(decoded.codepoint == '\r'){ decoded = str8_advance(&text); advanced++; }
-				draw_character(decoded.codepoint, text_scale, config.text_color, &visual_cursor);	
-				//--------------------------------------------------------------------------------------- Draw Cursor//
-				if(main_cursor.chunk_start == (decoded.codepoint == '\n' && buffer_CRLF ? advanced-1 : advanced)){
-					persist Stopwatch cursor_blink = start_stopwatch();
-					if(DeshInput->anyKeyDown) reset_stopwatch(&cursor_blink);
-					color cursor_color = config.cursor_color;
-					f32 mult = M_PI*peek_stopwatch(cursor_blink)/config.cursor_pulse_duration;
-					cursor_color.a = (u8)(255*(sin(mult + M_HALFPI + cos(mult + M_HALFPI))+1)/2);
-					switch(config.cursor_shape){
-						case CursorShape_VerticalLine:{
-							vec2 cursor_top = vec2(prevcur.x, prevcur.y);
-							vec2 cursor_bot = vec2(prevcur.x, prevcur.y + config.font_height);
-							render_line2(cursor_top, cursor_bot, cursor_color);
-						}break;
-						case CursorShape_VerticalLineThick:{
-							vec2 cursor_top = vec2(prevcur.x, prevcur.y);
-							vec2 cursor_bot = vec2(cursor_top.x,           cursor_top.y + config.font_height);
-							render_line_thick2(cursor_top, cursor_bot, 2, cursor_color);
-						}break;
-						case CursorShape_Underline:{
-							f32 x_width = visual_cursor.x - prevcur.x;
-							vec2 cursor_left  = vec2(prevcur.x,           prevcur.y + config.font_height);
-							vec2 cursor_right = vec2(prevcur.x + x_width, prevcur.y + config.font_height);
-							render_line2(cursor_left, cursor_right, cursor_color);
-						}break;
-						case CursorShape_Rectangle:{
-							f32 x_width = visual_cursor.x - prevcur.x;
-							vec2 cursor_top_left  = vec2(prevcur.x, prevcur.y);
-							render_quad2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
-						}break;
-						case CursorShape_FilledRectangle:{
-							str8 right_char = str8_eat_one(str8{line->raw.str+main_cursor.line_start, (s64)(line->raw.count-main_cursor.line_start)});
-							f32 x_width = CalcTextSize(right_char).x;
-							vec2 cursor_top_left = vec2(prevcur.x, prevcur.y);
-							render_quad_filled2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
-							render_text2(config.font, right_char, cursor_top_left, text_scale, Color_Black);
-						}break;
-					}
-				}
-				
-				
-				advanced += decoded.advance;
-				if(decoded.codepoint == '\n') line = NextLine(line); 
-				if(visual_cursor.y > text_space.y){ break; }
-			} 
-			
-#if 0 //DEBUG
-			//left vertical line
-			render_line2(chunk_pos + size.yComp(), chunk_pos + (size.yComp()/2.f), (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
-			
-			//right vertical line
-			render_line2(chunk_pos + size, chunk_pos + vec2(size.x, size.y/2.f), (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
-			
-			//right vertical newline
-			if(chunk->newline){
-				render_line2(chunk_pos + size.xComp(), chunk_pos + vec2(size.x, size.y/2.f), Color_Yellow);
-			}
-			
-			//bottom line
-			render_line2(chunk_pos + size.yComp(), chunk_pos + size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
-#endif	
-			render_start_cmd2(5, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
-			string fps = toStr(1000/DeshTime->deltaTime);
-			render_text2(config.font, {(u8*)fps.str,fps.count}, vec2::ZERO, vec2::ONE, Color_White);
-			
-        }
-    }
-
-	{//cursor debug
-		render_start_cmd2(6, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
-		str8 out = toStr8(
-			"chunk:        ", str8{main_cursor.chunk->raw.str, Min(main_cursor.chunk->raw.count, 10)}, "\n",
-			"chunk start:  ", main_cursor.chunk_start,                                                 "\n",
-			"line:         ", str8{main_cursor.line->raw.str,  Min(main_cursor.line->raw.count,  10)}, "\n",
-			"line start:   ", main_cursor.line_start,                                                  "\n",
-			"line startcp: ", main_cursor.line_startcp,                                                "\n",
-			"select count: ", main_cursor.count
-		).fin;
-		vec2 size = font_visual_size(config.font, out);
-		vec2 pos = DeshWindow->dimensions - size;
-		render_quad_filled2(DeshWindow->dimensions-size, size, Color_Black);
-		str8 scan = out;
-		f32 y = 0;
-		while(scan){
-			DecodedCodepoint dc = str8_advance(&scan);
-			if(dc.codepoint == U'\n'){
-				render_text2(config.font, str8{out.str, out.count - scan.count}, vec2{pos.x, pos.y+y}, vec2::ONE, Color_White);
-				out = scan;
-				y+=config.font->max_height;
-			}
-		}
-	}
 }
+
+
+
+// 	//--------------------------------------------------------------------------------------- Draw Cursor//
+			// 	if(main_cursor.chunk_start == (decoded.codepoint == '\n' && buffer_CRLF ? advanced-1 : advanced)){
+			// 		persist Stopwatch cursor_blink = start_stopwatch();
+			// 		if(DeshInput->anyKeyDown) reset_stopwatch(&cursor_blink);
+			// 		color cursor_color = config.cursor_color;
+			// 		f32 mult = M_PI*peek_stopwatch(cursor_blink)/config.cursor_pulse_duration;
+			// 		cursor_color.a = (u8)(255*(sin(mult + M_HALFPI + cos(mult + M_HALFPI))+1)/2);
+			// 		switch(config.cursor_shape){
+			// 			case CursorShape_VerticalLine:{
+			// 				vec2 cursor_top = vec2(prevcur.x, prevcur.y);
+			// 				vec2 cursor_bot = vec2(prevcur.x, prevcur.y + config.font_height);
+			// 				render_line2(cursor_top, cursor_bot, cursor_color);
+			// 			}break;
+			// 			case CursorShape_VerticalLineThick:{
+			// 				vec2 cursor_top = vec2(prevcur.x, prevcur.y);
+			// 				vec2 cursor_bot = vec2(cursor_top.x,           cursor_top.y + config.font_height);
+			// 				render_line_thick2(cursor_top, cursor_bot, 2, cursor_color);
+			// 			}break;
+			// 			case CursorShape_Underline:{
+			// 				f32 x_width = visual_cursor.x - prevcur.x;
+			// 				vec2 cursor_left  = vec2(prevcur.x,           prevcur.y + config.font_height);
+			// 				vec2 cursor_right = vec2(prevcur.x + x_width, prevcur.y + config.font_height);
+			// 				render_line2(cursor_left, cursor_right, cursor_color);
+			// 			}break;
+			// 			case CursorShape_Rectangle:{
+			// 				f32 x_width = visual_cursor.x - prevcur.x;
+			// 				vec2 cursor_top_left  = vec2(prevcur.x, prevcur.y);
+			// 				render_quad2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
+			// 			}break;
+			// 			case CursorShape_FilledRectangle:{
+			// 				str8 right_char = str8_eat_one(str8{line->raw.str+main_cursor.line_start, (s64)(line->raw.count-main_cursor.line_start)});
+			// 				f32 x_width = CalcTextSize(right_char).x;
+			// 				vec2 cursor_top_left = vec2(prevcur.x, prevcur.y);
+			// 				render_quad_filled2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
+			// 				render_text2(config.font, right_char, cursor_top_left, text_scale, Color_Black);
+			// 			}break;
+			// 		}
+			// 	}
+				
