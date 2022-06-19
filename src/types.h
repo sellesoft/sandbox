@@ -147,7 +147,10 @@ struct TextChunk{
 struct Cursor{
 	s64   pos; //position in user space in bytes
 	s64   count;  //selection size, signed for selections in either direction
+	u64   line_idx;
 };
+
+#define LinePosition(buffer,cursor) ((cursor)->pos-buffer->line_starts[(cursor)->line_idx])
 
 enum{
 	CursorShape_VerticalLine,

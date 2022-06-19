@@ -314,6 +314,7 @@ void init_editor(){DPZoneScoped;
 	
 	main_cursor.pos = 0;
 	main_cursor.count = 0;
+	main_cursor.line_idx = 0;
 	
 	load_config();
 	
@@ -323,19 +324,16 @@ void init_editor(){DPZoneScoped;
 	load_file(STR8("data/cfg/editor.cfg"));
 }
 
-//calculates the length of a line that a chunk is currently on in codepoints 
-u64 calc_line_length(TextChunk* chunk){
-	return 0;
-}
-
 //returns the number of bytes the cursor moved
 u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	u64 count = 0;
+	Cursor init = *cursor;
 	if      (match_any(bind, binds.cursorRight, binds.selectRight)){/////////////////////////////////// Move/Select Right
 		if(cursor->pos==buffer->capacity-buffer->gap_size-line_end_length+1) return 0; //end of file
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 		if(dc.codepoint == line_end_char){
 			dc.advance = line_end_length;
+			cursor->line_idx++;
 		}
 		cursor->pos += dc.advance;
 		count += dc.advance;
@@ -347,6 +345,7 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 		if(dc.codepoint == U'\n'){
 			dc.advance = line_end_length;
 			if(dc.advance==2)cursor->pos--;
+			cursor->line_idx--;
 		}
 		count += dc.advance;
 	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
@@ -378,11 +377,54 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 		}
 		if(count) move_cursor(cursor, binds.cursorRight);
 	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){
-
+		if(!cursor->line_idx) return 0; //first line
+		//if cursor's position is greater than the prev line length
+		if(LinePosition(buffer, cursor) >= LineLength(buffer, cursor->line_idx-1)){
+			u32 moved = LinePosition(buffer,cursor)+line_end_length;
+			cursor->line_idx--;
+			cursor->pos -= moved;//buffer->line_starts[cursor->line_idx] + LineLength(buffer, cursor->line_idx)-line_end_length;
+			return moved;
+		}
+		u32 codepoints = 0;
+		//scan left and see how many codepoints we pass
+		while(cursor->pos!=buffer->line_starts[cursor->line_idx]){
+			count+=move_cursor(cursor, binds.cursorLeft);
+			codepoints++;
+		}
+		//set to prev line start
+		cursor->line_idx--;
+		cursor->pos = buffer->line_starts[cursor->line_idx];
+		//scan right till we move as many codepoints 
+		while(codepoints--){
+			move_cursor(cursor, binds.cursorRight);
+		}
+		//figure out how many bytes we have moved
+		count+=LineLength(buffer,cursor->line_idx) - LinePosition(buffer, cursor);
 	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){
-
+		if(cursor->line_idx==buffer->line_starts[buffer->line_starts_count-1]) return 0; //last line
+		//if cursor position is greater than the next line's length
+		if(LinePosition(buffer, cursor) >= LineLength(buffer, cursor->line_idx+1)){
+			//there is an edge case where if the next line's length is equal to our line end length we have to put it at the beginning of the line
+			//so it doesnt move to the next
+			u32 nll = LineLength(buffer,cursor->line_idx+1);
+			cursor->line_idx++;
+			cursor->pos = buffer->line_starts[cursor->line_idx] + (nll==line_end_length?0:nll);//(LineLength(buffer,cursor->line_idx)-LinePosition(buffer,cursor))+(nll==1?0:nll);
+		}else{
+			u32 codepoints = 0;
+			//scan left and see how many codepoints we pass
+			while(cursor->pos!=buffer->line_starts[cursor->line_idx]){
+				count+=move_cursor(cursor, binds.cursorLeft);
+				codepoints++;
+			}
+			//set to next line start
+			cursor->line_idx++;
+			cursor->pos = buffer->line_starts[cursor->line_idx];
+			while(codepoints--){
+				move_cursor(cursor, binds.cursorRight);
+			}
+		}
 	}
-	return count;
+	return abs(init.pos - cursor->pos);
 }
 
 void text_insert(str8 text){DPZoneScoped;
@@ -736,21 +778,26 @@ void update_editor(){DPZoneScoped;
 	if(any_key_pressed() || any_key_released()){
 		reset_stopwatch(&repeat_hold);
 	}
-	if((peek_stopwatch(repeat_hold) > config.repeat_hold) && (peek_stopwatch(repeat_throttle) > config.repeat_throttle)){
+	else if((peek_stopwatch(repeat_hold) > config.repeat_hold) && (peek_stopwatch(repeat_throttle) > config.repeat_throttle)){
 		reset_stopwatch(&repeat_throttle);
 		repeat = 1;
 	}
+	// Log("", peek_stopwatch(repeat_hold));
+	// Log("", peek_stopwatch(repeat_throttle));
+
+
 #define CanDoInput(x) (key_pressed(x) || key_down(x) && repeat)
 	
 	//// cursor movement ////
-	if(CanDoInput(binds.cursorLeft))          { move_cursor(&main_cursor, binds.cursorLeft);}
-	if(CanDoInput(binds.cursorWordLeft))      { move_cursor(&main_cursor, binds.cursorWordLeft); }
-	if(CanDoInput(binds.cursorWordPartLeft))  { move_cursor(&main_cursor, binds.cursorWordPartLeft); }
-	if(CanDoInput(binds.cursorRight))         { move_cursor(&main_cursor, binds.cursorRight); }
-	if(CanDoInput(binds.cursorWordRight))     { move_cursor(&main_cursor, binds.cursorWordRight); }
-	if(CanDoInput(binds.cursorWordPartRight)) { move_cursor(&main_cursor, binds.cursorWordPartRight); }
-	if(CanDoInput(binds.cursorUp))            { move_cursor(&main_cursor, binds.cursorUp); }
-	if(CanDoInput(binds.cursorDown))          { move_cursor(&main_cursor, binds.cursorDown); }
+	static u64 last_move_count = 0; //debug
+	if(CanDoInput(binds.cursorLeft))          { last_move_count = move_cursor(&main_cursor, binds.cursorLeft);}
+	if(CanDoInput(binds.cursorWordLeft))      { last_move_count = move_cursor(&main_cursor, binds.cursorWordLeft); }
+	if(CanDoInput(binds.cursorWordPartLeft))  { last_move_count = move_cursor(&main_cursor, binds.cursorWordPartLeft); }
+	if(CanDoInput(binds.cursorRight))         { last_move_count = move_cursor(&main_cursor, binds.cursorRight); }
+	if(CanDoInput(binds.cursorWordRight))     { last_move_count = move_cursor(&main_cursor, binds.cursorWordRight); }
+	if(CanDoInput(binds.cursorWordPartRight)) { last_move_count = move_cursor(&main_cursor, binds.cursorWordPartRight); }
+	if(CanDoInput(binds.cursorUp))            { last_move_count = move_cursor(&main_cursor, binds.cursorUp); }
+	if(CanDoInput(binds.cursorDown))          { last_move_count = move_cursor(&main_cursor, binds.cursorDown); }
 	
 	//// text input ////
 	if(DeshInput->charCount){ 
@@ -784,6 +831,31 @@ void update_editor(){DPZoneScoped;
 
 		if(!passed&&!scan) scan = buffer->lowerbloc, passed = 1;
 	}
+
+	{//cursor debug
+		render_start_cmd2(1, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+		str8 info=toStr8(
+			"cursor","\n",
+			"------", "\n",
+			"pos:     ", main_cursor.pos,"\n",
+			"count:   ", main_cursor.count,"\n",
+			"line:    ", main_cursor.line_idx, "\n",
+			"linelen: ", LineLength(buffer, main_cursor.line_idx), "\n",
+			"linepos: ", LinePosition(buffer, &main_cursor), "\n",
+			"move:    ", last_move_count
+		).fin;
+		vec2 size = font_visual_size(config.font, info);
+		vec2 pos = DeshWindow->dimensions - size;
+		render_quad_filled2(pos, size, Color_Black);
+		while(info){
+			str8 line = str8_eat_until(info, '\n');
+			render_text2(config.font, line, pos, vec2::ONE, Color_White);
+			info = str8{line.str+line.count+1, info.count - (line.count+1)};
+			pos.y += config.font->max_height;
+		}
+	}
+
+
 }
 
 
