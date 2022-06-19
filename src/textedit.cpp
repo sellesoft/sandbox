@@ -269,32 +269,43 @@ void load_file(str8 filepath){DPZoneScoped;
 	buffer = (Buffer*)memalloc(sizeof(Buffer));
 
 	buffer->capacity = RoundUpTo(file->bytes*2, Kilobytes(4));
-	buffer->upperbloc.count = (file->bytes/2)+1;
-	buffer->lowerbloc.count = (file->bytes - buffer->upperbloc.count)+1;
+	buffer->upperbloc.count = (file->bytes/2);
+	buffer->lowerbloc.count = (file->bytes - buffer->upperbloc.count);
 	buffer->gap_size = buffer->capacity - file->bytes;
 	buffer->upperbloc.str = (u8*)memalloc(buffer->capacity);
+	buffer->lowerbloc.str = buffer->upperbloc.str + buffer->upperbloc.count + buffer->gap_size;
 	
-	buffer->upperbloc = file_read(file,buffer->upperbloc.str,buffer->upperbloc.count);
-	file_cursor(file, buffer->upperbloc.count);
-	buffer->lowerbloc = file_read(file,buffer->upperbloc.str+buffer->upperbloc.count+buffer->gap_size,buffer->lowerbloc.count);
-	
-	buffer->upperbloc.count--;	
-	buffer->lowerbloc.count--;
+	file_read(file,buffer->upperbloc.str,file->bytes);
+
+	memmove(buffer->lowerbloc.str,buffer->upperbloc.str+buffer->upperbloc.count,buffer->lowerbloc.count);
+
+	//doesnt work well because it reads a \0 at the end
+	//buffer->upperbloc = file_read(file,buffer->upperbloc.str,buffer->upperbloc.count);
+	//file_cursor(file, buffer->upperbloc.count);
+	//buffer->lowerbloc = file_read(file,buffer->upperbloc.str+buffer->upperbloc.count+buffer->gap_size,buffer->lowerbloc.count);
+
 
 	buffer->line_starts = (u64*)memalloc(file->bytes);
-	u64 idx = 0;
-	str8 scan = buffer->upperbloc;
-	b32 pass = 0;	
-	while(1){
-		DecodedCodepoint dc = str8_advance(&scan);
-		if(dc.codepoint==U'\n' || !scan){ 
-			buffer->line_starts[idx++] = (pass?buffer->lowerbloc.count:buffer->upperbloc.count) - scan.count;
+	buffer->line_starts[0] = 0;
+	u64 line_idx = 1;
+	u64 arr_idx = 0;
+	while(arr_idx < buffer->lowerbloc.count + buffer->upperbloc.count){
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, arr_idx), 4);
+		if(dc.codepoint==U'\r'){
+			buffer->line_starts[line_idx++] = GapToUserSpace(buffer, arr_idx) + 2;
+			line_end_char = U'\r';
+			line_end_length = 2;
+			dc.advance = 2;
 		}
-		if(pass&&!scan) break;
-		if(!scan) scan = buffer->lowerbloc, pass = 1;
+		else if(dc.codepoint==U'\n'){ 
+			buffer->line_starts[line_idx++] = GapToUserSpace(buffer, arr_idx) + 1;
+			line_end_char = U'\n';
+			line_end_length = 1;
+		}
+		arr_idx+=dc.advance;
 	}
-	buffer->line_starts_count = idx;
-	buffer->line_starts = (u64*)memrealloc(buffer->line_starts, idx*sizeof(u64));
+	buffer->line_starts_count = line_idx;
+	buffer->line_starts = (u64*)memrealloc(buffer->line_starts, line_idx*sizeof(u64));
 }
 
 
@@ -309,7 +320,7 @@ void init_editor(){DPZoneScoped;
 	init_editor_commands();
 	
     //load_file(STR8(__FILE__));
-	load_file(STR8("src/test.txt"));
+	load_file(STR8("data/cfg/editor.cfg"));
 }
 
 //calculates the length of a line that a chunk is currently on in codepoints 
@@ -321,42 +332,51 @@ u64 calc_line_length(TextChunk* chunk){
 u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	u64 count = 0;
 	if      (match_any(bind, binds.cursorRight, binds.selectRight)){/////////////////////////////////// Move/Select Right
+		if(cursor->pos==buffer->capacity-buffer->gap_size-line_end_length+1) return 0; //end of file
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		if(dc.codepoint == line_end_char){
+			dc.advance = line_end_length;
+		}
 		cursor->pos += dc.advance;
 		count += dc.advance;
 	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
+		if(!cursor->pos) return 0; //beginning of file
 		while(utf8_continuation_byte(*UserToMemSpace(buffer, cursor->pos))) cursor->pos--;
-		cursor->pos = Max(0, cursor->pos - 1);
+		cursor->pos--;
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		if(dc.codepoint == U'\n'){
+			dc.advance = line_end_length;
+			if(dc.advance==2)cursor->pos--;
+		}
 		count += dc.advance;
 	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
-		// u32 punc_codepoint;
-		// DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-		// if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
-		// else                       { punc_codepoint = 0; }
-		// while(1){
-		// 	u32 move = move_cursor(cursor, binds.cursorRight);
- 		// 	if(!move) break; //end of file
-		// 	count+=move;
-		// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-		// 	if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
-		// 	else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
-		// }
+		u32 punc_codepoint;
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		else                       { punc_codepoint = 0; }
+		while(1){
+			u32 move = move_cursor(cursor, binds.cursorRight);
+ 			if(!move) break; //end of file
+			count+=move;
+			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+			if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
+			else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
+		}
 	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
-		// u32 punc_codepoint;
-		// count += move_cursor(cursor, binds.cursorLeft);
-		// DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-		// if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
-		// else                       { punc_codepoint = 0; }
-		// while(count){
-		// 	u32 move = move_cursor(cursor, binds.cursorLeft);
-		// 	if(!move) break; //beginning of file
-		// 	count += move;
-		// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-		// 	if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
-		// 	else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
-		// }
-		// if(count) move_cursor(cursor, binds.cursorRight);
+		u32 punc_codepoint;
+		count += move_cursor(cursor, binds.cursorLeft);
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		else                       { punc_codepoint = 0; }
+		while(count){
+			u32 move = move_cursor(cursor, binds.cursorLeft);
+			if(!move) break; //beginning of file
+			count += move;
+			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+			if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
+			else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
+		}
+		if(count) move_cursor(cursor, binds.cursorRight);
 	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){
 
 	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){
@@ -615,7 +635,8 @@ void save_buffer(){DPZoneScoped;
 void draw_character(u32 character, vec2 scale, color col, vec2* cursor){DPZoneScoped;
 	Vertex2         vp[4];
 	RenderTwodIndex ip[6];
-	if(character == U'\n'){ //NOTE(sushi) \r is skipped outside of this function
+	if(character == U'\r') return;
+	if(character == U'\n'){ 
 		if(config.show_symbol_eol){
 			cursor->x += 4;
 			if(buffer_CRLF){
@@ -745,10 +766,24 @@ void update_editor(){DPZoneScoped;
 	if(key_pressed(binds.reloadConfig)){ load_config(); }
 
 	//render char at cursor
-
 	render_start_cmd2(0, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
-	render_text2(config.font, str8{UserToMemSpace(buffer, main_cursor.pos), 30}, vec2::ZERO, vec2::ONE, Color_White);
-	
+	vec2 cursor = config.buffer_padding + config.buffer_margin;
+	str8 scan = buffer->upperbloc;
+	b32 passed = 0;
+	u64 pos = 0;
+	while(scan){
+		vec2 prevpos = cursor;
+		DecodedCodepoint dc = str8_advance(&scan);
+		draw_character(dc.codepoint, vec2::ONE, Color_White, &cursor);
+		if(main_cursor.pos == pos){
+			render_line2(vec2(prevpos.x,prevpos.y), vec2(prevpos.x,prevpos.y+config.font_height),Color_White);
+
+		}
+		pos+=dc.advance;
+
+
+		if(!passed&&!scan) scan = buffer->lowerbloc, passed = 1;
+	}
 }
 
 
