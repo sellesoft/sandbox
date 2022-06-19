@@ -320,133 +320,48 @@ u64 calc_line_length(TextChunk* chunk){
 //returns the number of bytes the cursor moved
 u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	u64 count = 0;
-	// if      (match_any(bind, binds.cursorRight, binds.selectRight)){////////////////////////////////// Move/Select Right
-	// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-	// 	if(dc.codepoint == line_end_char){
-	// 		dc.advance = line_end_length;
-	// 		cursor->line_start = 0;
-	// 		cursor->line_startcp = 0;
-	// 		cursor->line = NextLine(cursor->line);
-	// 	} else{
-	// 		cursor->line_start += dc.advance;
-	// 		cursor->line_startcp++;
-	// 	} 
+	if      (match_any(bind, binds.cursorRight, binds.selectRight)){/////////////////////////////////// Move/Select Right
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		cursor->pos += dc.advance;
+		count += dc.advance;
+	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
+		while(utf8_continuation_byte(*UserToMemSpace(buffer, cursor->pos))) cursor->pos--;
+		cursor->pos = Max(0, cursor->pos - 1);
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		count += dc.advance;
+	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
+		// u32 punc_codepoint;
+		// DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		// if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		// else                       { punc_codepoint = 0; }
+		// while(1){
+		// 	u32 move = move_cursor(cursor, binds.cursorRight);
+ 		// 	if(!move) break; //end of file
+		// 	count+=move;
+		// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		// 	if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
+		// 	else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
+		// }
+	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
+		// u32 punc_codepoint;
+		// count += move_cursor(cursor, binds.cursorLeft);
+		// DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		// if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		// else                       { punc_codepoint = 0; }
+		// while(count){
+		// 	u32 move = move_cursor(cursor, binds.cursorLeft);
+		// 	if(!move) break; //beginning of file
+		// 	count += move;
+		// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+		// 	if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
+		// 	else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
+		// }
+		// if(count) move_cursor(cursor, binds.cursorRight);
+	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){
 
-	// 	if(cursor->chunk_start < cursor->chunk->raw.count){
-	// 		cursor->chunk_start += dc.advance;
-	// 	}else if(!IsRootChunk(cursor->chunk->node.next)){
-	// 		//TODO(sushi) confirm if this works when the chunk also ends at a newline
-	// 		cursor->chunk = NextTextChunk(cursor->chunk);
-	// 		cursor->chunk_start = 0;
-	// 	}
-	// 	cursor->count = 0;
-	// 	count += dc.advance;
-	// }else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
-	// 	if(!cursor->chunk->offset && !cursor->chunk_start) return 0;
-	// 	//NOTE(sushi) chunk must be evaluated first here becuase the cursor represents the character to its right
-	// 	//            so it must be moved back first
-	// 	count += utf8_move_back(cursor->chunk->raw.str+cursor->chunk_start);
-	// 	count++;
-	// 	if(cursor->chunk_start > 0){
-	// 		cursor->chunk_start -= count;
-	// 	}else if(!IsRootChunk(cursor->chunk->node.prev)){
-	// 		cursor->chunk = PrevTextChunk(cursor->chunk);
-	// 		cursor->chunk_start = cursor->chunk->raw.count;
-	// 	}
+	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){
 
-	// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-	// 	if(!IsRootLine(cursor->line->node.prev) && dc.codepoint == '\n'){//we can only hit a \n from here
-	// 		count = line_end_length;
-	// 		cursor->line = PrevLine(cursor->line);
-	// 		cursor->line_start = cursor->line->raw.count - line_end_length;
-	// 		cursor->line_startcp = cursor->line->count-1;
-	// 	} else {
-	// 		cursor->line_start -= count;
-	// 		cursor->line_startcp--;
-	// 	}
-			
-	// 	cursor->count = 0;
-	// }else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
-	// 	u32 punc_codepoint;
-	// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-	// 	if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
-	// 	else                       { punc_codepoint = 0; }
-	// 	while(1){
-	// 		u32 move = move_cursor(cursor, binds.cursorRight);
- 	// 		if(!move) break; //end of file
-	// 		count+=move;
-	// 		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-	// 		if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
-	// 		else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
-	// 	}
-	// }else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
-	// 	u32 punc_codepoint;
-	// 	count += move_cursor(cursor, binds.cursorLeft);
-	// 	DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-	// 	if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
-	// 	else                       { punc_codepoint = 0; }
-	// 	while(count){
-	// 		u32 move = move_cursor(cursor, binds.cursorLeft);
-	// 		if(!move) break; //beginning of file
-	// 		count += move;
-	// 		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-	// 		if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
-	// 		else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
-	// 	}
-	// 	if(count) move_cursor(cursor, binds.cursorRight);
-	// }else if(match_any(bind, binds.cursorUp, binds.selectUp)){
-	// 	if(!IsRootLine(cursor->line->node.prev)){
-	// 		Line* prev = PrevLine(cursor->line);
-	// 		if(cursor->line_start > prev->count){
-	// 			count += cursor->line_start;
-	// 			cursor->line = prev;
-	// 			cursor->line_start = prev->count;
-	// 			cursor->chunk = prev->chunk;
-	// 			cursor->chunk_start = prev->chunk_start + prev->raw.count - line_end_length; 
-	// 		}else{
-	// 			u32 codepoints = 0;
-	// 			while(cursor->line_start){
-	// 				count+=move_cursor(cursor, binds.cursorLeft);
-	// 				codepoints++;
-	// 			}
-	// 			cursor->line = prev;
-	// 			cursor->chunk = prev->chunk;
-	// 			cursor->chunk_start = prev->chunk_start;
-	// 			u64 sum = 0;
-	// 			while(codepoints--){
-	// 				sum+=move_cursor(cursor, binds.cursorRight);
-	// 			}
-	// 			count += prev->raw.count - sum;
-	// 		}
-	// 	}
-
-	// }else if(match_any(bind, binds.cursorDown, binds.selectDown)){
-	// 	if(!IsRootLine(cursor->line->node.next)){
-	// 		Line* next = NextLine(cursor->line);
-	// 		if(cursor->line_start > next->count){
-	// 			count += cursor->line_start;
-	// 			cursor->line = next;
-	// 			cursor->line_start = next->count;
-	// 			cursor->chunk = next->chunk;
-	// 			cursor->chunk_start = next->chunk_start + next->raw.count - line_end_length; 
-	// 		}else{
-	// 			u32 codepoints = 0;
-	// 			while(cursor->line_start){
-	// 				count+=move_cursor(cursor, binds.cursorLeft);
-	// 				codepoints++;
-	// 			}
-	// 			cursor->line = next;
-	// 			cursor->chunk = next->chunk;
-	// 			cursor->chunk_start = next->chunk_start;
-	// 			u64 sum = 0;
-	// 			while(codepoints--){
-	// 				sum+=move_cursor(cursor, binds.cursorRight);
-	// 			}
-	// 			count += next->raw.count - sum;
-	// 		}
-	// 	}
-
-	// }
+	}
 	return count;
 }
 
@@ -488,7 +403,7 @@ void text_insert(str8 text){DPZoneScoped;
 		//cursor is before the gap and we must move it 
 		u64 movesize = buffer->upperbloc.count - main_cursor.pos;
 		memmove(buffer->lowerbloc.str - movesize,  buffer->upperbloc.str + buffer->upperbloc.count, movesize);
-
+		
 	}
 	
 	
@@ -828,6 +743,11 @@ void update_editor(){DPZoneScoped;
 	
 	if(key_pressed(binds.saveBuffer)){ save_buffer(); }
 	if(key_pressed(binds.reloadConfig)){ load_config(); }
+
+	//render char at cursor
+
+	render_start_cmd2(0, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+	render_text2(config.font, str8{UserToMemSpace(buffer, main_cursor.pos), 30}, vec2::ZERO, vec2::ONE, Color_White);
 	
 }
 

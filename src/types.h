@@ -116,6 +116,7 @@ struct Buffer{
 };
 
 #define UserToGapSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count?(idx)+(buffer)->gap_size:(idx))
+#define UserToMemSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count?(buffer)->lowerbloc.str+((idx)-(buffer)->upperbloc.count):buffer->upperbloc.str+(idx))
 #define GapToUserSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count+(buffer)->gap_size?(idx)-(buffer)->gap_size:idx)
 #define LineLength(buffer, idx) (((idx==(buffer)->line_starts_count?(buffer)->upperbloc.count+(buffer)->lowerbloc.count:(buffer)->line_starts[idx+1]))-((buffer)->line_starts[idx]))
 
