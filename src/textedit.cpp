@@ -321,12 +321,11 @@ void init_editor(){DPZoneScoped;
 	init_editor_commands();
 	
     //load_file(STR8(__FILE__));
-	load_file(STR8("data/cfg/editor.cfg"));
+	load_file(STR8("src/test.txt"));
 }
 
 //returns the number of bytes the cursor moved
 u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
-	u64 count = 0;
 	Cursor init = *cursor;
 	if      (match_any(bind, binds.cursorRight, binds.selectRight)){/////////////////////////////////// Move/Select Right
 		if(cursor->pos==buffer->capacity-buffer->gap_size-line_end_length+1) return 0; //end of file
@@ -336,7 +335,6 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 			cursor->line_idx++;
 		}
 		cursor->pos += dc.advance;
-		count += dc.advance;
 	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
 		if(!cursor->pos) return 0; //beginning of file
 		while(utf8_continuation_byte(*UserToMemSpace(buffer, cursor->pos))) cursor->pos--;
@@ -347,48 +345,41 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 			if(dc.advance==2)cursor->pos--;
 			cursor->line_idx--;
 		}
-		count += dc.advance;
 	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
 		u32 punc_codepoint;
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
 		else                       { punc_codepoint = 0; }
 		while(1){
-			u32 move = move_cursor(cursor, binds.cursorRight);
- 			if(!move) break; //end of file
-			count+=move;
+ 			if(!move_cursor(cursor, binds.cursorRight)) break; //end of file
 			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 			if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
 			else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
 		}
 	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
 		u32 punc_codepoint;
-		count += move_cursor(cursor, binds.cursorLeft);
+		b32 moved = move_cursor(cursor, binds.cursorLeft);
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
 		else                       { punc_codepoint = 0; }
-		while(count){
-			u32 move = move_cursor(cursor, binds.cursorLeft);
-			if(!move) break; //beginning of file
-			count += move;
+		while(moved){
+			if(!move_cursor(cursor, binds.cursorLeft)) break; //beginning of file
 			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 			if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
 			else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
 		}
-		if(count) move_cursor(cursor, binds.cursorRight);
+		if(moved) move_cursor(cursor, binds.cursorRight);
 	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){
 		if(!cursor->line_idx) return 0; //first line
 		//if cursor's position is greater than the prev line length
 		if(LinePosition(buffer, cursor) >= LineLength(buffer, cursor->line_idx-1)){
-			u32 moved = LinePosition(buffer,cursor)+line_end_length;
+			cursor->pos -= LinePosition(buffer,cursor)+line_end_length;
 			cursor->line_idx--;
-			cursor->pos -= moved;//buffer->line_starts[cursor->line_idx] + LineLength(buffer, cursor->line_idx)-line_end_length;
-			return moved;
 		}
 		u32 codepoints = 0;
 		//scan left and see how many codepoints we pass
 		while(cursor->pos!=buffer->line_starts[cursor->line_idx]){
-			count+=move_cursor(cursor, binds.cursorLeft);
+			move_cursor(cursor, binds.cursorLeft);
 			codepoints++;
 		}
 		//set to prev line start
@@ -398,8 +389,6 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 		while(codepoints--){
 			move_cursor(cursor, binds.cursorRight);
 		}
-		//figure out how many bytes we have moved
-		count+=LineLength(buffer,cursor->line_idx) - LinePosition(buffer, cursor);
 	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){
 		if(cursor->line_idx==buffer->line_starts[buffer->line_starts_count-1]) return 0; //last line
 		//if cursor position is greater than the next line's length
@@ -413,7 +402,7 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 			u32 codepoints = 0;
 			//scan left and see how many codepoints we pass
 			while(cursor->pos!=buffer->line_starts[cursor->line_idx]){
-				count+=move_cursor(cursor, binds.cursorLeft);
+				move_cursor(cursor, binds.cursorLeft);
 				codepoints++;
 			}
 			//set to next line start
@@ -428,47 +417,34 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 }
 
 void text_insert(str8 text){DPZoneScoped;
-	// Arena* edit_arena = *edit_arenas.last;
-	// TextChunk* curchunk = main_cursor.chunk;
-	
-	// if(main_cursor.chunk_start != curchunk->raw.count || curchunk != current_edit_chunk){
-	// 	if(main_cursor.chunk_start == curchunk->raw.count){
-	// 		TextChunk* prev = new_chunk();
-	// 		*prev = *curchunk;
-			
-	// 		NodeInsertPrev(&curchunk->node, &prev->node);
-	// 	}else if(!main_cursor.chunk_start){
-	// 		TextChunk* next = new_chunk();
-	// 		*next = *curchunk;
-	// 		if(main_cursor.line->chunk == curchunk){
-	// 			//if the main cursor's line's chunk is the cursor's chunk we must tell the line that its new chunk is the one we just made
-	// 			main_cursor.line->chunk = next;
-	// 		}
-	// 		NodeInsertNext(&curchunk->node, &next->node);			
-	// 	}else{
-	// 		TextChunk* prev = new_chunk();
-	// 		TextChunk* next = new_chunk();
-	// 		if(main_cursor.line->chunk == curchunk){
-	// 			main_cursor.line->chunk = prev;
-	// 		}
-	// 		prev->raw = {curchunk->raw.str, (s64)main_cursor.chunk_start};
-	// 		next->raw = {curchunk->raw.str + main_cursor.chunk_start, curchunk->raw.count - (s64)main_cursor.chunk_start};
-	// 		NodeInsertPrev(&curchunk->node, &prev->node);
-	// 		NodeInsertNext(&curchunk->node, &next->node);	
-	// 	}
-	// }
-
-	if      (main_cursor.pos == buffer->upperbloc.count){
-		//cursor is already at the gap
-
-	}else if(main_cursor.pos < buffer->upperbloc.count){
-		//cursor is before the gap and we must move it 
+	if(main_cursor.pos < buffer->upperbloc.count){
+		//cursor is before the gap  
 		u64 movesize = buffer->upperbloc.count - main_cursor.pos;
-		memmove(buffer->lowerbloc.str - movesize,  buffer->upperbloc.str + buffer->upperbloc.count, movesize);
+		buffer->lowerbloc.str -= movesize;
+		buffer->upperbloc.count -= movesize;
+		buffer->lowerbloc.count += movesize;
+		memmove(buffer->lowerbloc.str, buffer->upperbloc.str + buffer->upperbloc.count, movesize);
 		
+	}else if(main_cursor.pos > buffer->upperbloc.count){
+		//cursor is after the gap
+		u64 movesize = main_cursor.pos - buffer->upperbloc.count;
+		memmove(buffer->upperbloc.str+buffer->upperbloc.count, buffer->lowerbloc.str, movesize);
+		buffer->lowerbloc.str += movesize;
+		buffer->upperbloc.count += movesize;
+		buffer->lowerbloc.count -= movesize;
 	}
 	
-	
+
+	memcpy(buffer->upperbloc.str+buffer->upperbloc.count, text.str, text.count);
+	buffer->upperbloc.count+=text.count;
+	main_cursor.pos = buffer->upperbloc.count;
+
+	//adjust line starts if we arent on the last line
+	//oh brother this guy reeks
+	//TODO(sushi) maybe there is a better way to handle this?
+	forI(buffer->line_starts_count - main_cursor.line_idx){
+		buffer->line_starts[i] += text.count;
+	}
 
 	// if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 	// 	TextChunk* curchunk = main_cursor.chunk;
@@ -827,8 +803,6 @@ void update_editor(){DPZoneScoped;
 
 		}
 		pos+=dc.advance;
-
-
 		if(!passed&&!scan) scan = buffer->lowerbloc, passed = 1;
 	}
 
@@ -854,8 +828,6 @@ void update_editor(){DPZoneScoped;
 			pos.y += config.font->max_height;
 		}
 	}
-
-
 }
 
 
