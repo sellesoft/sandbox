@@ -13,7 +13,6 @@ struct Config{
 	
     color buffer_color;
 	color text_color;
-    vec2  buffer_margin;
     vec2  buffer_padding;
 	
 	u32 tab_width;

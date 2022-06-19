@@ -35,6 +35,12 @@ b32 buffer_CRLF;
 u32 line_end_char; //either \n or \r, so we dont have to keep checking what buffer_CRLF is everywhere
 u32 line_end_length; //either 1 or 2, so we dont have to keep checking what buffer_CRLF is everywhere
 
+File* file;
+
+uiItem* buffer_filebar_text_widget = 0;
+array<uiItem*> buffer_textregion_lines = array<uiItem*>(deshi_allocator);
+u64 buffer_textregion_visible_lines = 0;
+
 Config config;
 KeyBinds binds;
 #define CMI(name, type, var) ConfigMapItem{STR8(name), (type), (var)}
@@ -52,7 +58,6 @@ global ConfigMapItem ConfigMap[] = {
 	CMI("buffer_color",           ConfigValueType_Col,  &config.buffer_color),
 	CMI("text_color",             ConfigValueType_Col,  &config.text_color),
 	CMI("\n",                     ConfigValueType_PADSECTION,(void*)15),
-	CMI("buffer_margin",          ConfigValueType_FV2,  &config.buffer_margin),
 	CMI("buffer_padding",         ConfigValueType_FV2,  &config.buffer_padding),
 	CMI("\n",                     ConfigValueType_PADSECTION,(void*)10),
 	CMI("tab_width",              ConfigValueType_U32,  &config.tab_width),
@@ -105,11 +110,6 @@ global ConfigMapItem ConfigMap[] = {
 };
 #undef CMI
 
-
-File* file;
-
-
-
 //NOTE(delle) including this after the vars so it can access them
 #include "editor_commands.cpp"
 
@@ -123,8 +123,7 @@ void load_config(){DPZoneScoped;
 		config.buffer_color           = color( 12, 12, 12,255);
 		config.text_color             = color(192,192,192,255);
 		
-		config.buffer_margin          = vec2{10.f,10.f};
-		config.buffer_padding         = vec2{10.f,10.f};
+		config.buffer_padding         = vec2::ZERO;
 		
 		config.tab_width              = 4;
 		config.word_wrap              = false;
@@ -171,8 +170,7 @@ void load_config(){DPZoneScoped;
 		binds.deleteWordRight     = Key_DELETE | InputMod_AnyCtrl;
 		binds.deleteWordPartRight = Key_DELETE | InputMod_AnyAlt;
 		
-		binds.saveBuffer          = Key_S | InputMod_AnyCtrl;
-		
+		binds.saveBuffer          = Key_S  | InputMod_AnyCtrl;
 		binds.reloadConfig        = Key_F5 | InputMod_AnyCtrl;
 		
 		config_save(STR8("data/cfg/editor.cfg"), ConfigMap, sizeof(ConfigMap)/sizeof(ConfigMapItem));
@@ -288,6 +286,75 @@ void load_file(str8 filepath){DPZoneScoped;
 	main_cursor.line_start = 0;
 }
 
+//NOTE(caj) this is its own function so it can be called on window resize or config change
+void editor_make_visual_lines(uiStyle* line_style){
+	buffer_textregion_visible_lines = 0;
+	for(s32 y = config.buffer_padding.y;
+		y < DeshWindow->height - config.buffer_padding.y - (config.font_height + 4);
+		y += config.font_height + 2)
+	{
+		buffer_textregion_visible_lines += 1;
+		if(buffer_textregion_visible_lines > buffer_textregion_lines.count){
+			//buffer_textregion_lines.add(uiTextMS(str8{}, line_style));
+			buffer_textregion_lines.add(uiTextMS(STR8("--------------------line--------------------"), line_style));
+		}
+	}
+}
+
+void init_ui(){
+	//[container] root  (don't trust the default style b/c it can change)
+	uiStyle root_style{};
+	root_style.positioning    = pos_fixed;
+	root_style.right          = MAX_F32;
+	root_style.bottom         = MAX_F32;
+	root_style.width          = (f32)DeshWindow->width;
+	root_style.height         = (f32)DeshWindow->height;
+	root_style.border_style   = border_none;
+	root_style.overflow       = overflow_hidden;
+	uiItemBS(&root_style);{
+		//[container] buffer
+		uiStyle buffer_style{}; buffer_style = root_style;
+		buffer_style.positioning = pos_static;
+		buffer_style.font        = config.font;
+		buffer_style.font_height = config.font_height;
+		uiItemBS(&buffer_style);{
+			//[container] buffer filebar
+			uiStyle filebar_style{}; filebar_style = buffer_style;
+			filebar_style.sizing           = size_fill_x;
+			filebar_style.height           = config.font_height + 4;
+			filebar_style.background_color = color(112,110, 98);
+			filebar_style.foreground_color = color(136,136,136);
+			filebar_style.text_color       = Color_Black;
+			uiItemBS(&filebar_style);{
+				//[widget] buffer filebar text
+				uiStyle filebar_text_style{}; filebar_text_style = filebar_style;
+				filebar_style.sizing             = size_fill;
+				filebar_text_style.margin_left   = 2;
+				filebar_text_style.margin_right  = 2;
+				filebar_text_style.margin_top    = 2;
+				filebar_text_style.margin_bottom = 2;
+				//buffer_filebar_text_widget = uiTextM(str8{});
+				buffer_filebar_text_widget = uiTextMS(STR8("filebar text"), &filebar_text_style);
+			}uiItemE();
+			
+			//[container] buffer text region
+			uiStyle textregion_style{}; textregion_style = buffer_style;
+			textregion_style.sizing           = size_fill;
+			textregion_style.padding          = config.buffer_padding;
+			textregion_style.paddingbr        = config.buffer_padding;
+			textregion_style.background_color = config.buffer_color;
+			textregion_style.text_color       = config.text_color;
+			textregion_style.overflow         = overflow_scroll;
+			uiItemBS(&textregion_style);{
+				//buffer text region lines
+				uiStyle textline_style{}; textline_style = textregion_style;
+				textline_style.margin_top    = 1;
+				textline_style.margin_bottom = 1;
+				editor_make_visual_lines(&textline_style);
+			}uiItemE();
+		}uiItemE();
+	}uiItemE();
+}
 
 void init_editor(){DPZoneScoped;
 	edit_arenas = array<Arena*>(deshi_allocator);
@@ -304,6 +371,8 @@ void init_editor(){DPZoneScoped;
 	load_config();
 	
 	init_editor_commands();
+	
+	init_ui();
 	
     //load_file(STR8(__FILE__));
 	load_file(STR8("data/cfg/editor.cfg"));
@@ -825,7 +894,7 @@ void draw_character(u32 character, vec2 scale, color col, vec2* cursor){DPZoneSc
 			cursor->x += slashn_size.x;
 		}
 		cursor->y += config.font->max_height * scale.y;
-		cursor->x = config.buffer_margin.x + config.buffer_padding.x;
+		cursor->x = config.buffer_padding.x;
 		return;
 	}
 	switch(config.font->type){
@@ -938,6 +1007,12 @@ void update_editor(){DPZoneScoped;
 	
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// render
+	if(g_ui->hovered){
+		render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
+		render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
+	}
+	
+	/*
 	render_start_cmd2(0, 0, vec2::ZERO, DeshWindow->dimensions);
     //buffer background
     render_quad_filled2(config.buffer_margin, DeshWindow->dimensions-config.buffer_margin*2, config.buffer_color);
@@ -1038,4 +1113,5 @@ void update_editor(){DPZoneScoped;
 			
         }
     }
+	*/
 }
