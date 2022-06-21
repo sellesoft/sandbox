@@ -15,17 +15,40 @@ buffer memory is NOT contiguous and is stitched together when we save the file
 
 */
 
-Arena* static_arena;
-array<Arena*> edit_arenas;
-TextChunk* current_edit_chunk = 0;
+//NOTE(sushi) i define this locally for my IDE so the unity build issue doesnt happen, dont actually define this in a build
+#ifdef FIX_MY_IDE_PLEASE
+#include "kigu/profiling.h"
+#include "kigu/array.h"
+#include "kigu/array_utils.h"
+#include "kigu/common.h"
+#include "kigu/cstring.h"
+#include "kigu/map.h"
+#include "kigu/string.h"
 
-Node root_chunk;
-#define IsRootChunk(x) ((x) == &root_chunk)
-Node root_line;
-#define IsRootLine(x) ((x) == &root_line)
+//// deshi includes ////
+#define DESHI_DISABLE_IMGUI
+#include "core/commands.h"
+#include "core/console.h"
+#include "core/config.h"
+#include "core/graphing.h"
+#include "core/file.h"
+#include "core/input.h"
+#include "core/logger.h"
+#include "core/memory.h"
+#include "core/platform.h"
+#include "core/render.h"
+#include "core/storage.h"
+#include "core/threading.h"
+#include "core/time.h"
+#include "core/ui.h"
+#include "core/ui2.h"
+#include "core/window.h"
+#include "core/file.h"
+#include "math/math.h"
 
-mutex linelock; //locks following node
-Node root_line_chunks; // maintained indexing of lines
+//// text editor includes ////
+#include "types.h"
+#endif
 
 Cursor main_cursor;
 array<Cursor> extra_cursors;
@@ -37,9 +60,10 @@ u32 line_end_length; //either 1 or 2, so we dont have to keep checking what buff
 
 File* file;
 
-uiItem* buffer_filebar_text_widget = 0;
+uiItem* buffer_filebar_text = 0;
 array<uiItem*> buffer_textregion_lines = array<uiItem*>(deshi_allocator);
 u64 buffer_textregion_visible_lines = 0;
+Buffer* buffer;
 
 Config config;
 KeyBinds binds;
@@ -231,13 +255,7 @@ Line* new_line(){DPZoneScoped;
 
 //inserts line and updates all following lines's indexes
 void insert_line(Node* dest, Node* src){DPZoneScoped;
-	NodeInsertNext(dest, src);
-	Line* destl = LineFromNode(dest);
-	Line* srcl = LineFromNode(src);
-	srcl->index = destl->index + 1;
-	for(Node* n = src->next; !IsRootLine(n); n = n->next){
-		LineFromNode(n)->index++;
-	}
+	
 }
 
 //loads a file and creates one TextChunk encompassing the entire file
@@ -246,44 +264,47 @@ void load_file(str8 filepath){DPZoneScoped;
 	file = file_init(filepath, FileAccess_ReadWrite);
 	if(!file){ Assert(false); return; }
 	
-    static_arena = memory_create_arena(file->bytes+1);
-	str8 buffer = file_read(file, static_arena->start, static_arena->size);
+	//eventually put these in an array or arena or something crazy like that
+	buffer = (Buffer*)memalloc(sizeof(Buffer));
 	
-	TextChunk* initial = new_chunk();
-	initial->raw = buffer;
-	initial->offset = 0;
-	NodeInsertPrev(&root_chunk, &initial->node);
+	buffer->capacity = RoundUpTo(file->bytes*2, Kilobytes(4));
+	buffer->upperbloc.count = (file->bytes/2);
+	buffer->lowerbloc.count = (file->bytes - buffer->upperbloc.count);
+	buffer->gap_size = buffer->capacity - file->bytes;
+	buffer->upperbloc.str = (u8*)memalloc(buffer->capacity);
+	buffer->lowerbloc.str = buffer->upperbloc.str + buffer->upperbloc.count + buffer->gap_size;
 	
-	u32 index = 0;
-	str8 remaining = buffer;
-    while(remaining){
-		str8 line = str8_eat_until(remaining, U'\n'); line.count++;
-		if(*(line.str+line.count-2)=='\r'){
-			buffer_CRLF = 1;
-			line_end_char = '\r';
+	file_read(file,buffer->upperbloc.str,file->bytes);
+	
+	memmove(buffer->lowerbloc.str,buffer->upperbloc.str+buffer->upperbloc.count,buffer->lowerbloc.count);
+	
+	//doesnt work well because it reads a \0 at the end
+	//buffer->upperbloc = file_read(file,buffer->upperbloc.str,buffer->upperbloc.count);
+	//file_cursor(file, buffer->upperbloc.count);
+	//buffer->lowerbloc = file_read(file,buffer->upperbloc.str+buffer->upperbloc.count+buffer->gap_size,buffer->lowerbloc.count);
+	
+	
+	buffer->line_starts = (u64*)memalloc(file->bytes);
+	buffer->line_starts[0] = 0;
+	u64 line_idx = 1;
+	u64 arr_idx = 0;
+	while(arr_idx < buffer->lowerbloc.count + buffer->upperbloc.count){
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, arr_idx), 4);
+		if(dc.codepoint==U'\r'){
+			buffer->line_starts[line_idx++] = GapToUserSpace(buffer, arr_idx) + 2;
+			line_end_char = U'\r';
 			line_end_length = 2;
-		}else{
-			buffer_CRLF = 0;
-			line_end_char = '\n';
+			dc.advance = 2;
+		}
+		else if(dc.codepoint==U'\n'){ 
+			buffer->line_starts[line_idx++] = GapToUserSpace(buffer, arr_idx) + 1;
+			line_end_char = U'\n';
 			line_end_length = 1;
 		}
-		str8_increment(&remaining, line.count);
-		
-		Line* l = new_line();
-		l->raw = line;
-		l->count = str8_length(line);
-		l->index = index++;
-		NodeInsertPrev(&root_line, &l->node);
-		
-		static_arena->cursor += line.count;
-		static_arena->used   += line.count;
-    }
-	initial->line = LineFromNode(root_line.next);
-	
-	main_cursor.chunk = TextChunkFromNode(root_chunk.next);
-	main_cursor.line = LineFromNode(root_line.next);
-	main_cursor.chunk_start = 0;
-	main_cursor.line_start = 0;
+		arr_idx+=dc.advance;
+	}
+	buffer->line_starts_count = line_idx;
+	buffer->line_starts = (u64*)memrealloc(buffer->line_starts, line_idx*sizeof(u64));
 }
 
 //NOTE(caj) this is its own function so it can be called on window resize or config change
@@ -323,7 +344,6 @@ void init_ui(){
 			filebar_style.sizing           = size_fill_x;
 			filebar_style.height           = config.font_height + 4;
 			filebar_style.background_color = color(112,110, 98);
-			filebar_style.foreground_color = color(136,136,136);
 			filebar_style.text_color       = Color_Black;
 			uiItemBS(&filebar_style);{
 				//[widget] buffer filebar text
@@ -333,8 +353,8 @@ void init_ui(){
 				filebar_text_style.margin_right  = 2;
 				filebar_text_style.margin_top    = 2;
 				filebar_text_style.margin_bottom = 2;
-				//buffer_filebar_text_widget = uiTextM(str8{});
-				buffer_filebar_text_widget = uiTextMS(STR8("filebar text"), &filebar_text_style);
+				//buffer_filebar_text = uiTextM(str8{});
+				buffer_filebar_text = uiTextMS(STR8("filebar text"), &filebar_text_style);
 			}uiItemE();
 			
 			//[container] buffer text region
@@ -343,13 +363,13 @@ void init_ui(){
 			textregion_style.padding          = config.buffer_padding;
 			textregion_style.paddingbr        = config.buffer_padding;
 			textregion_style.background_color = config.buffer_color;
-			textregion_style.text_color       = config.text_color;
 			textregion_style.overflow         = overflow_scroll;
 			uiItemBS(&textregion_style);{
 				//buffer text region lines
 				uiStyle textline_style{}; textline_style = textregion_style;
 				textline_style.margin_top    = 1;
 				textline_style.margin_bottom = 1;
+				textline_style.text_color    = config.text_color;
 				editor_make_visual_lines(&textline_style);
 			}uiItemE();
 		}uiItemE();
@@ -357,15 +377,9 @@ void init_ui(){
 }
 
 void init_editor(){DPZoneScoped;
-	edit_arenas = array<Arena*>(deshi_allocator);
-	edit_arenas.add(memory_create_arena(Kilobytes(1)));
 	extra_cursors = array<Cursor>(deshi_allocator);
 	
-	root_chunk.next = root_chunk.prev = &root_chunk;
-	root_line.next = root_line.prev = &root_line;
-	main_cursor.chunk = 0;
-	main_cursor.chunk_start = 0;
-	main_cursor.line_start = 0;
+	main_cursor.pos = 0;
 	main_cursor.count = 0;
 	
 	load_config();
@@ -386,292 +400,103 @@ u64 calc_line_length(TextChunk* chunk){
 //returns the number of bytes the cursor moved
 u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 	u64 count = 0;
-	if      (match_any(bind, binds.cursorRight, binds.selectRight)){////////////////////////////////// Move/Select Right
-		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
+	if      (match_any(bind, binds.cursorRight, binds.selectRight)){/////////////////////////////////// Move/Select Right
+		if(cursor->pos==buffer->capacity-buffer->gap_size-line_end_length+1) return 0; //end of file
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 		if(dc.codepoint == line_end_char){
 			dc.advance = line_end_length;
-			cursor->line_start = 0;
-			cursor->line = NextLine(cursor->line);
-		} else cursor->line_start += dc.advance;
-		if(cursor->chunk_start < cursor->chunk->raw.count){
-			cursor->chunk_start += dc.advance;
-		}else if(!IsRootChunk(cursor->chunk->node.next)){
-			//TODO(sushi) confirm if this works when the chunk also ends at a newline
-			cursor->chunk = NextTextChunk(cursor->chunk);
-			cursor->chunk_start = 0;
 		}
-		cursor->count = 0;
+		cursor->pos += dc.advance;
 		count += dc.advance;
-	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left
-		if(!cursor->chunk->offset && !cursor->chunk_start) return 0;
-		count += utf8_move_back(cursor->chunk->raw.str+cursor->chunk_start);
-		count++;
-		DecodedCodepoint dc = str8_index(cursor->chunk->raw, cursor->chunk_start);
-		if(!IsRootLine(cursor->line->node.prev) && dc.codepoint == '\n'){//we can only hit a \n from here
-			count = line_end_length;
-			cursor->line = PrevLine(cursor->line);
-			cursor->line_start = cursor->line->raw.count - line_end_length;
-		} else cursor->line_start -= count;
-		if(cursor->chunk_start > 0){
-			cursor->chunk_start -= count;
-		}else if(!IsRootChunk(cursor->chunk->node.prev)){
-			cursor->chunk = PrevTextChunk(cursor->chunk);
-			cursor->chunk_start = cursor->chunk->raw.count;
-		}	
-		cursor->count = 0;
+	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
+		if(!cursor->pos) return 0; //beginning of file
+		while(utf8_continuation_byte(*UserToMemSpace(buffer, cursor->pos))) cursor->pos--;
+		cursor->pos--;
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		if(dc.codepoint == U'\n'){
+			dc.advance = line_end_length;
+			if(dc.advance==2)cursor->pos--;
+		}
+		count += dc.advance;
+	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
+		u32 punc_codepoint;
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		else                       { punc_codepoint = 0; }
+		while(1){
+			u32 move = move_cursor(cursor, binds.cursorRight);
+			if(!move) break; //end of file
+			count+=move;
+			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+			if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
+			else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
+		}
+	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
+		u32 punc_codepoint;
+		count += move_cursor(cursor, binds.cursorLeft);
+		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
+		else                       { punc_codepoint = 0; }
+		while(count){
+			u32 move = move_cursor(cursor, binds.cursorLeft);
+			if(!move) break; //beginning of file
+			count += move;
+			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
+			if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
+			else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
+		}
+		if(count) move_cursor(cursor, binds.cursorRight);
+	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){
+		
+	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){
+		
 	}
-	// u64 count = 0;
-	// if      (match_any(bind, binds.cursorLeft, binds.selectLeft)){////////////////////////////////////  Move/Select Left
-	// 	if(cursor->start > 0){
-	// 		while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
-	// 			cursor->start -= 1;
-	// 			count++;
-	// 		} 
-	// 		cursor->start -= 1;
-	// 		count++;
-	// 		if(bind==binds.selectLeft) cursor->count += 1;
-	// 		else                      cursor->count  = 0;
-	// 	}else if(cursor->chunk->node.prev != &root_chunk){
-	// 		cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
-	// 		cursor->start = cursor->chunk->raw.count;
-	// 		if(!cursor->chunk->newline){
-	// 			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
-	// 				cursor->start -= 1; 
-	// 				count++;
-	// 			}
-	// 			if(bind==binds.selectLeft) 
-	// 				cursor->count += 1;
-	// 			cursor->start -= 1;
-	// 			cursor->column--;
-	// 			count++;
-	// 		}
-	// 		else {
-	// 			cursor->line--;
-	// 		}
-	// 		if(bind!=binds.selectLeft) 
-	// 			cursor->count = 0;
-	// 	}
-	// }else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){//////////////////////// Move/Select Word Left
-	// 	b32 skip_alnum = -1;
-	// 	for(;;){
-	// 		if(cursor->start > 0){
-	// 			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-	
-	// 			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){ 
-	// 				cursor->start -= 1;
-	// 				count++;
-	// 			}
-	// 			count++;
-	// 			cursor->start -= 1;
-	// 			cursor->count  = 0;
-	
-	// 			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-	// 			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-	// 			if(cursor->start == 0 && cursor->chunk->node.prev != &root_chunk && TextChunkFromNode(cursor->chunk->node.prev)->newline) break;
-	// 		}else if(cursor->chunk->node.prev != &root_chunk){
-	// 			cursor->chunk = TextChunkFromNode(cursor->chunk->node.prev);
-	// 			cursor->start = cursor->chunk->raw.count;
-	
-	// 			if(skip_alnum == -1) skip_alnum = isalnum(*(cursor->chunk->raw.str + cursor->start - 1));
-	
-	// 			while(utf8_continuation_byte(*(cursor->chunk->raw.str + cursor->start - 1))){
-	// 				cursor->start -= 1;
-	// 				count++;
-	// 			} 
-	// 			count++;
-	// 			cursor->start -= 1;
-	// 			cursor->count  = 0;
-	
-	// 			if(cursor->chunk->newline){ cursor->start += 1; break; }
-	// 			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-	// 			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ cursor->start += 1; break; }
-	// 		}else{
-	// 			break;
-	// 		}
-	// 	}
-	// }else if(match_any(bind, binds.cursorRight, binds.selectRight)){////////////////////////////////// Move/Select Right
-	// 	if(cursor->start < cursor->chunk->raw.count){
-	// 		DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start,4);
-	// 		cursor->start += dc.advance;
-	// 		count += dc.advance;
-	// 		cursor->count  = 0;
-	// 	}else if(cursor->chunk->node.next != &root_chunk){
-	// 		TextChunk* prev_chunk = cursor->chunk;
-	// 		cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
-	// 		if(!prev_chunk->newline){
-	// 			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);        
-	// 			cursor->start = dc.advance;
-	// 			count += dc.advance;
-	// 		}else{
-	// 			cursor->start = 0;
-	// 		}
-	// 		cursor->count = 0;
-	// 	}
-	// }else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){///////////////////// Move/Select Word Right 
-	// 	b32 skip_alnum = -1;
-	// 	for(;;){
-	// 		if(cursor->start < cursor->chunk->raw.count){
-	// 			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
-	// 			if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-	
-	// 			cursor->start += dc.advance;
-	// 			cursor->count  = 0;
-	// 			count += dc.advance;
-	
-	// 			if(cursor->start >= cursor->chunk->raw.count){
-	// 				if(cursor->chunk->newline) break;
-	// 			}else{
-	// 				if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
-	// 				if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))) break;
-	// 			}
-	// 		}else if(cursor->chunk->node.next != &root_chunk){
-	// 			TextChunk* prev_chunk = cursor->chunk;
-	// 			cursor->chunk = TextChunkFromNode(cursor->chunk->node.next);
-	// 			cursor->start = 0;
-	// 			cursor->count = 0;
-	
-	// 			DecodedCodepoint dc = decoded_codepoint_from_utf8(cursor->chunk->raw.str+cursor->start, 4);
-	// 			if(skip_alnum == -1) skip_alnum = isalnum(dc.codepoint);
-	
-	// 			if(prev_chunk->newline) break;
-	// 			if( skip_alnum && !isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
-	// 			if(!skip_alnum &&  isalnum(*(cursor->chunk->raw.str + cursor->start))){ break; }
-	// 		}else{
-	// 			break;
-	// 		}
-	// 	}
-	// }else if(match_any(bind, binds.cursorUp, binds.selectUp)){/////////////////////////////////////////// Move/Select Up
-	// 	if(cursor->chunk->node.prev == &root_chunk) return count;;
-	// 	Cursor seek = *cursor;
-	// 	u64 chars_moved = 0;
-	// 	enum{ Finished, MoveLeftToPrevLine, MoveLeftToLineBegin, MoveRightToChar } state = MoveLeftToPrevLine;
-	// 	while(state){
-	// 		switch(state){
-	// 			case MoveLeftToPrevLine:{ // move to the previous line and count how many chars it takes to get there
-	// 				count += move_cursor(&seek, binds.cursorLeft);
-	// 				if(seek.chunk != cursor->chunk && seek.chunk->newline) state = MoveLeftToLineBegin;
-	// 				else chars_moved++;
-	// 			}break;
-	// 			case MoveLeftToLineBegin:{ // move to the beginning of the prev line so we can advance to column
-	// 				if(seek.chunk->node.prev == &root_chunk || 
-	// 					PrevTextChunk(seek.chunk)->newline){ 
-	// 						state = MoveRightToChar; 
-	// 						seek.start = 0; 
-	// 				} 
-	// 				else seek.chunk = PrevTextChunk(seek.chunk);
-	// 			}break;
-	// 			case MoveRightToChar:{ // advance to column
-	// 				if(chars_moved--){ 
-	// 					u64 moved = move_cursor(&seek, binds.cursorRight); 
-	// 					if(!moved){ 
-	// 						//if we reach the end of the line early out
-	// 						state = Finished; 
-	// 						seek.chunk = PrevTextChunk(seek.chunk);
-	// 						seek.start = seek.chunk->raw.count;
-	// 					} else count += moved;
-	// 				} else state = Finished; 
-	// 			}break;
-	// 		}
-	// 	}
-	// 	*cursor = seek;
-	// }else if(match_any(bind, binds.cursorDown, binds.selectDown)){///////////////////////////////////// Move/Select Down
-	// 	if(cursor->chunk->node.next == &root_chunk) return count;
-	// 	Cursor seek = *cursor;
-	// 	u64 chars_moved = 0;
-	// 	enum{ Finished, MoveLeftToLineBegin, MoveRightToNextLine, MoveRightToChar } state = MoveLeftToLineBegin;
-	// 	while(state){
-	// 		switch(state){
-	// 			case MoveLeftToLineBegin:{ // find what coulmn we're on 
-	// 				u64 moved = move_cursor(&seek, binds.cursorLeft);
-	// 				if(moved) { 
-	// 					chars_moved++; 
-	// 					count += moved; 
-	// 				}
-	// 				else {
-	// 					state = MoveRightToNextLine; 
-	// 					seek = *cursor; //we set the cursor back here because we know that it's closer than seek 
-	// 				}
-	// 			}break;
-	// 			case MoveRightToNextLine:{ // proceed to next line
-	// 				if(seek.chunk->newline) {state = MoveRightToChar; seek.start = 0;} 
-	// 				seek.chunk = NextTextChunk(seek.chunk);
-	// 			}break;
-	// 			case MoveRightToChar:{
-	// 				if(chars_moved--){ 
-	// 					u64 moved = move_cursor(&seek, binds.cursorRight); 
-	// 					if(!moved){ 
-	// 						//if we reach the end of the line early out
-	// 						state = Finished; 
-	// 						seek.chunk = PrevTextChunk(seek.chunk);
-	// 						seek.start = seek.chunk->raw.count;
-	// 					} else count += moved;
-	// 				} else state = Finished; 
-	// 			}break;
-	// 		}
-	// 	}
-	// 	*cursor = seek;
-	// }
-	// return count;
 	return count;
 }
 
-//TODO(sushi) do this (for fun)
-void index_lines(){
-	linelock.lock();
-	Cursor cursor;
-	
-	if(!root_line_chunks.next){//initialize
-		TextChunk* init = new_chunk();
-		NodeInsertNext(&root_line_chunks, &init->node);
-	}
-	
-	TextChunk* curline = TextChunkFromNode(root_line_chunks.next);
-	TextChunk* line_start = TextChunkFromNode(root_chunk.next);
-	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
-		
-	}
-	
-	linelock.unlock();
-	platform_sleep(100);
-}
-
-
 void text_insert(str8 text){DPZoneScoped;
-	Arena* edit_arena = *edit_arenas.last;
-	TextChunk* curchunk = main_cursor.chunk;
+	// Arena* edit_arena = *edit_arenas.last;
+	// TextChunk* curchunk = main_cursor.chunk;
 	
-	if(main_cursor.chunk_start != curchunk->raw.count || curchunk != current_edit_chunk){
-		if(main_cursor.chunk_start == curchunk->raw.count){
-			TextChunk* prev = new_chunk();
-			*prev = *curchunk;
-			NodeInsertPrev(&curchunk->node, &prev->node);
-		}else if(!main_cursor.chunk_start){
-			TextChunk* next = new_chunk();
-			*next = *curchunk;
-			NodeInsertNext(&curchunk->node, &next->node);			
-		}else{
-			TextChunk* prev = new_chunk();
-			TextChunk* next = new_chunk();
-			prev->raw = {curchunk->raw.str, (s64)main_cursor.chunk_start};
-			next->raw = {curchunk->raw.str + main_cursor.chunk_start, curchunk->raw.count - (s64)main_cursor.chunk_start};
-			NodeInsertPrev(&curchunk->node, &prev->node);
-			NodeInsertNext(&curchunk->node, &next->node);	
-		}
-	}
+	// if(main_cursor.chunk_start != curchunk->raw.count || curchunk != current_edit_chunk){
+	// 	if(main_cursor.chunk_start == curchunk->raw.count){
+	// 		TextChunk* prev = new_chunk();
+	// 		*prev = *curchunk;
 	
+	// 		NodeInsertPrev(&curchunk->node, &prev->node);
+	// 	}else if(!main_cursor.chunk_start){
+	// 		TextChunk* next = new_chunk();
+	// 		*next = *curchunk;
+	// 		if(main_cursor.line->chunk == curchunk){
+	// 			//if the main cursor's line's chunk is the cursor's chunk we must tell the line that its new chunk is the one we just made
+	// 			main_cursor.line->chunk = next;
+	// 		}
+	// 		NodeInsertNext(&curchunk->node, &next->node);			
+	// 	}else{
+	// 		TextChunk* prev = new_chunk();
+	// 		TextChunk* next = new_chunk();
+	// 		if(main_cursor.line->chunk == curchunk){
+	// 			main_cursor.line->chunk = prev;
+	// 		}
+	// 		prev->raw = {curchunk->raw.str, (s64)main_cursor.chunk_start};
+	// 		next->raw = {curchunk->raw.str + main_cursor.chunk_start, curchunk->raw.count - (s64)main_cursor.chunk_start};
+	// 		NodeInsertPrev(&curchunk->node, &prev->node);
+	// 		NodeInsertNext(&curchunk->node, &next->node);	
+	// 	}
+	// }
 	
-	
-	
-	while(text){
-		DecodedCodepoint dc = str8_advance(&text);
-		if(dc.codepoint == '\b'){
-			
-		}else if(dc.codepoint == 0x1b){}//do nothing on ESC
-		else{
-			
-		}
+	if      (main_cursor.pos == buffer->upperbloc.count){
+		//cursor is already at the gap
+		
+	}else if(main_cursor.pos < buffer->upperbloc.count){
+		//cursor is before the gap and we must move it 
+		u64 movesize = buffer->upperbloc.count - main_cursor.pos;
+		memmove(buffer->lowerbloc.str - movesize,  buffer->upperbloc.str + buffer->upperbloc.count, movesize);
 		
 	}
+	
+	
+	
 	// if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 	// 	TextChunk* curchunk = main_cursor.chunk;
 	// 	if(main_cursor.start == 0){
@@ -850,7 +675,7 @@ void save_buffer(){DPZoneScoped;
 	// for(auto ea : edit_arenas){
 	// 	growth += ea->used;
 	// }
-	// Arena* stitched = memory_create_arena(static_arena->size + growth);
+	// Arena* stitched = memory_create_arena(buffer_arena->size + growth);
 	// for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
 	// 	TextChunk* chunk = TextChunkFromNode(it);
 	// 	memcpy(stitched->cursor, chunk->raw.str, chunk->raw.count);
@@ -872,14 +697,15 @@ void save_buffer(){DPZoneScoped;
 	// file_write(file, stitched->start, stitched->used);
 	
 	// //replace old static arena with new
-	// memory_delete_arena(static_arena);
-	// static_arena = stitched;
+	// memory_delete_arena(buffer_arena);
+	// buffer_arena = stitched;
 }
 
 void draw_character(u32 character, vec2 scale, color col, vec2* cursor){DPZoneScoped;
 	Vertex2         vp[4];
 	RenderTwodIndex ip[6];
-	if(character == U'\n'){ //NOTE(sushi) \r is skipped outside of this function
+	if(character == U'\r') return;
+	if(character == U'\n'){ 
 		if(config.show_symbol_eol){
 			cursor->x += 4;
 			if(buffer_CRLF){
@@ -967,6 +793,10 @@ void update_editor(){DPZoneScoped;
 	//if(file->path == 0) DebugBreakpoint;
 	//-////////////////////////////////////////////////////////////////////////////////////////////
 	//// input
+	str8b out; str8_builder_init(&out, STR8(""), deshi_temp_allocator);
+	forI(buffer->upperbloc.count + buffer->lowerbloc.count){
+		str8_builder_append(&out, str8{&buffer->upperbloc.str[UserToGapSpace(buffer, i)], 1});
+	}
 	
 	//// repeat timer ////
 	persist Stopwatch repeat_hold = start_stopwatch();
@@ -1114,4 +944,69 @@ void update_editor(){DPZoneScoped;
         }
     }
 	*/
+	
+	
 }
+
+/*
+//render char at cursor
+render_start_cmd2(0, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+vec2 cursor = config.buffer_padding + config.buffer_margin;
+str8 scan = buffer->upperbloc;
+b32 passed = 0;
+u64 pos = 0;
+while(scan){
+	vec2 prevpos = cursor;
+	DecodedCodepoint dc = str8_advance(&scan);
+	draw_character(dc.codepoint, vec2::ONE, Color_White, &cursor);
+	if(main_cursor.pos == pos){
+		render_line2(vec2(prevpos.x,prevpos.y), vec2(prevpos.x,prevpos.y+config.font_height),Color_White);
+		
+	}
+	pos+=dc.advance;
+	
+	
+	if(!passed&&!scan) scan = buffer->lowerbloc, passed = 1;
+}
+}
+*/
+
+
+// 	//--------------------------------------------------------------------------------------- Draw Cursor//
+// 	if(main_cursor.chunk_start == (decoded.codepoint == '\n' && buffer_CRLF ? advanced-1 : advanced)){
+// 		persist Stopwatch cursor_blink = start_stopwatch();
+// 		if(DeshInput->anyKeyDown) reset_stopwatch(&cursor_blink);
+// 		color cursor_color = config.cursor_color;
+// 		f32 mult = M_PI*peek_stopwatch(cursor_blink)/config.cursor_pulse_duration;
+// 		cursor_color.a = (u8)(255*(sin(mult + M_HALFPI + cos(mult + M_HALFPI))+1)/2);
+// 		switch(config.cursor_shape){
+// 			case CursorShape_VerticalLine:{
+// 				vec2 cursor_top = vec2(prevcur.x, prevcur.y);
+// 				vec2 cursor_bot = vec2(prevcur.x, prevcur.y + config.font_height);
+// 				render_line2(cursor_top, cursor_bot, cursor_color);
+// 			}break;
+// 			case CursorShape_VerticalLineThick:{
+// 				vec2 cursor_top = vec2(prevcur.x, prevcur.y);
+// 				vec2 cursor_bot = vec2(cursor_top.x,           cursor_top.y + config.font_height);
+// 				render_line_thick2(cursor_top, cursor_bot, 2, cursor_color);
+// 			}break;
+// 			case CursorShape_Underline:{
+// 				f32 x_width = visual_cursor.x - prevcur.x;
+// 				vec2 cursor_left  = vec2(prevcur.x,           prevcur.y + config.font_height);
+// 				vec2 cursor_right = vec2(prevcur.x + x_width, prevcur.y + config.font_height);
+// 				render_line2(cursor_left, cursor_right, cursor_color);
+// 			}break;
+// 			case CursorShape_Rectangle:{
+// 				f32 x_width = visual_cursor.x - prevcur.x;
+// 				vec2 cursor_top_left  = vec2(prevcur.x, prevcur.y);
+// 				render_quad2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
+// 			}break;
+// 			case CursorShape_FilledRectangle:{
+// 				str8 right_char = str8_eat_one(str8{line->raw.str+main_cursor.line_start, (s64)(line->raw.count-main_cursor.line_start)});
+// 				f32 x_width = CalcTextSize(right_char).x;
+// 				vec2 cursor_top_left = vec2(prevcur.x, prevcur.y);
+// 				render_quad_filled2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
+// 				render_text2(config.font, right_char, cursor_top_left, text_scale, Color_Black);
+// 			}break;
+// 		}
+// 	}

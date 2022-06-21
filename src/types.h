@@ -104,15 +104,29 @@ struct KeyBinds{
     KeyCode reloadConfig;
 };
 
+struct Buffer{
+	str8 upperbloc;
+	str8 lowerbloc;
+	u64  gap_size;
+	u64  capacity;
+
+	u64* line_starts;
+	u64  line_starts_count;
+};
+
+#define UserToGapSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count?(idx)+(buffer)->gap_size:(idx))
+//NOTE(sushi) this macro only works if you know you are working with just single byte chars or if your idx is guaranteed to be aligned to a character
+#define UserToMemSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count?(buffer)->lowerbloc.str+((idx)-(buffer)->upperbloc.count):buffer->upperbloc.str+(idx))
+#define GapToUserSpace(buffer, idx) ((idx)>(buffer)->upperbloc.count+(buffer)->gap_size?(idx)-(buffer)->gap_size:idx)
+#define LineLength(buffer, idx) (((idx==(buffer)->line_starts_count?(buffer)->upperbloc.count+(buffer)->lowerbloc.count:(buffer)->line_starts[idx+1]))-((buffer)->line_starts[idx]))
+
+
 struct TextChunk;
 struct Line{
 	Node node;
 	str8 raw;
 	u64  index;
 	u64  count; //count of codepoints in line
-	//pointer to the first text chunk that occurs in the line
-	//NOTE(sushi) this chunk may not be aligned to the line
-	TextChunk* chunk; 
 };	
 #define LineFromNode(x) CastFromMember(Line, node, x)
 #define NextLine(x) LineFromNode((x)->node.next)
@@ -130,11 +144,8 @@ struct TextChunk{
 
 
 struct Cursor{
+	s64   pos; //position in user space in bytes
 	s64   count;  //selection size, signed for selections in either direction
-	Line* line;
-	u64   line_start; //byte offset
-	TextChunk* chunk;
-	u64   chunk_start; //byte offset
 };
 
 enum{

@@ -54,6 +54,8 @@ int main(){
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
+	//ui_demo();
+
 	init_editor();
 	//start main loop
 	while(platform_update()){DPZoneScoped;
