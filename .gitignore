@@ -19,6 +19,7 @@
 *.svg
 *.code-workspace
 *.cache
+*.dll
 
 #folders
 .vs/
@@ -42,4 +43,3 @@ misc/suugu.vcxproj.user
 
 #delle specifics
 misc/shell.bat
-
