@@ -381,33 +381,29 @@ void init_editor(){DPZoneScoped;
 	
 	main_cursor.pos = 0;
 	main_cursor.count = 0;
+	main_cursor.line_idx = 0;
 	
 	load_config();
 	
 	init_editor_commands();
 	
-	init_ui();
+	//init_ui();
 	
     //load_file(STR8(__FILE__));
-	load_file(STR8("data/cfg/editor.cfg"));
-}
-
-//calculates the length of a line that a chunk is currently on in codepoints 
-u64 calc_line_length(TextChunk* chunk){
-	return 0;
+	load_file(STR8("src/test.txt"));
 }
 
 //returns the number of bytes the cursor moved
 u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
-	u64 count = 0;
+	Cursor init = *cursor;
 	if      (match_any(bind, binds.cursorRight, binds.selectRight)){/////////////////////////////////// Move/Select Right
 		if(cursor->pos==buffer->capacity-buffer->gap_size-line_end_length+1) return 0; //end of file
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 		if(dc.codepoint == line_end_char){
 			dc.advance = line_end_length;
+			cursor->line_idx++;
 		}
 		cursor->pos += dc.advance;
-		count += dc.advance;
 	}else if(match_any(bind, binds.cursorLeft, binds.selectLeft)){///////////////////////////////////// Move/Select Left /////
 		if(!cursor->pos) return 0; //beginning of file
 		while(utf8_continuation_byte(*UserToMemSpace(buffer, cursor->pos))) cursor->pos--;
@@ -416,86 +412,107 @@ u64 move_cursor(Cursor* cursor, KeyCode bind){DPZoneScoped;
 		if(dc.codepoint == U'\n'){
 			dc.advance = line_end_length;
 			if(dc.advance==2)cursor->pos--;
+			cursor->line_idx--;
 		}
-		count += dc.advance;
 	}else if(match_any(bind, binds.cursorWordRight, binds.selectWordRight)){
 		u32 punc_codepoint;
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
 		else                       { punc_codepoint = 0; }
 		while(1){
-			u32 move = move_cursor(cursor, binds.cursorRight);
-			if(!move) break; //end of file
-			count+=move;
+			if(!move_cursor(cursor, binds.cursorRight)) break; //end of file
 			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 			if      ( punc_codepoint && dc.codepoint != punc_codepoint) break;
 			else if (!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_' ) break;
 		}
 	}else if(match_any(bind, binds.cursorWordLeft, binds.selectWordLeft)){
 		u32 punc_codepoint;
-		count += move_cursor(cursor, binds.cursorLeft);
+		b32 moved = move_cursor(cursor, binds.cursorLeft);
 		DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 		if(!isalnum(dc.codepoint)) { punc_codepoint = dc.codepoint; }
 		else                       { punc_codepoint = 0; }
-		while(count){
-			u32 move = move_cursor(cursor, binds.cursorLeft);
-			if(!move) break; //beginning of file
-			count += move;
+		while(moved){
+			if(!move_cursor(cursor, binds.cursorLeft)) break; //beginning of file
 			DecodedCodepoint dc = decoded_codepoint_from_utf8(UserToMemSpace(buffer, cursor->pos), 4);
 			if     ( punc_codepoint && dc.codepoint != punc_codepoint) break;
 			else if(!punc_codepoint && !isalnum(dc.codepoint) && dc.codepoint != U'_') break;
 		}
-		if(count) move_cursor(cursor, binds.cursorRight);
+		if(moved) move_cursor(cursor, binds.cursorRight);
 	}else if(match_any(bind, binds.cursorUp, binds.selectUp)){
-		
+		if(!cursor->line_idx) return 0; //first line
+		//if cursor's position is greater than the prev line length
+		if(LinePosition(buffer, cursor) >= LineLength(buffer, cursor->line_idx-1)){
+			cursor->pos -= LinePosition(buffer,cursor)+line_end_length;
+			cursor->line_idx--;
+		}
+		u32 codepoints = 0;
+		//scan left and see how many codepoints we pass
+		while(cursor->pos!=buffer->line_starts[cursor->line_idx]){
+			move_cursor(cursor, binds.cursorLeft);
+			codepoints++;
+		}
+		//set to prev line start
+		cursor->line_idx--;
+		cursor->pos = buffer->line_starts[cursor->line_idx];
+		//scan right till we move as many codepoints 
+		while(codepoints--){
+			move_cursor(cursor, binds.cursorRight);
+		}
 	}else if(match_any(bind, binds.cursorDown, binds.selectDown)){
-		
+		if(cursor->line_idx==buffer->line_starts[buffer->line_starts_count-1]) return 0; //last line
+		//if cursor position is greater than the next line's length
+		if(LinePosition(buffer, cursor) >= LineLength(buffer, cursor->line_idx+1)){
+			//there is an edge case where if the next line's length is equal to our line end length we have to put it at the beginning of the line
+			//so it doesnt move to the next
+			u32 nll = LineLength(buffer,cursor->line_idx+1);
+			cursor->line_idx++;
+			cursor->pos = buffer->line_starts[cursor->line_idx] + (nll==line_end_length?0:nll);//(LineLength(buffer,cursor->line_idx)-LinePosition(buffer,cursor))+(nll==1?0:nll);
+		}else{
+			u32 codepoints = 0;
+			//scan left and see how many codepoints we pass
+			while(cursor->pos!=buffer->line_starts[cursor->line_idx]){
+				move_cursor(cursor, binds.cursorLeft);
+				codepoints++;
+			}
+			//set to next line start
+			cursor->line_idx++;
+			cursor->pos = buffer->line_starts[cursor->line_idx];
+			while(codepoints--){
+				move_cursor(cursor, binds.cursorRight);
+			}
+		}
 	}
-	return count;
+	return abs(init.pos - cursor->pos);
 }
 
 void text_insert(str8 text){DPZoneScoped;
-	// Arena* edit_arena = *edit_arenas.last;
-	// TextChunk* curchunk = main_cursor.chunk;
-	
-	// if(main_cursor.chunk_start != curchunk->raw.count || curchunk != current_edit_chunk){
-	// 	if(main_cursor.chunk_start == curchunk->raw.count){
-	// 		TextChunk* prev = new_chunk();
-	// 		*prev = *curchunk;
-	
-	// 		NodeInsertPrev(&curchunk->node, &prev->node);
-	// 	}else if(!main_cursor.chunk_start){
-	// 		TextChunk* next = new_chunk();
-	// 		*next = *curchunk;
-	// 		if(main_cursor.line->chunk == curchunk){
-	// 			//if the main cursor's line's chunk is the cursor's chunk we must tell the line that its new chunk is the one we just made
-	// 			main_cursor.line->chunk = next;
-	// 		}
-	// 		NodeInsertNext(&curchunk->node, &next->node);			
-	// 	}else{
-	// 		TextChunk* prev = new_chunk();
-	// 		TextChunk* next = new_chunk();
-	// 		if(main_cursor.line->chunk == curchunk){
-	// 			main_cursor.line->chunk = prev;
-	// 		}
-	// 		prev->raw = {curchunk->raw.str, (s64)main_cursor.chunk_start};
-	// 		next->raw = {curchunk->raw.str + main_cursor.chunk_start, curchunk->raw.count - (s64)main_cursor.chunk_start};
-	// 		NodeInsertPrev(&curchunk->node, &prev->node);
-	// 		NodeInsertNext(&curchunk->node, &next->node);	
-	// 	}
-	// }
-	
-	if      (main_cursor.pos == buffer->upperbloc.count){
-		//cursor is already at the gap
-		
-	}else if(main_cursor.pos < buffer->upperbloc.count){
-		//cursor is before the gap and we must move it 
+	if(main_cursor.pos < buffer->upperbloc.count){
+		//cursor is before the gap  
 		u64 movesize = buffer->upperbloc.count - main_cursor.pos;
-		memmove(buffer->lowerbloc.str - movesize,  buffer->upperbloc.str + buffer->upperbloc.count, movesize);
+		buffer->lowerbloc.str -= movesize;
+		buffer->upperbloc.count -= movesize;
+		buffer->lowerbloc.count += movesize;
+		memmove(buffer->lowerbloc.str, buffer->upperbloc.str + buffer->upperbloc.count, movesize);
 		
+	}else if(main_cursor.pos > buffer->upperbloc.count){
+		//cursor is after the gap
+		u64 movesize = main_cursor.pos - buffer->upperbloc.count;
+		memmove(buffer->upperbloc.str+buffer->upperbloc.count, buffer->lowerbloc.str, movesize);
+		buffer->lowerbloc.str += movesize;
+		buffer->upperbloc.count += movesize;
+		buffer->lowerbloc.count -= movesize;
 	}
 	
+	memcpy(buffer->upperbloc.str+buffer->upperbloc.count, text.str, text.count);
+	buffer->upperbloc.count+=text.count;
+	main_cursor.pos = buffer->upperbloc.count;
 	
+	//adjust line starts if we arent on the last line
+	//oh brother this guy reeks
+	//TODO(sushi) maybe there is a better way to handle this?
+	forI(buffer->line_starts_count - main_cursor.line_idx){
+		buffer->line_starts[i] += text.count;
+	}
 	
 	// if(main_cursor.start != main_cursor.chunk->raw.count || main_cursor.chunk != current_edit_chunk){//we must branch a new chunk from the loaded file 
 	// 	TextChunk* curchunk = main_cursor.chunk;
@@ -805,25 +822,30 @@ void update_editor(){DPZoneScoped;
 	if(any_key_pressed() || any_key_released()){
 		reset_stopwatch(&repeat_hold);
 	}
-	if((peek_stopwatch(repeat_hold) > config.repeat_hold) && (peek_stopwatch(repeat_throttle) > config.repeat_throttle)){
+	else if((peek_stopwatch(repeat_hold) > config.repeat_hold) && (peek_stopwatch(repeat_throttle) > config.repeat_throttle)){
 		reset_stopwatch(&repeat_throttle);
 		repeat = 1;
 	}
+	// Log("", peek_stopwatch(repeat_hold));
+	// Log("", peek_stopwatch(repeat_throttle));
+	
+	
 #define CanDoInput(x) (key_pressed(x) || key_down(x) && repeat)
 	
 	//// cursor movement ////
-	if(CanDoInput(binds.cursorLeft))          { move_cursor(&main_cursor, binds.cursorLeft);}
-	if(CanDoInput(binds.cursorWordLeft))      { move_cursor(&main_cursor, binds.cursorWordLeft); }
-	if(CanDoInput(binds.cursorWordPartLeft))  { move_cursor(&main_cursor, binds.cursorWordPartLeft); }
-	if(CanDoInput(binds.cursorRight))         { move_cursor(&main_cursor, binds.cursorRight); }
-	if(CanDoInput(binds.cursorWordRight))     { move_cursor(&main_cursor, binds.cursorWordRight); }
-	if(CanDoInput(binds.cursorWordPartRight)) { move_cursor(&main_cursor, binds.cursorWordPartRight); }
-	if(CanDoInput(binds.cursorUp))            { move_cursor(&main_cursor, binds.cursorUp); }
-	if(CanDoInput(binds.cursorDown))          { move_cursor(&main_cursor, binds.cursorDown); }
+	static u64 last_move_count = 0; //debug
+	if(CanDoInput(binds.cursorLeft))          { last_move_count = move_cursor(&main_cursor, binds.cursorLeft);}
+	if(CanDoInput(binds.cursorWordLeft))      { last_move_count = move_cursor(&main_cursor, binds.cursorWordLeft); }
+	if(CanDoInput(binds.cursorWordPartLeft))  { last_move_count = move_cursor(&main_cursor, binds.cursorWordPartLeft); }
+	if(CanDoInput(binds.cursorRight))         { last_move_count = move_cursor(&main_cursor, binds.cursorRight); }
+	if(CanDoInput(binds.cursorWordRight))     { last_move_count = move_cursor(&main_cursor, binds.cursorWordRight); }
+	if(CanDoInput(binds.cursorWordPartRight)) { last_move_count = move_cursor(&main_cursor, binds.cursorWordPartRight); }
+	if(CanDoInput(binds.cursorUp))            { last_move_count = move_cursor(&main_cursor, binds.cursorUp); }
+	if(CanDoInput(binds.cursorDown))          { last_move_count = move_cursor(&main_cursor, binds.cursorDown); }
 	
 	//// text input ////
 	if(DeshInput->charCount){ 
-        text_insert({DeshInput->charIn, (s64)DeshInput->charCount});
+		text_insert({DeshInput->charIn, (s64)DeshInput->charCount});
 	}
 	//if(key_pressed(Key_ENTER | InputMod_None)){ text_insert(STR8("\n"));  }
 	
@@ -834,142 +856,47 @@ void update_editor(){DPZoneScoped;
 	if(key_pressed(binds.saveBuffer)){ save_buffer(); }
 	if(key_pressed(binds.reloadConfig)){ load_config(); }
 	
-	
-	//-////////////////////////////////////////////////////////////////////////////////////////////
-	//// render
-	if(g_ui->hovered){
-		render_start_cmd2(7, 0, vec2::ZERO, DeshWindow->dimensions);
-		render_quad2(g_ui->hovered->spos, g_ui->hovered->size, Color_Red);
+	//render char at cursor
+	render_start_cmd2(0, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+	vec2 cursor = config.buffer_padding;
+	str8 scan = buffer->upperbloc;
+	b32 passed = 0;
+	u64 pos = 0;
+	while(scan){
+		vec2 prevpos = cursor;
+		DecodedCodepoint dc = str8_advance(&scan);
+		draw_character(dc.codepoint, vec2::ONE, Color_White, &cursor);
+		if(main_cursor.pos == pos){
+			render_line2(vec2(prevpos.x,prevpos.y), vec2(prevpos.x,prevpos.y+config.font_height),Color_White);
+			
+		}
+		pos+=dc.advance;
+		if(!passed&&!scan) scan = buffer->lowerbloc, passed = 1;
 	}
 	
-	/*
-	render_start_cmd2(0, 0, vec2::ZERO, DeshWindow->dimensions);
-    //buffer background
-    render_quad_filled2(config.buffer_margin, DeshWindow->dimensions-config.buffer_margin*2, config.buffer_color);
-    //buffer outline
-    render_quad2(config.buffer_margin, DeshWindow->dimensions-config.buffer_margin*2, color(200,200,200));
-	
-    //text
-    vec2  visual_cursor = config.buffer_margin + config.buffer_padding;
-    vec2  text_space = DeshWindow->dimensions - (config.buffer_margin + config.buffer_padding) * 2;
-    vec2  text_scale = vec2::ONE * config.font_height / (f32)config.font->max_height;
-	Line* line = LineFromNode(root_line.next);
-    
-    render_start_cmd2(0, config.font->tex, config.buffer_padding, text_space);
-	for(Node* it = root_chunk.next; it != &root_chunk; it = it->next){
-        TextChunk* chunk = TextChunkFromNode(it);
-		vec2 size = CalcTextSize(chunk->raw); //maybe this can be cached?
-		
-        //dont render anything if it goes beyond buffer width
-        //if(visual_cursor.x > text_space.x){ 
-		//	visual_cursor.x = config.buffer_margin.x + config.buffer_padding.x;
-		//	visual_cursor.y += size.y;
-		//	continue;
-		//}
-        //TODO(sushi) word wrapping
-        if(config.word_wrap) NotImplemented;
-        else{
-			//draw chunk text
-			str8 text = chunk->raw;
-			u64 advanced = 0;
-			while(text){
-				vec2 prevcur = visual_cursor;
-				DecodedCodepoint decoded = str8_advance(&text);
-				if(decoded.codepoint == '\r'){ decoded = str8_advance(&text); advanced++; }
-				draw_character(decoded.codepoint, text_scale, config.text_color, &visual_cursor);	
-				//--------------------------------------------------------------------------------------- Draw Cursor//
-				if(main_cursor.chunk_start == (decoded.codepoint == '\n' && buffer_CRLF ? advanced-1 : advanced)){
-					persist Stopwatch cursor_blink = start_stopwatch();
-					if(DeshInput->anyKeyDown) reset_stopwatch(&cursor_blink);
-					color cursor_color = config.cursor_color;
-					f32 mult = M_PI*peek_stopwatch(cursor_blink)/config.cursor_pulse_duration;
-					cursor_color.a = (u8)(255*(sin(mult + M_HALFPI + cos(mult + M_HALFPI))+1)/2);
-					switch(config.cursor_shape){
-						case CursorShape_VerticalLine:{
-							vec2 cursor_top = vec2(prevcur.x, prevcur.y);
-							vec2 cursor_bot = vec2(prevcur.x, prevcur.y + config.font_height);
-							render_line2(cursor_top, cursor_bot, cursor_color);
-						}break;
-						case CursorShape_VerticalLineThick:{
-							vec2 cursor_top = vec2(prevcur.x, prevcur.y);
-							vec2 cursor_bot = vec2(cursor_top.x,           cursor_top.y + config.font_height);
-							render_line_thick2(cursor_top, cursor_bot, 2, cursor_color);
-						}break;
-						case CursorShape_Underline:{
-							f32 x_width = visual_cursor.x - prevcur.x;
-							vec2 cursor_left  = vec2(prevcur.x,           prevcur.y + config.font_height);
-							vec2 cursor_right = vec2(prevcur.x + x_width, prevcur.y + config.font_height);
-							render_line2(cursor_left, cursor_right, cursor_color);
-						}break;
-						case CursorShape_Rectangle:{
-							f32 x_width = visual_cursor.x - prevcur.x;
-							vec2 cursor_top_left  = vec2(prevcur.x, prevcur.y);
-							render_quad2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
-						}break;
-						case CursorShape_FilledRectangle:{
-							str8 right_char = str8_eat_one(str8{line->raw.str+main_cursor.line_start, (s64)(line->raw.count-main_cursor.line_start)});
-							f32 x_width = CalcTextSize(right_char).x;
-							vec2 cursor_top_left = vec2(prevcur.x, prevcur.y);
-							render_quad_filled2(cursor_top_left, vec2(x_width, config.font_height), cursor_color);
-							render_text2(config.font, right_char, cursor_top_left, text_scale, Color_Black);
-						}break;
-					}
-				}
-				
-				
-				advanced += decoded.advance;
-				if(decoded.codepoint == '\n') line = NextLine(line); 
-				if(visual_cursor.y > text_space.y){ break; }
-			} 
-			
-#if 0 //DEBUG
-			//left vertical line
-			render_line2(chunk_pos + size.yComp(), chunk_pos + (size.yComp()/2.f), (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
-			
-			//right vertical line
-			render_line2(chunk_pos + size, chunk_pos + vec2(size.x, size.y/2.f), (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
-			
-			//right vertical newline
-			if(chunk->newline){
-				render_line2(chunk_pos + size.xComp(), chunk_pos + vec2(size.x, size.y/2.f), Color_Yellow);
-			}
-			
-			//bottom line
-			render_line2(chunk_pos + size.yComp(), chunk_pos + size, (main_cursor.chunk == chunk ? Color_Cyan : Color_Red));
-#endif	
-			render_start_cmd2(5, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
-			string fps = toStr(1000/DeshTime->deltaTime);
-			render_text2(config.font, {(u8*)fps.str,fps.count}, vec2::ZERO, vec2::ONE, Color_White);
-			
-        }
-    }
-	*/
-	
-	
-}
-
-/*
-//render char at cursor
-render_start_cmd2(0, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
-vec2 cursor = config.buffer_padding + config.buffer_margin;
-str8 scan = buffer->upperbloc;
-b32 passed = 0;
-u64 pos = 0;
-while(scan){
-	vec2 prevpos = cursor;
-	DecodedCodepoint dc = str8_advance(&scan);
-	draw_character(dc.codepoint, vec2::ONE, Color_White, &cursor);
-	if(main_cursor.pos == pos){
-		render_line2(vec2(prevpos.x,prevpos.y), vec2(prevpos.x,prevpos.y+config.font_height),Color_White);
-		
+	{//cursor debug
+		render_start_cmd2(1, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+		str8 info=toStr8(
+						 "cursor","\n",
+						 "------", "\n",
+						 "pos:     ", main_cursor.pos,"\n",
+						 "count:   ", main_cursor.count,"\n",
+						 "line:    ", main_cursor.line_idx, "\n",
+						 "linelen: ", LineLength(buffer, main_cursor.line_idx), "\n",
+						 "linepos: ", LinePosition(buffer, &main_cursor), "\n",
+						 "move:    ", last_move_count
+						 ).fin;
+		vec2 size = font_visual_size(config.font, info);
+		vec2 pos = DeshWindow->dimensions - size;
+		render_quad_filled2(pos, size, Color_Black);
+		while(info){
+			str8 line = str8_eat_until(info, '\n');
+			render_text2(config.font, line, pos, vec2::ONE, Color_White);
+			info = str8{line.str+line.count+1, info.count - (line.count+1)};
+			pos.y += config.font->max_height;
+		}
 	}
-	pos+=dc.advance;
-	
-	
-	if(!passed&&!scan) scan = buffer->lowerbloc, passed = 1;
 }
-}
-*/
 
 
 // 	//--------------------------------------------------------------------------------------- Draw Cursor//
