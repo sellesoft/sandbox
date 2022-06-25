@@ -11,7 +11,7 @@ REM ____________________________________________________________________________
 
 @set INCLUDES=/I"..\src" /I"..\deshi\src" /I"..\deshi\src\external" /I"C:\src\glfw-3.3.2.bin.WIN64\include" /I"%VULKAN_SDK%\include"
 @set SOURCES=..\deshi\src\deshi.cpp main.cpp
-@set LIBS=/libpath:C:\src\glfw-3.3.2.bin.WIN64\lib-vc2019 /libpath:%VULKAN_SDK%\lib glfw3.lib opengl32.lib gdi32.lib shell32.lib vulkan-1.lib shaderc_combined.lib
+@set LIBS=/libpath:C:\src\glfw-3.3.2.bin.WIN64\lib-vc2019 /libpath:%VULKAN_SDK%\lib glfw3.lib opengl32.lib gdi32.lib shell32.lib vulkan-1.lib shaderc_combined.lib ws2_32.lib
 
 REM _____________________________________________________________________________________________________
 REM                                      Compiler and Linker Flags

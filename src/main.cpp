@@ -30,9 +30,7 @@
 #include "core/file.h"
 #include "math/math.h"
 
-#if BUILD_INTERNAL
 #include "misc_testing.cpp"
-#endif
 
 int main(){
 	//init deshi
