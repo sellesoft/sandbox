@@ -518,3 +518,80 @@ void spring(){
 	}
 }
 
+typedef f64 (*MathFunc)(f64);
+
+f64 SecantMethod(f64 x0, f64 x1, f64 tol, MathFunc func) {
+	f64 x2 = 0;
+	u32 it = 0;
+	while (true) {
+		x2 = x1 - func(x0) * (x1 - x0) / (func(x1) - func(x0));
+		Log("", x2, " with func is ", func(x2));
+		x0 = x1; x1 = x2;
+		if (abs(func(x2)) < tol) return x2;
+		if (it++ > 3000) return x2;
+	}
+}
+
+void graph_testing(){
+	persist b32 init = 0;
+	persist const u32 res = 300;
+	persist Graph g;
+	persist array<vec2g> data;
+	//TODO only actually resize when OSWindow size changes
+	data.resize(DeshWindow->width);
+	if(!data.count)return;
+	if(!init){
+		g.xAxisLabel = str8_lit("x");
+		g.yAxisLabel = str8_lit("y");
+		init=1;
+	}
+	else{
+		UI::Begin(str8_lit("graphe"), vec2::ONE, vec2(600,500), UIWindowFlags_NoScroll);
+		u32 res = Min(DeshWindow->width, UI::GetWindow()->width - UI::GetStyle().windowMargins.x*2);
+		g.data={data.data,res};
+		g.dotsize = 3;
+		g.xShowMinorLines = false;
+		g.yShowMinorLines = false;
+		
+		f64 t = DeshTotalTime/1000;
+		
+		static Stopwatch timer = start_stopwatch();
+		
+		
+		if(peek_stopwatch(timer) > 10){
+			reset_stopwatch(&timer);
+			forI(res){
+				f64 alignment = (g.cameraPosition.x-g.cameraZoom)+f64(i)/res*g.cameraZoom*2;
+				f64& x = data[i].x;
+				f64& y = data[i].y;
+				x = alignment;
+				y = rng()%5000/5000.f;
+			}
+		}
+		
+		
+		
+		draw_graph(&g, UI::GetWindow()->dimensions-UI::GetStyle().windowMargins*2);
+		UIItem* gr = UI::GetLastItem();
+		
+		
+		static vec2 mp;
+		static vec2 gcp;
+		if(UI::IsLastItemHovered() && input_lmouse_pressed()){
+			UI::SetPreventInputs();
+			mp = input_mouse_position();
+			gcp = g.cameraPosition;
+		}
+		if(mp!=vec2::ONE*FLT_MAX && input_lmouse_down()){
+			g.cameraPosition = gcp - (input_mouse_position() - mp) / (vec2g(g.dimensions_per_unit_length.x, g.dimensions_per_unit_length.x*g.aspect_ratio));
+			//Log("test",g.cameraPosition.x," ",g.cameraPosition.y);
+		}
+		if(input_lmouse_released()){
+			UI::SetAllowInputs();
+			mp=vec2::ONE*FLT_MAX;
+		}
+		
+		g.cameraZoom -= 0.2*g.cameraZoom*DeshInput->scrollY;
+		UI::End();
+	}
+}
