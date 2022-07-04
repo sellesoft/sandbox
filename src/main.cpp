@@ -30,13 +30,9 @@
 #include "core/file.h"
 #include "math/math.h"
 
-#if BUILD_INTERNAL
-#include "misc_testing.cpp"
-#endif
-
 //// nasau includes ////
 #include "hardware.h"
-#include "assembler.cpp"
+#include "assembler.h"
 #define nbits(n) ((u64(1) << u64(n)) - u64(1)) 
 #define MchnInst(ptr, bits) *ptr=bits;ptr+=1
 //helps write programs 
@@ -135,7 +131,7 @@ struct progwrite{
 
 	void SDIV(u64 QR, u64 RR, u64 SR1, u64 immcond, s64 S){
 		u64 instr = 0b000110;
-		u64 Su = ConversionlessCast(u64, S);
+		u64 Su = *(u64*)S;
 		instr = (instr << 4) | (QR & nbits(4));
 		instr = (instr << 4) | (RR & nbits(4));
 		instr = (instr << 4) | (SR1 & nbits(4));
@@ -276,8 +272,17 @@ int main(){
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
+	assembler asmblr;
+	array<u64> program = asmblr.assemble(STR8("asm/jumptests.a"));
+	
+	machine mchn;
+	mchn.PC_START = 0;
+	memcpy(mchn.mem + mchn.PC_START, program.data, program.count * sizeof(u64));
+	mchn.turnon();
+
 	//start main loop
 	while(platform_update()){DPZoneScoped;
+		mchn.tick();
 		console_update();
 		UI::Update();
 		render_update();

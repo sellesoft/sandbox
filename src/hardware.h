@@ -146,24 +146,29 @@ enum : u32{
     OP_JN,
     OP_MOV,
     OP_COUNT,
+    OP_UNKNOWN = npos,
 };
 
 static const str8 opnames[] = {
-    str8l("nop"),
-    str8l("add"), 
-    str8l("sub"), 
-    str8l("mul"), 
-    str8l("smul"), 
-    str8l("div"), 
-    str8l("sdiv"), 
-    str8l("and"), 
-    str8l("or"), 
-    str8l("xor"), 
-    str8l("shr"), 
-    str8l("shl"), 
-    str8l("not"), 
-    str8l("jmp"), 
-    str8l("mov"), 
+    STR8("nop"),
+    STR8("add"), 
+    STR8("sub"), 
+    STR8("mul"), 
+    STR8("smul"), 
+    STR8("div"), 
+    STR8("sdiv"),
+    STR8("and"), 
+    STR8("or"), 
+    STR8("xor"), 
+    STR8("shr"), 
+    STR8("shl"), 
+    STR8("not"), 
+    STR8("jmp"), 
+    STR8("jz"), 
+    STR8("jnz"),
+    STR8("jp"),
+    STR8("jn"),
+    STR8("mov"),
 };
 
 /*
@@ -451,8 +456,8 @@ mov:
   
   encoding:
     normal:
-      001110 | **** | 0 | **** | ... |
-          |  dr  |   | sr1  | nu  |
+      010010 | **** | 0 | **** | ... |
+      mov    |  dr  |   | sr1  | nu  |
       63   58|57  54| 53|52  49|48  0|
 
     immediate:
@@ -566,10 +571,21 @@ InstrRead ReadInstr(u64 instr){
         case OP_JMP:{
             read.SR1 = readbits(54, 4);
         }break;
+        case OP_JZ:{
+            read.SR1 = readbits(54, 4);
+        }break;
+        case OP_JNZ:{
+            read.SR1 = readbits(54, 4);
+        }break;
+        case OP_JP:{
+            read.SR1 = readbits(54, 4);
+        }break;
+        case OP_JN:{
+            read.SR1 = readbits(54, 4);
+        }break;
         case OP_MOV:{
             read.DR = readbits(54, 4);
-            read.SR1 = readbits(50, 4);
-            if(readbits(53, 1)) read.immval = sign_extend(readbits(0, 42), 42), read.immcond = 1;
+            if(readbits(53, 1)) read.immval = sign_extend(readbits(0, 52), 52), read.immcond = 1;
             else                read.SR1 = readbits(49,4);
         }break;
     }
@@ -617,7 +633,7 @@ struct machine{
         u64 instr = mem_read(reg[R_PC].u++);  //get current instruction
         InstrRead read = ReadInstr(instr);
         
-#if 0
+#if 1
         Log("",
             "OP:  ", opnames[read.OP], "\n",
             "DR:  %", read.DR, "\n",
@@ -648,7 +664,7 @@ struct machine{
                 update_flags(read.DR);
             }break;
             case OP_SMUL:{
-                if(read.immcond) sreg(read.DR) = sreg(read.SR1) * ConversionlessCast(s64,read.immval);
+                if(read.immcond) sreg(read.DR) = sreg(read.SR1) * *(s64*)&read.immval;
                 else                sreg(read.DR) = sreg(read.SR1) * sreg(read.SR2);
                 update_flags(read.DR);
             }break;
@@ -665,8 +681,8 @@ struct machine{
             }break;
             case OP_SDIV:{
                 if(read.immcond){
-                    sreg(read.QR) = sreg(read.SR1) / ConversionlessCast(s64, read.immval);
-                    sreg(read.RR) = sreg(read.SR1) % ConversionlessCast(s64, read.immval);
+                    sreg(read.QR) = sreg(read.SR1) / *(s64*)read.immval;
+                    sreg(read.RR) = sreg(read.SR1) % *(s64*)read.immval;
                 }
                 else{
                     sreg(read.QR) = sreg(read.SR1) / sreg(read.SR2);
