@@ -44,6 +44,7 @@
 
 #define asmerr(...)  Log("", filename, "(", linenum, ",", linecol, "): ", ErrorFormat("error: "),     __VA_ARGS__)
 #define asmwarn(...) Log("", filename, "(", linenum, ",", linecol, "): ", WarningFormat("warning: "), __VA_ARGS__)
+#define asmnote(...) Log("", filename, "(", linenum, ",", linecol, "): ", MagentaFormat("note: "), __VA_ARGS__)
 
 #define nbits(n) ((u64(1) << u64(n)) - u64(1)) 
 
@@ -124,6 +125,15 @@ void print_instr(u64 instr){
     );
 }
 
+//for caching info about tokens in some situations so we can give better notes/errors 
+struct InstToken{
+    str8 raw;
+    u64 inst_idx;
+    u32 l0;
+    u32 c0;
+    u8* line_start;
+};
+
 struct assembler{
     str8 filename;
 
@@ -164,10 +174,20 @@ struct assembler{
 
     str8 eat_word(){
         str8 out = {stream.str, 0};
-        while(is_identifier_char(decoded_codepoint_from_utf8(stream.str, 4).codepoint)){
-            out.count += str8_advance(&stream).advance;
+        str8 cursor = stream;
+        DecodedCodepoint dc = decoded_codepoint_from_utf8(stream.str, 4);
+        //check that first char is not a number
+        if(is_identifier_char(dc.codepoint)){
+            out.count += dc.advance;
             linecol++;
-        }   
+            dc = decoded_codepoint_from_utf8(stream.str + out.count, 4);
+        }else return out;
+        while(is_identifier_char(dc.codepoint) || is_digit(dc.codepoint)){
+            out.count += dc.advance;
+            linecol++;
+            dc = decoded_codepoint_from_utf8(stream.str + out.count, 4);
+        }
+        str8_increment(&stream, out.count);
         return out;
     }
 
@@ -195,6 +215,9 @@ struct assembler{
 
         File* file = file_init(filename, FileAccess_Read);
         str8 buffer = file_read_alloc(file, file->bytes, deshi_allocator);
+        defer{
+            memzfree(buffer.str);
+        };
 
         stream = buffer;
         linenum = 1;
@@ -216,6 +239,11 @@ struct assembler{
             expect_operand = 1 << 3,
         }state = expect_id;
 
+        //list of jumps that use labels that appear after it
+        //so we must return to them later
+        map<str8, array<InstToken>> incomplete_jumps;
+        map<str8, InstToken> labels;
+
         while(stream){
             switch(decoded_codepoint_from_utf8(stream.str, 4).codepoint){
                 case '\t': case '\n': case '\v': case '\f':  case '\r':
@@ -226,22 +254,9 @@ struct assembler{
                     eat_whitespace();
                 }continue;
 
-                case '0': case '1': case '2': case '3': case '4': 
-                case '5': case '6': case '7': case '8': case '9':{
-                    // if(HasFlag(state, expect_operand)){
-                    //     //we must be parsing an immediate value
-
-                    // }
-                    // if(!(HasFlag(state, expect_digit) || HasFlag(state, expect_operand))) asmerr("unexpected digit.");
-                    // else{
-
-                    // }
-                }break;
-
                 case '%':{
                     if(!(HasFlag(state, expect_reg) || HasFlag(state, expect_operand))) asmerr("unexpected register.");
                     stream_next;
-                    
                 }break;
                 
                 default:{
@@ -250,182 +265,224 @@ struct assembler{
                         
                         word = eat_word();
                         opcode = is_opcode(word);
-                        if(opcode == OP_UNKNOWN) {
-                            asmerr("unknown word '", word, "'");
-                            break;
-                        }
-                        switch(opcode){
-                            case OP_NOP:{
-                                progout.add(0);
-                            }break;
-                            case OP_ADD: 
-                            case OP_SUB:
-                            case OP_MUL:
-                            case OP_SMUL:
-                            case OP_AND:
-                            case OP_OR:
-                            case OP_XOR:
-                            case OP_SHR:
-                            case OP_SHL:{
-                                u64 maximm = 49;
-                                instr = opcode;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    stream_next;
-                                    operand1 = parse_reg();
-                                }else{
-                                    asmerr("first operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
-                                    break;
-                                } 
-                                eat_whitespace();
-                                if(*stream.str != ','){
-                                    asmerr("unexpected token after first operand, expected ','");
-                                    break;
-                                } 
-                                stream_next;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    stream_next;
-                                    operand2 = parse_reg();
+                        if(opcode != OP_UNKNOWN) {
+                            switch(opcode){
+                                case OP_NOP:{
+                                    progout.add(0);
+                                }break;
+                                case OP_ADD: 
+                                case OP_SUB:
+                                case OP_MUL:
+                                case OP_SMUL:
+                                case OP_AND:
+                                case OP_OR:
+                                case OP_XOR:
+                                case OP_SHR:
+                                case OP_SHL:{
+                                    u64 maximm = 49;
+                                    instr = opcode;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        stream_next;
+                                        operand1 = parse_reg();
+                                    }else{
+                                        asmerr("first operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
+                                        break;
+                                    } 
+                                    eat_whitespace();
                                     if(*stream.str != ','){
-                                        //binop so set operand 2 to 1 and 3 to 2 and early out
-                                        instr |= operand1 & nbits(4);
-                                        instr <<= 5;
-                                        instr |= operand2;
+                                        asmerr("unexpected token after first operand, expected ','");
+                                        break;
+                                    } 
+                                    stream_next;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        stream_next;
+                                        operand2 = parse_reg();
+                                        if(*stream.str != ','){
+                                            //binop so set operand 2 to 1 and 3 to 2 and early out
+                                            instr |= operand1 & nbits(4);
+                                            instr <<= 5;
+                                            instr |= operand2;
+                                            instr <<= 45;
+                                            progout.add(instr);
+                                            break;
+                                        }
+                                    }else if(is_digit(*stream.str)){
+                                        // binop overload
+                                        instr = (instr << 4) | (operand1 & nbits(4));
+                                        operand2 = stolli(eat_int());
+                                        instr = (instr << 1) | 1; //set imm bit
+                                        if(operand2 > nbits(maximm)){
+                                            asmerr("attempt to use immediate value ", operand2, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). TODO(sushi) implement an instruction for mov'ing a 64 bit value.");
+                                            break;
+                                        }else{
+                                            instr = (instr << maximm) | operand2;
+                                            progout.add(instr);
+                                        }
+                                        break;
+                                    }
+                                    eat_whitespace();
+                                    if(*stream.str != ','){
+                                        break;
+                                    } 
+                                    stream_next;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        stream_next;
+                                        instr <<= 1;
+                                        operand3 = parse_reg();
                                         instr <<= 45;
                                         progout.add(instr);
+                                    }else if(is_digit(*stream.str)){
+                                        operand3 = stolli(eat_int());
+                                        instr = (instr << 1) | 1; //set imm bit
+                                        if(operand3 > nbits(maximm)){
+                                            asmerr("attempt to use immediate value ", operand2, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). TODO(sushi) implement an instruction for mov'ing a 64 bit value.");
+                                        }else{
+                                            instr = (instr << maximm) | operand3;
+                                            progout.add(instr);
+                                        }
+                                    }
+                                }break;
+                                case OP_MOV:{
+                                    u64 maximm = 53;
+                                    instr = opcode;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        stream_next;
+                                        operand1 = parse_reg();
+                                    }else{
+                                        asmerr("first operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
+                                        break;
+                                    } 
+                                    eat_whitespace();
+                                    if(*stream.str != ','){
+                                        asmerr("unexpected token after first operand, expected ','");
+                                        break;
+                                    } 
+                                    stream_next;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        instr = (instr << 1);
+                                        stream_next;
+                                        operand2 = parse_reg();
+                                        instr <<= 49;
+                                        progout.add(instr);
+                                    }else if(is_digit(*stream.str)){
+                                        operand2 = stolli(eat_int());
+                                        instr = (instr << 1) | 1; //set imm bit
+                                        if(operand2 > nbits(maximm)){
+                                            asmerr("attempt to use immediate value ", operand2, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). \nYou must put this immediate value into a register then use it as an operand. \nTODO(sushi) implement an instruction for mov'ing a 64 bit value.");
+                                        }else{
+                                            instr = (instr << maximm) | operand2;
+                                            progout.add(instr);
+                                        }
+                                    }
+                                    if(*stream.str == ','){
+                                        asmerr(word, " only takes two operands.");
+                                    }
+                                }break;
+                                case OP_JMP:  
+                                case OP_JZ:  
+                                case OP_JNZ: 
+                                case OP_JP: 
+                                case OP_JN:{
+                                    u64 maximm = 57;
+                                    instr = opcode;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        stream_next;
+                                        instr = (instr << 1) | 0;
+                                        operand1 = parse_reg();
+                                        instr <<= 53;
+                                        progout.add(instr);
+                                    }else if(is_digit(*stream.str)){
+                                        operand1 = stolli(eat_int());
+                                        if(operand1 > nbits(maximm)){
+                                            asmerr("attempt to use immediate value ", operand1, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). \nYou must put this immediate value into a register then use it as an operand. \nTODO(sushi) implement an instruction for mov'ing a 64 bit value.");
+                                            break;
+                                        }
+                                        instr = (((instr << 1) | 1) << maximm) | operand1;
+                                        progout.add(instr);
+                                    }else if(is_identifier_char(*stream.str)){
+                                        word = eat_word();
+                                        if(InstToken* it = labels.at(word)){
+                                            u64 jump_addr = it->inst_idx;
+                                            if(jump_addr > nbits(maximm)){
+                                                asmerr("labels placed at locations greater than ", nbits(maximm), " are not supported. I don't know if this will even happen.");
+                                                break;
+                                            }else{
+                                                instr = (((instr << 1) | 1) << maximm) | jump_addr;
+                                                progout.add(instr);
+                                            }
+                                        }else{
+                                            if(!incomplete_jumps.has(word)) incomplete_jumps.add(word);
+                                            InstToken ti;
+                                            //TODO(sushi) line/col does not work properly here
+                                            ti.l0 = linenum;
+                                            ti.c0 = linecol;
+                                            ti.inst_idx = progout.count;
+                                            ti.raw = stream;
+                                            incomplete_jumps[word].add(ti);
+                                        }
+                                    }else{
+                                        asmerr("operand of ", CyanFormatDyn(word), " must be either a register, number, or label.");
                                         break;
                                     }
-                                }else if(is_digit(*stream.str)){
-                                    // binop overload
-                                    instr = (instr << 4) | (operand1 & nbits(4));
-                                    operand2 = stolli(eat_int());
-                                    instr = (instr << 1) | 1; //set imm bit
-                                    if(operand2 > nbits(maximm)){
-                                        asmerr("attempt to use immediate value ", operand2, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). TODO(sushi) implement an instruction for mov'ing a 64 bit value.");
-                                        break;
-                                    }else{
-                                        instr = (instr << maximm) | operand2;
-                                        progout.add(instr);
-                                    }
-                                    break;
-                                }
-                                eat_whitespace();
-                                if(*stream.str != ','){
-                                    break;
-                                } 
-                                stream_next;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    stream_next;
-                                    instr <<= 1;
-                                    operand3 = parse_reg();
-                                    instr <<= 45;
-                                    progout.add(instr);
-                                }else if(is_digit(*stream.str)){
-                                    operand3 = stolli(eat_int());
-                                    instr = (instr << 1) | 1; //set imm bit
-                                    if(operand3 > nbits(maximm)){
-                                        asmerr("attempt to use immediate value ", operand2, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). TODO(sushi) implement an instruction for mov'ing a 64 bit value.");
-                                    }else{
-                                        instr = (instr << maximm) | operand3;
-                                        progout.add(instr);
-                                    }
-                                }
-                            }break;
-                            case OP_MOV:{
-                                u64 maximm = 53;
-                                instr = opcode;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    stream_next;
-                                    operand1 = parse_reg();
-                                }else{
-                                    asmerr("first operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
-                                    break;
-                                } 
-                                eat_whitespace();
-                                if(*stream.str != ','){
-                                    asmerr("unexpected token after first operand, expected ','");
-                                    break;
-                                } 
-                                stream_next;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    instr = (instr << 1);
-                                    stream_next;
-                                    operand2 = parse_reg();
-                                    instr <<= 49;
-                                    progout.add(instr);
-                                }else if(is_digit(*stream.str)){
-                                    operand2 = stolli(eat_int());
-                                    instr = (instr << 1) | 1; //set imm bit
-                                    if(operand2 > nbits(maximm)){
-                                        asmerr("attempt to use immediate value ", operand2, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). \nYou must put this immediate value into a register then use it as an operand. \nTODO(sushi) implement an instruction for mov'ing a 64 bit value.");
-                                    }else{
-                                        instr = (instr << maximm) | operand2;
-                                        progout.add(instr);
-                                    }
-                                }
-                                if(*stream.str == ','){
-                                    asmerr(word, " only takes two operands.");
-                                }
-                            }break;
-                            case OP_JMP:  
-                            case OP_JZ:  
-                            case OP_JNZ: 
-                            case OP_JP: 
-                            case OP_JN:{
-                                u64 maximm = 57;
-                                instr = opcode;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    stream_next;
-                                    instr = (instr << 1) | 0;
-                                    operand1 = parse_reg();
-                                    instr <<= 53;
-                                    progout.add(instr);
-                                }else if(is_digit(*stream.str)){
-                                    operand1 = stolli(eat_int());
-                                    if(operand1 > nbits(maximm)){
-                                        asmerr("attempt to use immediate value ", operand1, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). \nYou must put this immediate value into a register then use it as an operand. \nTODO(sushi) implement an instruction for mov'ing a 64 bit value.");
+                                    if(*stream.str == ','){
+                                        asmerr(CyanFormatDyn(word), " only takes one operand");
                                         break;
                                     }
-                                    instr = (((instr << 1) | 1) << maximm) | operand1;
+                                }break;
+                                case OP_ST:
+                                case OP_LD:
+                                case OP_NOT:{
+                                    instr = opcode;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        stream_next;
+                                        parse_reg();
+                                    }else asmerr("first operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
+                                    eat_whitespace();
+                                    if(*stream.str != ','){
+                                        asmerr(word, " expects 2 operands.");
+                                        break;
+                                    }
+                                    stream_next;
+                                    eat_whitespace();
+                                    if(*stream.str == '%'){
+                                        stream_next;
+                                        parse_reg();
+                                    }else asmerr("second operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
+                                    instr <<= 50;
                                     progout.add(instr);
-                                }else{
-                                    asmerr("operand of ", CyanFormatDyn(word), " must be either a register or a number.");
-                                    break;
-
+                                }break;
+                            }
+                        }else if(*stream.str == ':'){
+                            if(labels.has(word)){
+                                InstToken it = labels[word];
+                                asmerr("label names must be unique (for now).");
+                                asmnote("original label was defined at (", it.l0, ",", it.c0, ")");
+                            }else{
+                                InstToken* it = labels.atIdx(labels.add(word));
+                                it->l0 = linenum;
+                                it->c0 = linecol;
+                                it->line_start = line_start;
+                                it->raw = stream;
+                                it->inst_idx = progout.count;
+                                if(incomplete_jumps.has(word)){
+                                    for(InstToken& t : incomplete_jumps[word]){
+                                        u64* i = &progout[t.inst_idx];
+                                        *i = (((*i << 1) | 1) << 57) | (it->inst_idx );
+                                    }
+                                    incomplete_jumps.remove(word);
                                 }
-                                if(*stream.str == ','){
-                                    asmerr(CyanFormatDyn(word), " only takes one operand");
-                                    break;
-                                }
-                            }break;
-                            case OP_ST:
-                            case OP_LD:
-                            case OP_NOT:{
-                                instr = opcode;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    stream_next;
-                                    parse_reg();
-                                }else asmerr("first operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
-                                eat_whitespace();
-                                if(*stream.str != ','){
-                                    asmerr(word, " expects 2 operands.");
-                                    break;
-                                }
-                                stream_next;
-                                eat_whitespace();
-                                if(*stream.str == '%'){
-                                    stream_next;
-                                    parse_reg();
-                                }else asmerr("second operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
-                                instr <<= 50;
-                                progout.add(instr);
-                            }break;
+                            }
+                            stream_next;
+                        }else{
+                            asmerr("unknown word '", word, "'");
+                            break;
                         }
                         
                     }

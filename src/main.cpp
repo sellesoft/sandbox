@@ -277,13 +277,17 @@ int main(){
 	assembler asmblr;
 	array<u64> program = asmblr.assemble(STR8("asm/set_half_kilobyte.a"));
 	
+	File* file = file_init(STR8("asm/set_half_kilobyte.a"), FileAccess_Read);
+	file_cursor(file, 0);
+	str8 buffer = file_read_alloc(file, file->bytes, deshi_allocator);
+
 	machine mchn;
 	mchn.PC_START = 0;
 	memcpy(mchn.mem + mchn.PC_START, program.data, program.count * sizeof(u64));
 	mchn.turnon();
-
+	vec2 blocksize = {2,2};
 	uiItem* blocks[1024] = {0};
-	u64 inc = 2;
+	u64 inc = 1;
 #define viewsize 
 	uiItem* win = uiItemB();
 		win->style.background_color = color(14,14,14);
@@ -293,34 +297,76 @@ int main(){
 		win->style.padding = {5,5,5,5};
 		win->style.sizing = size_percent;
 		win->style.size = {100,100};
-		forI(1024){
-			blocks[i] = uiItemM();
-			blocks[i]->style.positioning = pos_relative;
-			blocks[i]->style.size = {10,10};
-		}
+		win->style.display = display_flex | display_row;
+		win->style.font = Storage::CreateFontFromFileBDF(STR8("gohufont-11.bdf")).second;
+		win->style.font_height = 11;
+		win->style.text_color = Color_White;
+
+		uiItem* sourcewin = uiItemB();
+			uiStyle* sws = &sourcewin->style;
+			sws->border_color = Color_White;
+			sws->border_style = border_solid;
+			sws->border_width = 1;
+			sws->sizing = size_flex | size_percent_y;
+			sws->size = {1, 100};
+			sws->padding = {4,4,4,4};
+			sws->overflow = overflow_hidden;
+			sws->background_color = color(0,0,0);
+			sws->margin_right = 4;
+			uiItem* test = uiItemM();
+			test->style.size = {10,10};
+			test->style.background_color = Color_Yellow;
+			uiItem* text = uiTextM(buffer);
+		uiItemE();
+
+		uiItem* memwin = uiItemB();
+			
+			uiStyle* mws = &memwin->style;
+			mws->border_color = Color_White;
+			mws->border_style = border_solid;
+			mws->border_width = 1;
+			mws->background_color = color(0,0,0);
+			mws->sizing = size_flex | size_percent_y;
+			mws->size = {0.5, 100};
+			mws->padding = {4,4,4,4};
+			forI(1024){
+				blocks[i] = uiItemM();
+				blocks[i]->style.positioning = pos_absolute;
+			}
+		uiItemE();
+
+
 	uiItemE();
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		if(mchn.ureg(0)){
-			mchn.tick();
-		}else if(key_pressed(Key_SPACE)){
+			Stopwatch cputime = start_stopwatch();
+			while(mchn.ureg(0)){
+				mchn.tick();
+			}
+			Log("", "cpu took ", peek_stopwatch(cputime));
+		}
+		if(key_pressed(Key_SPACE)){
 			mchn.ureg(0) = inc++;
 		}
 
 		vec2 cursor = {0,0};
 		forI(1024){
+			u64 val = *((u64*)mchn.mem + i);
 			blocks[i]->style.pos = cursor;
-			u64 val = *(u64*)mchn.mem + i;
-			blocks[i]->style.background_color = color(val/5.f*255,val/5.f*255,val/5.f*255);
-			cursor.x += 10;
-			if(cursor.x > PaddedWidth(win)){
+			blocks[i]->style.size = blocksize;
+			blocks[i]->style.background_color = color(255*val/5.f,255*val/5.f,255*val/5.f);
+			cursor.x += blocksize.x;
+			if(cursor.x > PaddedWidth(memwin)){
 				cursor.x = 0;
-				cursor.y += 10;
+				cursor.y += blocksize.y;
+				if(cursor.y > PaddedHeight(memwin)){
+					break;
+				}
 			}
-			if(cursor.y > PaddedHeight(win)) break;
 		}
-
+		
 		uiUpdate();
 		console_update();
 		UI::Update();

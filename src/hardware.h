@@ -635,7 +635,7 @@ struct machine{
 
     b32 powered = false;
     u64 PC_START = 0x0000; //the address the machine starts executing from.
-    u8 mem[MAX_U16]; // the machines memory
+    u8* mem = (u8*)memalloc(Kilobytes(1)); // the machines memory
     
     void turnon(){
         powered = true;
@@ -673,10 +673,10 @@ struct machine{
             else                 ureg(R_COND)=FL_POS;
         };
     
-        u64 instr = mem_read_u64(reg[R_PC].u++);  //get current instruction
+        u64 instr = mem_read_u64(reg[R_PC].u++ * sizeof(u64));  //get current instruction
         InstrRead read = ReadInstr(instr);
         
-#if 1
+#if 0
         Log("",
             "OP:  ", opnames[read.OP], "\n",
             "DR:  %", read.DR, "\n",
