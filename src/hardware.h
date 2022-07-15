@@ -145,6 +145,8 @@ enum : u32{
     OP_JP,
     OP_JN,
     OP_MOV,
+    OP_ST,
+    OP_LD,
     OP_COUNT,
     OP_UNKNOWN = npos,
 };
@@ -169,6 +171,8 @@ static const str8 opnames[] = {
     STR8("jp"),
     STR8("jn"),
     STR8("mov"),
+    STR8("st"),
+    STR8("ld"),
 };
 
 /*
@@ -399,56 +403,73 @@ not:
       001100 | **** | **** | ... |
       not    |  dr  |  sr1 | nu  |
       63   58|57  54|53  50|49  0|
+
 ---------------------------------------------------------------------------------------------------------------
+//TODO(sushi) all of these jmp entries can be combined into one entry
 jmp:
   jump unconditionally to the location specified in the register
   
   encoding:
     normal:
-      001101 | **** | ... |
-      jmp    |  sr1 | nu  |
-      63   58|57  54|53  0|
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-NOTE: there is no cmp opcode
-      the equivalent of cmp is just subtracting 2 operands 
-      cmp can still be implemented in our ASM language, though
+      001101 | 0 | **** | ... |
+      jmp    |   |  sr1 | nu  |
+      63   58| 57|56  53|52  0|
+    immediate:
+      001101 | 1 |  ...  |
+      jmp    |   | imm57 |
+      63   58| 57|56    0|
 ---------------------------------------------------------------------------------------------------------------
 jz:
   jump to the location specified in sr1 if the previous operation was 0
   
   encoding:
     normal:
-      001110 | **** | ... |
-      je     |  sr1 | nu  |
-      63   58|57  54|53  0|
+      001110 | 0 | **** | ... |
+      jz     |   |  sr1 | nu  |
+      63   58| 57|56  53|52  0|
+    immediate:
+      001110 | 1 |  ...  |
+      jz     |   | imm57 |
+      63   58| 57|56    0|
 ---------------------------------------------------------------------------------------------------------------
 jnz:
   jump to the location specified in sr1 if the previous operation was not 0
   
   encoding:
     normal:
-      001111 | **** | ... |
-      jne    |  sr1 | nu  |
-      63   58|57  54|53  0|
+      001111 | 0 | **** | ... |
+      jnz    |   |  sr1 | nu  |
+      63   58| 57|56  53|52  0|
+    immediate:
+      001111 | 1 |  ...  |
+      jnz    |   | imm57 |
+      63   58| 57|56    0|
 ---------------------------------------------------------------------------------------------------------------
 jp:
   jump to the location specified in sr1 if the previous operation resulted in a positive number
   
   encoding:
     normal:
-      010000 | **** | ... |
-      jz     |  sr1 | nu  |
-      63   58|57  54|53  0|
+      010000 | 0 | **** | ... |
+      jp     |   |  sr1 | nu  |
+      63   58| 57|56  53|52  0|
+    immediate:
+      010000 | 1 |  ...  |
+      jp     |   | imm57 |
+      63   58| 57|56    0|
 ---------------------------------------------------------------------------------------------------------------
 jn:
   jump to the location specified in sr1 if the previous operation resulted in a negative number
   
   encoding:
     normal:
-      010001 | **** | ... |
-      jz     |  sr1 | nu  |
-      63   58|57  54|53  0|
+      010001 | 0 | **** | ... |
+      jn     |   |  sr1 | nu  |
+      63   58| 57|56  53|52  0|
+    immediate:
+      010001 | 1 |  ...  |
+      jn     |   | imm57 |
+      63   58| 57|56    0|
 ---------------------------------------------------------------------------------------------------------------
 mov:
   if 53rd bit is 0, copies data from sr1 to dr
@@ -464,8 +485,24 @@ mov:
       010010 | **** | 1 |  ...  |
       mov    |  dr  |   | imm53 |
       63   58|57  54| 53|52    0|
+---------------------------------------------------------------------------------------------------------------
+st:
+  stores the value stored in sr1 at the memory location pointered to by dr
 
+  encoding:
+    normal:
+      010011 | **** | **** | ... |
+      st     |  dr  | sr1  | nu  |
+      63   58|57  54|53  50|49  0|
+---------------------------------------------------------------------------------------------------------------
+ld:
+  loads the value stored at the memory location sr1 to dr
 
+  encoding:
+    normal:
+      010100 | **** | **** | ... |
+      ld     |  dr  | sr1  | nu  |
+      63   58|57  54|53  50|49  0|
 
 */
 
@@ -568,25 +605,23 @@ InstrRead ReadInstr(u64 instr){
             read.DR   = readbits(54, 4);
             read.SR1  = readbits(50, 4);
         }break;
+        case OP_JZ:
+        case OP_JNZ:
+        case OP_JP:
+        case OP_JN:
         case OP_JMP:{
-            read.SR1 = readbits(54, 4);
-        }break;
-        case OP_JZ:{
-            read.SR1 = readbits(54, 4);
-        }break;
-        case OP_JNZ:{
-            read.SR1 = readbits(54, 4);
-        }break;
-        case OP_JP:{
-            read.SR1 = readbits(54, 4);
-        }break;
-        case OP_JN:{
-            read.SR1 = readbits(54, 4);
+            if(readbits(57,1)) read.immval = sign_extend(readbits(0, 56), 56), read.immcond = 1;
+            else               read.SR1 = readbits(53, 4);
         }break;
         case OP_MOV:{
             read.DR = readbits(54, 4);
             if(readbits(53, 1)) read.immval = sign_extend(readbits(0, 52), 52), read.immcond = 1;
             else                read.SR1 = readbits(49,4);
+        }break;
+        case OP_LD:
+        case OP_ST:{
+            read.DR = readbits(54, 4);
+            read.SR1 = readbits(50, 4);
         }break;
     }
     return read;
@@ -600,8 +635,7 @@ struct machine{
 
     b32 powered = false;
     u64 PC_START = 0x0000; //the address the machine starts executing from.
-    u64 MEM_START = 0x7fff;
-    u64 mem[MAX_U16]; // the machines memory
+    u8 mem[MAX_U16]; // the machines memory
     
     void turnon(){
         powered = true;
@@ -621,8 +655,17 @@ struct machine{
         auto mem_write = [&](u64 address, u64 val){
             mem[address] = val;
         };
-        auto mem_read = [&](u64 address){
-            return mem[address];
+        auto mem_read_u8 = [&](u64 address){
+            return *(u8*)(mem + address);
+        };
+        auto mem_read_u16 = [&](u64 address){
+            return *(u16*)(mem + address);
+        };
+        auto mem_read_u32 = [&](u64 address){
+            return *(u32*)(mem + address);
+        };
+        auto mem_read_u64 = [&](u64 address){
+            return *(u64*)(mem + address);
         };
         auto update_flags = [&](u64 r){
             if     (ureg(r)==0)  ureg(R_COND)=FL_ZRO;
@@ -630,7 +673,7 @@ struct machine{
             else                 ureg(R_COND)=FL_POS;
         };
     
-        u64 instr = mem_read(reg[R_PC].u++);  //get current instruction
+        u64 instr = mem_read_u64(reg[R_PC].u++);  //get current instruction
         InstrRead read = ReadInstr(instr);
         
 #if 1
@@ -720,23 +763,42 @@ struct machine{
                 update_flags(read.DR);
             }break;
             case OP_JMP:{
-                ureg(R_PC) = ureg(read.SR1);
+                if(read.immcond) ureg(R_PC) = read.immval;
+                else             ureg(R_PC) = ureg(read.SR1);
             }break;
             case OP_JZ:{
-                if(ureg(R_COND) & FL_ZRO) ureg(R_PC) = ureg(read.SR1);
+                if(ureg(R_COND) & FL_ZRO){
+                    if(read.immcond) ureg(R_PC) = read.immval;
+                    else             ureg(R_PC) = ureg(read.SR1);
+                } 
             }break;
             case OP_JNZ:{
-                if(!(ureg(R_COND) & FL_ZRO)) ureg(R_PC) = ureg(read.SR1);
+                if(!(ureg(R_COND) & FL_ZRO)){
+                    if(read.immcond) ureg(R_PC) = read.immval;
+                    else             ureg(R_PC) = ureg(read.SR1);
+                } 
             }break;
             case OP_JP:{
-                if(ureg(R_COND) & FL_POS) ureg(R_PC) = ureg(read.SR1);
+                if(ureg(R_COND) & FL_POS){
+                    if(read.immcond) ureg(R_PC) = read.immval;
+                    else             ureg(R_PC) = ureg(read.SR1);
+                } 
             }break;
             case OP_JN:{
-                if(ureg(R_COND) & FL_NEG) ureg(R_PC) = ureg(read.SR1);
+                if(ureg(R_COND) & FL_NEG){
+                    if(read.immcond) ureg(R_PC) = read.immval;
+                    else             ureg(R_PC) = ureg(read.SR1);
+                } 
             }break;
             case OP_MOV:{
                 if(read.immcond) ureg(read.DR) = read.immval;
                 else             ureg(read.DR) = ureg(read.SR1);
+            }break;
+            case OP_ST:{
+                mem_write(ureg(read.DR), ureg(read.SR1));
+            }break; 
+            case OP_LD:{
+                ureg(read.DR) = mem_read_u64(ureg(read.SR1));
             }break;
         }//switch(read.OP)
     }//tick()

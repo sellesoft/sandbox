@@ -104,6 +104,8 @@ b32 is_opcode(str8 in){
         case str8case("jp"):    return OP_JP;
         case str8case("jn"):    return OP_JN;
         case str8case("mov"):   return OP_MOV;
+        case str8case("st"):    return OP_ST;
+        case str8case("ld"):    return OP_LD;
     }
     return OP_UNKNOWN;
 }
@@ -151,7 +153,7 @@ struct assembler{
         while(is_white_space(decoded_codepoint_from_utf8(stream.str, 4).codepoint)){
             out.count += str8_advance(&stream).advance;
             linecol++;
-            if(*stream.str == '\n'){
+            if(*(stream.str-1) == '\n'){
                 line_start = stream.str;
                 linenum++;
                 linecol = 0;
@@ -374,24 +376,38 @@ struct assembler{
                             case OP_JNZ: 
                             case OP_JP: 
                             case OP_JN:{
+                                u64 maximm = 57;
                                 instr = opcode;
                                 eat_whitespace();
                                 if(*stream.str == '%'){
                                     stream_next;
+                                    instr = (instr << 1) | 0;
                                     operand1 = parse_reg();
-                                    instr <<= 54;
+                                    instr <<= 53;
+                                    progout.add(instr);
+                                }else if(is_digit(*stream.str)){
+                                    operand1 = stolli(eat_int());
+                                    if(operand1 > nbits(maximm)){
+                                        asmerr("attempt to use immediate value ", operand1, " which is larger than the CPU's max immediate value for ", CyanFormatDyn(word), " (", maximm, " bits, which is ", nbits(maximm), "). \nYou must put this immediate value into a register then use it as an operand. \nTODO(sushi) implement an instruction for mov'ing a 64 bit value.");
+                                        break;
+                                    }
+                                    instr = (((instr << 1) | 1) << maximm) | operand1;
                                     progout.add(instr);
                                 }else{
-                                    asmerr("operand of ", CyanFormatDyn(word), " must be a register, did you forget '%'?");
+                                    asmerr("operand of ", CyanFormatDyn(word), " must be either a register or a number.");
                                     break;
+
                                 }
                                 if(*stream.str == ','){
                                     asmerr(CyanFormatDyn(word), " only takes one operand");
                                     break;
                                 }
                             }break;
+                            case OP_ST:
+                            case OP_LD:
                             case OP_NOT:{
                                 instr = opcode;
+                                eat_whitespace();
                                 if(*stream.str == '%'){
                                     stream_next;
                                     parse_reg();
@@ -401,6 +417,8 @@ struct assembler{
                                     asmerr(word, " expects 2 operands.");
                                     break;
                                 }
+                                stream_next;
+                                eat_whitespace();
                                 if(*stream.str == '%'){
                                     stream_next;
                                     parse_reg();

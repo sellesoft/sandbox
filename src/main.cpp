@@ -26,6 +26,7 @@
 #include "core/threading.h"
 #include "core/time.h"
 #include "core/ui.h"
+#include "core/ui2.h"
 #include "core/window.h"
 #include "core/file.h"
 #include "math/math.h"
@@ -269,20 +270,58 @@ int main(){
 	cmd_init();
 	window_show(DeshWindow);
 	render_use_default_camera();
+	uiInit(0,0);
 	DeshThreadManager->init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	assembler asmblr;
-	array<u64> program = asmblr.assemble(STR8("asm/fib.a"));
+	array<u64> program = asmblr.assemble(STR8("asm/set_half_kilobyte.a"));
 	
 	machine mchn;
 	mchn.PC_START = 0;
 	memcpy(mchn.mem + mchn.PC_START, program.data, program.count * sizeof(u64));
 	mchn.turnon();
 
+	uiItem* blocks[1024] = {0};
+	u64 inc = 2;
+#define viewsize 
+	uiItem* win = uiItemB();
+		win->style.background_color = color(14,14,14);
+		win->style.border_style = border_solid;
+		win->style.border_color = color(188,188,188);
+		win->style.border_width = 1;
+		win->style.padding = {5,5,5,5};
+		win->style.sizing = size_percent;
+		win->style.size = {100,100};
+		forI(1024){
+			blocks[i] = uiItemM();
+			blocks[i]->style.positioning = pos_relative;
+			blocks[i]->style.size = {10,10};
+		}
+	uiItemE();
+
 	//start main loop
 	while(platform_update()){DPZoneScoped;
-		mchn.tick();
+		if(mchn.ureg(0)){
+			mchn.tick();
+		}else if(key_pressed(Key_SPACE)){
+			mchn.ureg(0) = inc++;
+		}
+
+		vec2 cursor = {0,0};
+		forI(1024){
+			blocks[i]->style.pos = cursor;
+			u64 val = *(u64*)mchn.mem + i;
+			blocks[i]->style.background_color = color(val/5.f*255,val/5.f*255,val/5.f*255);
+			cursor.x += 10;
+			if(cursor.x > PaddedWidth(win)){
+				cursor.x = 0;
+				cursor.y += 10;
+			}
+			if(cursor.y > PaddedHeight(win)) break;
+		}
+
+		uiUpdate();
 		console_update();
 		UI::Update();
 		render_update();
