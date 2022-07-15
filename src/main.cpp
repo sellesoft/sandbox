@@ -273,7 +273,7 @@ int main(){
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	assembler asmblr;
-	array<u64> program = asmblr.assemble(STR8("asm/jumptests.a"));
+	array<u64> program = asmblr.assemble(STR8("asm/fib.a"));
 	
 	machine mchn;
 	mchn.PC_START = 0;
