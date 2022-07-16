@@ -275,7 +275,7 @@ int main(){
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	assembler asmblr;
-	array<u64> program = asmblr.assemble(STR8("asm/set_half_kilobyte.a"));
+	array<u64> program = asmblr.assemble(STR8("asm/set_mem_chunk.a"));
 	
 	File* file = file_init(STR8("asm/set_half_kilobyte.a"), FileAccess_Read);
 	file_cursor(file, 0);
@@ -313,9 +313,6 @@ int main(){
 			sws->overflow = overflow_hidden;
 			sws->background_color = color(0,0,0);
 			sws->margin_right = 4;
-			uiItem* test = uiItemM();
-			test->style.size = {10,10};
-			test->style.background_color = Color_Yellow;
 			uiItem* text = uiTextM(buffer);
 		uiItemE();
 

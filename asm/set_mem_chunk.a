@@ -4,7 +4,7 @@ mov %2, 64
 loop:
 st  %2, %0
 add %2, 8
-sub %3, %2, 65535
+sub %3, %2, 4096
 jnz loop
 mov %0, 0
 jmp reset
