@@ -65,28 +65,132 @@ void printbits(u64 in){
     Log("", bits);
 }
 
-enum hardware_type : u32 {
+enum  {
     HT_memory,
     HT_cpu,
     HT_bus,
 };
 
+struct battery{
+    f32 output = 5; //volts
+    u64 use = 0; //incremented by 1 everytime power is requested from this battery
+    
+    f32 power(){
+        return 5;
+    }
+};
+
+struct hardware{
+    u64 id;
+    str8 name;
+    Type type;
+};
+
+struct wire;
+struct pin{
+    wire* w = 0;
+    f32 V = 0;
+};
+
+struct wire{
+    pin* p0;
+    pin* p1;
+    f32 load = 5; //how much power the wire can carry before burning up or breaking
+    f32 voltage = 0; //how much force is travelling through the wire
+    b32 burnt = 0; //true when the wire has burnt up
+};
+
+//volatile
+//TODO(sushi) with very large ram chips, we may want to put clearing onto another thread
+//            and just block the chips execution until we are done
 /*
+    nasau ram chip
+    --------------
+
+    this is a parallel in/out random access memory chip
+    
+    it has 18 pins
+        1 for power
+        1 for chip select
+        16 for addressing
+        8 for input and output
+
+    
+    the chip can read up to 65535 addresses
 
 
 */
 
-struct hardware{
-    u64 id;
-    cstring name;
-    hardware_type type;
-
+enum{
+    ram_op_write,
+    ram_op_read,
 };
+struct ram {
+    hardware hw;
+    
+    b32 powered = 0;
 
-struct memory : public hardware {
     u8* mem = 0;
-    u64 size=0;
+    u64 size = 0;
+    //set to true when the chip has been cleared because of no power
+    //so we dont try and clear everytime this chip is clocked
+    b32 cleared = 0;
+
+    enum{
+        read_input,
+        write,
+        read,
+    };
+
+    u32 stage = 0;
+
+    struct{
+        pin power;
+
+        //if this pin is set to high, the chip will assume incoming signals
+        //are meant for it and respond to them
+        //otherwise the chip does nothing
+        pin active;
+
+        //addressing pins
+        pin a[16];
+
+        //input/output pins
+        pin io[8];
+    }pins;
+    
+    void init(u64 memsize){
+        size = memsize;
+        mem = (u8*)memalloc(memsize);
+    }
+
+    void clock(){
+        Assert(mem, "attempt to use a ram chip without initializing it. (call init())");
+        //if the power pin is set to low, then we clear the memory and do nothing else
+        if(!pins.power.w || pins.power.w->voltage < 2){
+            if(!cleared){
+                memset(mem, 0, size);
+                cleared = 1;
+            }
+            return;
+        }
+        cleared = 0;
+        switch(stage){
+            case read_input:{
+                if(!pins.active.w || pins.active.w->voltage < 2) return;
+
+            }break;
+        }
+
+
+
+    }    
+
 };
+
+struct rom {
+
+};  
 
 union Reg {
     u64 u;
@@ -176,6 +280,23 @@ static const str8 opnames[] = {
 };
 
 /*
+
+    nasau cpu opcode reference
+
+    nasau's current cpu opcodes are fixed length at 64 bits
+
+    the opcodes for nasau's cpus should follow some guidelines
+
+        1. the order of operands follows traditional writing of operations
+            so the destination is always the first operand, followed by sources
+            for example, add would be
+                add dr, sr1, sr2
+            which is equivalent to
+                destination register = source register 1 + source register 2
+        2. not sure of anymore yet :)
+
+    
+
 
 
     |  ****  |
@@ -276,6 +397,7 @@ smul:
         63   58|57  54|53  50| 49|48    0|
 ---------------------------------------------------------------------------------------------------------------
 div:
+//TODO(sushi) this can probably just store into high and low bytes of a single register
   unsigned division
 
   if the 45th bit is 0 sr1 is divided by sr2 and the quotient and remainder are stored in qr and rr respectively
@@ -803,5 +925,186 @@ struct machine{
         }//switch(read.OP)
     }//tick()
 };//machine
+
+/*
+    nasau cpu
+    ---------
+
+    this is a much-more-complex-than-it-needs-to-be implementation of a nasau cpu
+    this implementation uses the pin struct to simulate connects between it and other chips
+    in practical use it would be much better to just have chips communicate by calling each other
+*/
+// struct cpu{
+//     Reg reg[R_COUNT];
+
+//     struct{
+//         pin power;
+
+//         pin active;
+
+//         //addressing pins
+//         //64 bits provides access to 18,446,744,073,709,551,615 bytes of memory 
+//         pin a[64];
+
+//         //data pins
+//         //64 bits is the fixed length of an opcode for this cpu
+//         pin d[64];
+//     }pins;
+
+//     void tick(){
+//         if(!pins.power.w || pins.power.w->voltage < 2 || !pins.active.w || pins.active.w->voltage < 2){
+//             //reset the cpu and return immediatly
+//             reg = {0};
+//         }
+//         auto mem_write = [&](u64 address, u64 val){
+//             mem[address] = val;
+//         };
+//         auto mem_read_u8 = [&](u64 address){
+//             return *(u8*)(mem + address);
+//         };
+//         auto mem_read_u16 = [&](u64 address){
+//             return *(u16*)(mem + address);
+//         };
+//         auto mem_read_u32 = [&](u64 address){
+//             return *(u32*)(mem + address);
+//         };
+//         auto mem_read_u64 = [&](u64 address){
+//             return *(u64*)(mem + address);
+//         };
+//         auto update_flags = [&](u64 r){
+//             if     (ureg(r)==0)  ureg(R_COND)=FL_ZRO;
+//             else if(ureg(r)>>63) ureg(R_COND)=FL_NEG;
+//             else                 ureg(R_COND)=FL_POS;
+//         };
+    
+//         u64 instr = mem_read_u64(reg[R_PC].u++ * sizeof(u64));  //get current instruction
+//         InstrRead read = ReadInstr(instr);
+        
+// #if 0
+//         Log("",
+//             "OP:  ", opnames[read.OP], "\n",
+//             "DR:  %", read.DR, "\n",
+//             "QR:  %", read.QR, "\n",
+//             "RR:  %", read.RR, "\n",
+//             "SR1: %", read.SR1, "\n",
+//             "SR2: %", read.SR2, "\n",
+//             "imc: ", read.immcond, "\n",
+//             "imv: ", read.immval, "\n"
+//         );
+
+// #endif
+
+//         switch(read.OP){
+//             case OP_ADD:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) + read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) + ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_SUB:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) - read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) - ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_MUL:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) * read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) * ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_SMUL:{
+//                 if(read.immcond) sreg(read.DR) = sreg(read.SR1) * *(s64*)&read.immval;
+//                 else             sreg(read.DR) = sreg(read.SR1) * sreg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_DIV:{
+//                 if(read.immcond){
+//                     ureg(read.QR) = ureg(read.SR1) / read.immval;
+//                     ureg(read.RR) = ureg(read.SR1) % read.immval;
+//                 }else{
+//                     ureg(read.QR) = ureg(read.SR1) / ureg(read.SR2);
+//                     ureg(read.RR) = ureg(read.SR1) % ureg(read.SR2);
+//                 }
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_SDIV:{
+//                 if(read.immcond){
+//                     sreg(read.QR) = sreg(read.SR1) / *(s64*)read.immval;
+//                     sreg(read.RR) = sreg(read.SR1) % *(s64*)read.immval;
+//                 }
+//                 else{
+//                     sreg(read.QR) = sreg(read.SR1) / sreg(read.SR2);
+//                     sreg(read.RR) = sreg(read.SR1) % sreg(read.SR2);
+//                 }
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_AND:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) & read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) & ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_OR:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) | read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) | ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_XOR:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) ^ read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) ^ ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_SHR:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) >> read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) >> ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_SHL:{
+//                 if(read.immcond) ureg(read.DR) = ureg(read.SR1) << read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1) << ureg(read.SR2);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_NOT:{
+//                 ureg(read.DR) = !ureg(read.SR1);
+//                 update_flags(read.DR);
+//             }break;
+//             case OP_JMP:{
+//                 if(read.immcond) ureg(R_PC) = read.immval;
+//                 else             ureg(R_PC) = ureg(read.SR1);
+//             }break;
+//             case OP_JZ:{
+//                 if(ureg(R_COND) & FL_ZRO){
+//                     if(read.immcond) ureg(R_PC) = read.immval;
+//                     else             ureg(R_PC) = ureg(read.SR1);
+//                 } 
+//             }break;
+//             case OP_JNZ:{
+//                 if(!(ureg(R_COND) & FL_ZRO)){
+//                     if(read.immcond) ureg(R_PC) = read.immval;
+//                     else             ureg(R_PC) = ureg(read.SR1);
+//                 } 
+//             }break;
+//             case OP_JP:{
+//                 if(ureg(R_COND) & FL_POS){
+//                     if(read.immcond) ureg(R_PC) = read.immval;
+//                     else             ureg(R_PC) = ureg(read.SR1);
+//                 } 
+//             }break;
+//             case OP_JN:{
+//                 if(ureg(R_COND) & FL_NEG){
+//                     if(read.immcond) ureg(R_PC) = read.immval;
+//                     else             ureg(R_PC) = ureg(read.SR1);
+//                 } 
+//             }break;
+//             case OP_MOV:{
+//                 if(read.immcond) ureg(read.DR) = read.immval;
+//                 else             ureg(read.DR) = ureg(read.SR1);
+//             }break;
+//             case OP_ST:{
+//                 mem_write(ureg(read.DR), ureg(read.SR1));
+//             }break; 
+//             case OP_LD:{
+//                 ureg(read.DR) = mem_read_u64(ureg(read.SR1));
+//             }break;
+//         }//switch(read.OP)
+//     }//tick()
+// };
 
 #endif
