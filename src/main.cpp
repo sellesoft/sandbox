@@ -26,13 +26,10 @@
 #include "core/threading.h"
 #include "core/time.h"
 #include "core/ui.h"
+#include "core/ui2.h"
 #include "core/window.h"
 #include "core/file.h"
 #include "math/math.h"
-
-#if BUILD_INTERNAL
-#include "misc_testing.cpp"
-#endif
 
 int main(){
 	//init deshi
@@ -41,8 +38,9 @@ int main(){
 	platform_init();
 	logger_init();
 	window_create(str8l("suugu"));
-	console_init();
 	render_init();
+	uiInit(0,0);
+	console_init();
 	Storage::Init();
 	UI::Init();
 	cmd_init();
