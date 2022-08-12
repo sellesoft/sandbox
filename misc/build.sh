@@ -222,6 +222,7 @@ libs=(
   gdi32
   shell32
   ws2_32
+  winmm
   opengl32
   vulkan-1
   shaderc_combined

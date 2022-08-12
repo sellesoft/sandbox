@@ -317,7 +317,7 @@ void editor_make_visual_lines(uiStyle* line_style){
 		buffer_textregion_visible_lines += 1;
 		if(buffer_textregion_visible_lines > buffer_textregion_lines.count){
 			//buffer_textregion_lines.add(uiTextMS(str8{}, line_style));
-			buffer_textregion_lines.add(uiTextMS(STR8("--------------------line--------------------"), line_style));
+			buffer_textregion_lines.add(uiTextMS(line_style, STR8("--------------------line--------------------")));
 		}
 	}
 }
@@ -326,8 +326,6 @@ void init_ui(){
 	//[container] root  (don't trust the default style b/c it can change)
 	uiStyle root_style{};
 	root_style.positioning    = pos_fixed;
-	root_style.right          = MAX_F32;
-	root_style.bottom         = MAX_F32;
 	root_style.width          = (f32)DeshWindow->width;
 	root_style.height         = (f32)DeshWindow->height;
 	root_style.border_style   = border_none;
@@ -341,27 +339,29 @@ void init_ui(){
 		uiItemBS(&buffer_style);{
 			//[container] buffer filebar
 			uiStyle filebar_style{}; filebar_style = buffer_style;
-			filebar_style.sizing           = size_fill_x;
+			filebar_style.sizing           = size_percent_x;
+			filebar_style.width            = 100;
 			filebar_style.height           = config.font_height + 4;
 			filebar_style.background_color = color(112,110, 98);
 			filebar_style.text_color       = Color_Black;
 			uiItemBS(&filebar_style);{
 				//[widget] buffer filebar text
 				uiStyle filebar_text_style{}; filebar_text_style = filebar_style;
-				filebar_style.sizing             = size_fill;
+				filebar_style.sizing             = size_percent;
+				filebar_style.size               = {100,100};
 				filebar_text_style.margin_left   = 2;
 				filebar_text_style.margin_right  = 2;
 				filebar_text_style.margin_top    = 2;
 				filebar_text_style.margin_bottom = 2;
 				//buffer_filebar_text = uiTextM(str8{});
-				buffer_filebar_text = uiTextMS(STR8("filebar text"), &filebar_text_style);
+				buffer_filebar_text = uiTextMS(&filebar_text_style, STR8("filebar text"));
 			}uiItemE();
 			
 			//[container] buffer text region
 			uiStyle textregion_style{}; textregion_style = buffer_style;
-			textregion_style.sizing           = size_fill;
-			textregion_style.padding          = config.buffer_padding;
-			textregion_style.paddingbr        = config.buffer_padding;
+			textregion_style.sizing           = size_percent;
+			textregion_style.size             = {100,100};
+			textregion_style.padding          = {config.buffer_padding.x,config.buffer_padding.y,config.buffer_padding.x,config.buffer_padding.y};
 			textregion_style.background_color = config.buffer_color;
 			textregion_style.overflow         = overflow_scroll;
 			uiItemBS(&textregion_style);{
@@ -857,7 +857,7 @@ void update_editor(){DPZoneScoped;
 	if(key_pressed(binds.reloadConfig)){ load_config(); }
 	
 	//render char at cursor
-	render_start_cmd2(0, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+	render_start_cmd2(0, config.font->tex, vec2::ZERO, DeshWindow->dimensions.toVec2());
 	vec2 cursor = config.buffer_padding;
 	str8 scan = buffer->upperbloc;
 	b32 passed = 0;
@@ -867,15 +867,14 @@ void update_editor(){DPZoneScoped;
 		DecodedCodepoint dc = str8_advance(&scan);
 		draw_character(dc.codepoint, vec2::ONE, Color_White, &cursor);
 		if(main_cursor.pos == pos){
-			render_line2(vec2(prevpos.x,prevpos.y), vec2(prevpos.x,prevpos.y+config.font_height),Color_White);
-			
+			render_line2(prevpos, vec2{prevpos.x,prevpos.y+config.font_height},Color_White);
 		}
 		pos+=dc.advance;
 		if(!passed&&!scan) scan = buffer->lowerbloc, passed = 1;
 	}
 	
 	{//cursor debug
-		render_start_cmd2(1, config.font->tex, vec2::ZERO, DeshWindow->dimensions);
+		render_start_cmd2(1, config.font->tex, vec2::ZERO, DeshWindow->dimensions.toVec2());
 		str8 info=toStr8(
 						 "cursor","\n",
 						 "------", "\n",
@@ -885,9 +884,9 @@ void update_editor(){DPZoneScoped;
 						 "linelen: ", LineLength(buffer, main_cursor.line_idx), "\n",
 						 "linepos: ", LinePosition(buffer, &main_cursor), "\n",
 						 "move:    ", last_move_count
-						 ).fin;
+						 );
 		vec2 size = font_visual_size(config.font, info);
-		vec2 pos = DeshWindow->dimensions - size;
+		vec2 pos = DeshWindow->dimensions.toVec2() - size;
 		render_quad_filled2(pos, size, Color_Black);
 		while(info){
 			str8 line = str8_eat_until(info, '\n');
