@@ -198,21 +198,21 @@ struct progwrite{
 		mem++;
 	}
 
-	void SHR(u64 DR, u64 SR1, u64 immcond, u64 S){
-		u64 instr = 0b001010;
-		instr = (instr << 4) | (DR & nbits(4));
-		instr = (instr << 4) | (SR1 & nbits(4));
-		if(immcond){
-			instr = (instr << 1) | 1;
-			instr = (instr << 49) | (S & nbits(49));
-		}
-		else{
-			instr = (instr << 5) | (S & nbits(4));
-			instr <<= 45;
-		}
-		*mem = instr;
-		mem++;
+void SHR(u64 DR, u64 SR1, u64 immcond, u64 S){
+	u64 instr = 0b001010;
+	instr = (instr << 4) | (DR & nbits(4));
+	instr = (instr << 4) | (SR1 & nbits(4));
+	if(immcond){
+		instr = (instr << 1) | 1;
+		instr = (instr << 49) | (S & nbits(49));
 	}
+	else{
+		instr = (instr << 5) | (S & nbits(4));
+		instr <<= 45;
+	}
+	*mem = instr;
+	mem++;
+}
 
 	void SHL(u64 DR, u64 SR1, u64 immcond, u64 S){
 		u64 instr = 0b001011;
@@ -332,8 +332,13 @@ int main(){
 			}
 		uiItemE();
 
+		
+
 
 	uiItemE();
+
+	uiItem* item = uiItemB();
+
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
