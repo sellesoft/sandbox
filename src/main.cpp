@@ -22,7 +22,7 @@
 #include "core/memory.h"
 #include "core/platform.h"
 #include "core/render.h"
-#include "core/storage.h"
+#include "core/assets.h"
 #include "core/threading.h"
 #include "core/time.h"
 #include "core/ui.h"
@@ -39,9 +39,9 @@ int main(){
 	logger_init();
 	window_create(str8l("suugu"));
 	render_init();
+	assets_init();
 	uiInit(0,0);
 	console_init();
-	Storage::Init();
 	UI::Init();
 	cmd_init();
 	window_show(DeshWindow);
