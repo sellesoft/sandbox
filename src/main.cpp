@@ -42,17 +42,15 @@ int main(){
 	assets_init();
 	uiInit(0,0);
 	console_init();
-	UI::Init();
 	cmd_init();
 	window_show(DeshWindow);
 	render_use_default_camera();
-	DeshThreadManager->init();
+	threader_init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		console_update();
-		UI::Update();
 		render_update();
 		logger_update();
 		memory_clear_temp();
