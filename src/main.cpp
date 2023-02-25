@@ -31,6 +31,11 @@
 #include "core/file.h"
 #include "math/math.h"
 
+#include "stb/stb_ds.h"
+
+#include "types.h"
+#include "parser.cpp"
+
 int main(){
 	//init deshi
 	Stopwatch deshi_watch = start_stopwatch();
@@ -48,6 +53,12 @@ int main(){
 	threader_init();
 	LogS("deshi","Finished deshi initialization in ",peek_stopwatch(deshi_watch),"ms");
 	
+	storage.entities = memory_create_arena(sizeof(Entity) * 128);
+	storage.objects = memory_create_arena(sizeof(Object) * 128);
+	storage.agents = memory_create_arena(sizeof(Agent) * 128);
+
+	parse_ontology();
+
 	//start main loop
 	while(platform_update()){DPZoneScoped;
 		console_update();

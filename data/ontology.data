@@ -1,0 +1,182 @@
+entity:{
+    desc: "anything that exists, whether it be physical, abstract, tangible, intangible, etc.";
+    instance_of: entity;
+    plural: "entities";
+}
+concept:{
+    desc: "an intangible entity that represents an abstract idea.";
+    subclass_of: entity;
+    plural: "concepts";
+}
+class:{
+    desc: "a collection of items with similar qualities, characteristics, or attributes.";
+    instance_of: class;
+    plural: "classes";
+}
+object:{
+    desc: "anything tangible that may be acted upon.";
+    subclass_of: entity;
+    has_quality: ["mass", "age", "pos"];
+    plural: "objects";
+}
+container:{
+    desc: "any receptacle for holding an object.";
+    instance_of: class;
+    has_quality: [ "has", "volume", "closed" ];
+    plural: "containers";
+}
+food:{
+    desc: "any solid substance that can be consumed by living organisms in order to sustain life.";
+    instance_of: class;
+    has_quality: ["food_cost"];
+}
+fruit:{
+    desc: "sweet or fleshy part_of a plant that contains seed and can be eaten.";
+    subclass_of: "food";
+}
+apple:{
+    desc: "a common, round fruit produced by an apple tree.";
+    subclass_of: fruit;
+    plural: "apples";
+    template:{
+        adverts:{
+            eat:{
+                action:{
+                    time:{
+                        minutes: 1;
+                    }
+                    costs:{
+                        food: 1;
+                    }
+                    reqs:{
+                        has:{
+                            mouth:{
+                                has: null;
+                            } 
+                        }
+                        not:{
+                            instance_of: carnivore;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+organism: {
+    desc: "a discrete and complete living thing.";
+    instance_of: class;
+    has_quality: [sex];
+    plural: "organisms";
+}
+animal:{
+    desc: "an organism that is usually mobile, whose cells are not encased in a cell wall, and which derives energy solely from the consumption of other organisms";
+    subclass_of: organism;
+    plural: "animals";
+}
+omnivore:{
+    desc: "animal that consumes both plants and animals.";
+    subclass_of: animal;
+    plural: "omnivores";
+}
+carnivore:{
+    desc: "animal that exclusively consumes other animals.";
+    subclass_of: animal;
+    plural: "carnivores";
+}
+herbivore:{
+    desc: "animal that exclusively consumes plants";
+    subclass_of: animal;
+    plural: "herbivores";
+}
+manipulator:{
+    desc: "natural or artificial object used to grasp and hold.";
+    subclass_of: object;
+    plural: "manipulators";
+}
+body_part:{
+    desc: "a part of an animal.";
+    instance_of: class;
+    plural: "body parts";
+}
+arm:{
+    desc: "A limb of an animal";
+    instance_of: body_part;
+    plural: "arms";
+}
+leg:{
+    desc: "a limb of an animal used for locomotion.";
+    instance_of: body_part;
+    plural: "legs";
+}
+hand:{
+    desc: "the extremity of the human arm.";
+    instance_of: [body_part, manipulator, container];
+    part_of: [human, arm];
+    plural: "hands";
+}
+foot:{
+    desc: "a biological structure found in many animals that is used for locomotion and is found at the terminal part_of the leg.";
+    instance_of: body_part;
+    part_of: leg;
+    plural: "feet";
+}
+head:{
+    desc: "the part of an animal which contains the brain, mouth, and main sense organs";
+    instance_of: body_part;
+    plural: "heads";
+}
+brain:{
+    desc: "body part that serves as the center of the nervous system.";
+    instance_of: body_part;
+    part_of: [head];
+    plural: "brains";
+}
+eye:{
+    desc: "body part that detects light.";
+    instance_of: body_part;
+    part_of: head;
+    plural: "eyes";
+}
+mouth:{
+    desc: "body part that processes food.";
+    instance_of: [body_part, container];
+    part_of: head;
+    plural: "mouths";
+}
+human:{
+    desc: "of or belonging to the species Homo sapien.";
+    subclass_of: omnivore;
+    has_quality: ["has", "sex"];
+    plural: "humans";
+}
+event:{
+    desc: "an occurance in space and time. something that happens.";
+    subclass_of: entity;
+    plural: "humans";
+}
+activity:{
+    desc: "series of actions which results in a change";
+    subclass_of: event;
+    has_parts: [action];
+    plural: "activities";
+}
+action:{
+    desc: "something an agent can do.";
+    subclass_of: event;
+    plural: "actions";
+}
+sleeping_place:{
+    desc: "place used for sleep.";
+    instance_of: class;
+    plural: "sleeping places";
+}
+furniture:{
+    desc: "objects used in households, offices, or shops, for purposes such as storage, seating, sleeping, etc.";
+    subclass_of: object;
+}
+bed:{
+    desc: "a piece of furniture used to sleep or relax.";
+    subclass_of: [furniture, sleeping_place];
+    plural: beds;
+}
