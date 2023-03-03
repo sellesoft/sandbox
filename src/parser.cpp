@@ -71,14 +71,21 @@ void parse_concept(){
                 pass_key(desc);
                 if(*parser.stream.str != '"'){ error("expected a string for 'desc' of concept '", parser.working->name, "'."); return; }
                 parser.working->desc = eat_string();
+                advance();
             }break;
             case str8case("instance_of"):{
                 pass_key(instance_of);
                 if(!isalnum(utf8codepoint(parser.stream.str)) && *parser.stream.str != '_') { error("expected a concept identifier for 'instance of' of concept '", parser.working->name, "'."); return; }
                 str8 name = eat_word();
-                Entity* ref = concept_map_at(name);
+                Entity* ref = strmap_at(&storage.concepts, name);
                 if(!ref) { error("the concept '", name, "' is not defined."); return; }
                 
+            }break;
+            case str8case("plural"):{
+                // TODO(sushi) decide if we are going to use this or not.
+            }break; 
+            case str8case("has_quality"):{
+
             }break;
         }
 
@@ -96,6 +103,7 @@ void parse_concept(){
 // parses ontology.data
 void parse_ontology(){
     File* f = file_init(STR8("data/ontology.data"), FileAccess_Read);
+    //NOTE(sushi) we DONT deallocate this buffer, because we use it to point str8's into, instead of making many copies of its contents
     parser.buffer = file_read_alloc(f, f->bytes, deshi_allocator);
     file_deinit(f);
     parser.stream = parser.buffer;
@@ -108,8 +116,12 @@ void parse_ontology(){
         eat_whitespace();
         if(isalnum(utf8codepoint(parser.stream.str)) || *parser.stream.str == '_'){
             str8 name = eat_word();
-            if(concept_map_find(name) != -1) { error("the concept '", name, "' was defined twice."); return; }
-            concept_map_add(name, Entity{name});
+            if(strmap_find(&storage.concepts, name) != -1) { error("the concept '", name, "' was defined twice."); return; }
+            FixMe;
+            // smval v;
+            // v.type = smval_entity;
+            // v.entity = storage.entities;
+            // strmap_add(&storage.concepts, name, {smval_entity, Entity(name)});
             eat_whitespace();
             if(*parser.stream.str != ':'){ error("expected ':' after concept name defintion."); return; }
             advance();
