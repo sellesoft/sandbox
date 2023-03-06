@@ -31,8 +31,8 @@ food:{
     has_quality: ["food_cost"];
 }
 fruit:{
-    desc: "sweet or fleshy part_of a plant that contains seed and can be eaten.";
-    subclass_of: "food";
+    desc: "sweet or fleshy part of a plant that contains seed and can be eaten.";
+    subclass_of: food;
 }
 apple:{
     desc: "a common, round fruit produced by an apple tree.";
@@ -66,7 +66,7 @@ apple:{
 organism: {
     desc: "a discrete and complete living thing.";
     instance_of: class;
-    has_quality: [sex];
+    has_quality: ["sex"];
     plural: "organisms";
 }
 animal:{
@@ -178,5 +178,5 @@ furniture:{
 bed:{
     desc: "a piece of furniture used to sleep or relax.";
     subclass_of: [furniture, sleeping_place];
-    plural: beds;
+    plural: "beds";
 }

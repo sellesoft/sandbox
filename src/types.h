@@ -4,34 +4,18 @@
 #include "math/vector.h"
 
 struct Entity;
-struct Predicate{
-	Entity* subject;
-	str8 predicate;
-	Entity* object;
-};
+
 
 // represents keys in strmap
+// NOTE(sushi): the key_string is NOT copied and is expected to be kept allocated by the user 
 struct smkey{
 	str8 key_string;
 	u64 key;
 };
 
-// indicates what type an smval is
-enum{
-	smval_string, // an smval that holds a str8
-	smval_entity, // an smval that holds an Entity*
-	smval_array,  // an smval that holds an array of smvals
-};
 
-// represents a value in a strmap
-struct smval{
-	Type type;
-	union{
-		str8 str;
-		Entity* entity;
-		smval* arr;
-	};
-};
+
+struct smval;
 
 // maps a string to a value
 // the value may be a string, and Entity*, or an array of smvals
@@ -41,6 +25,32 @@ struct strmap{
 	smval* values;
 	s64 count;
 	s64 space;
+};
+
+// indicates what type an smval is
+enum{
+	smval_null,         // nothing, likely an error
+	smval_string,       // holds a str8
+	smval_entity,       // holds an Entity*
+	smval_array,        // holds an array of smvals
+	smval_map,          // holds a strmap
+	smval_signed_int,   // holds a signed int
+	smval_unsigned_int, // holds a unsigned int
+	smval_float,        // holds a float
+};
+
+// represents a value in a strmap
+struct smval{
+	Type type;
+	union{
+		str8 str;
+		Entity* entity;
+		smval* arr;
+		strmap map;
+		s64 signed_int;
+		u64 unsigned_int;
+		f64 floating;
+	};
 };
 
 // returns the index of a key
@@ -82,9 +92,9 @@ void strmap_insert(strmap* map, s64 idx, str8 key, u64 hashed, smval val){DPZone
 		MoveMemory(map->keys+idx+1, map->keys+idx, (map->count-idx)*sizeof(smkey));
 		MoveMemory(map->values+idx+1, map->values+idx, (map->count-idx)*sizeof(smval));
 	}
-	CopyMemory(&(map->keys+idx)->key_string, &key, sizeof(str8));
-	CopyMemory(&(map->keys+idx)->key, &hashed, sizeof(u64));
-	CopyMemory(map->values+idx, &val, sizeof(smval));
+	(map->keys+idx)->key_string = key;
+	(map->keys+idx)->key = hashed;
+	*(map->values+idx) = val;
 	map->count++;
 }
 
@@ -164,6 +174,8 @@ smval* strmap_at_idx(strmap* map, s64 idx){
 	return &map->values[idx];
 }
 
+
+
 //TODO(sushi) we could just store this in the actual strmap struct, but that may be tedious
 struct smpair{
 	smkey* key;
@@ -180,7 +192,7 @@ smpair strmap_pair_at_idx(strmap* map, s64 idx){
 struct Action{
 	u64  time;
 	f32* costs; 
-	Predicate* reqs; // a list of requirements in the form of predicates needed to perform this action
+	strmap reqs; // a list of requirements in the form of predicates needed to perform this action
 };
 
 // an advertisement of a collection of actions that an agent may take
@@ -216,23 +228,20 @@ struct Agent{
 	Entity* memories; // TODO(sushi)
 };
 
-struct cmkey{
-	str8 name;
-	u64 key;
-};
-
-// a sorted map for concepts; unique entities representing classes of entities
-// this handles collisions by storing the original key string
-struct cmap{
-	cmkey* keys;
-	Entity* values;
-	s64 count;
-	s64 space;
-};
-
 struct{
 	Arena* entities;
 	Arena* objects;
 	Arena* agents;
 	strmap concepts;
 }storage;
+
+// returns -1 if no more room
+u64 storage_add_entity() {
+	if(storage.entities->used + sizeof(Entity) > storage.entities->size){
+		LogE("agent_storage", "The max amount of entities have been allocated. Increase size of storage.entities.");
+		return -1;
+	}
+	storage.entities->used += sizeof(Entity);
+	storage.entities->cursor += sizeof(Entity);
+	return u64(storage.entities->cursor - storage.entities->start) / sizeof(Entity);
+}
