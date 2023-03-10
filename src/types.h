@@ -16,6 +16,8 @@ struct smkey{
 
 
 struct smval;
+struct strmap;
+smval* strmap_at(strmap* map, str8 key);
 
 // maps a string to a value
 // the value may be a string, and Entity*, or an array of smvals
@@ -25,6 +27,9 @@ struct strmap{
 	smval* values;
 	s64 count;
 	s64 space;
+
+	template<u64 N> smval* operator[](char const (&key)[N]){ str8 guy; guy.str = (u8*)key; guy.count = N-1; return strmap_at(this, guy); }
+	smval* operator[](str8 key){ return strmap_at(this, key); }
 };
 
 // indicates what type an smval is
@@ -174,8 +179,6 @@ smval* strmap_at_idx(strmap* map, s64 idx){
 	return &map->values[idx];
 }
 
-
-
 //TODO(sushi) we could just store this in the actual strmap struct, but that may be tedious
 struct smpair{
 	smkey* key;
@@ -201,10 +204,19 @@ struct Advert{
 	Action* actions;
 };
 
+enum{
+	entity_null, // indicates that an entity has not been parsed or that an error has occured
+	entity_entity,
+	entity_object,
+	entity_agent,
+};
+
 // anything that exists, whether it be physical, abstract, tangible, intangible... so on.
 // all things have a name and a set of predicates describing qualities about that thing
 struct Entity{
-	str8 name;
+	Type type;
+	str8 raw;  // the data that defined this entity
+	str8 name; 
 	str8 desc;
 	strmap predicates;
 };
@@ -228,6 +240,25 @@ struct Agent{
 	Entity* memories; // TODO(sushi)
 };
 
+// walks up from a given entity to find if it is a subclass of the other entity.
+b32 is_subclass_of(Entity* entity, Entity* class_entity){
+	smval* val = strmap_at(&entity->predicates, STR8("subclass_of"));
+	if(!val) return 0;
+	switch(val->type){
+		case smval_entity:{
+			if(val->entity == class_entity) return 1;
+			else return is_subclass_of(val->entity, class_entity);
+		}break;
+		case smval_array:{
+			forI(arrlen(val->arr)){
+				Entity* e = val->arr[i].entity;
+				if(is_subclass_of(e, class_entity)) return 1;
+			}
+		}break;
+	}
+	return 0;
+}
+
 struct{
 	Arena* entities;
 	Arena* objects;
@@ -245,3 +276,101 @@ u64 storage_add_entity() {
 	storage.entities->cursor += sizeof(Entity);
 	return u64(storage.entities->cursor - storage.entities->start) / sizeof(Entity);
 }
+
+u64 storage_add_object() {
+	if(storage.objects->used + sizeof(Object) > storage.objects->size){
+		LogE("agent_storage", "The max amount of objects have been allocated. Increase size of storage.objects.");
+		return -1;
+	}
+	storage.objects->used += sizeof(Object);
+	storage.objects->cursor += sizeof(Object);
+	return u64(storage.objects->cursor - storage.objects->start) / sizeof(Object);
+}
+
+u64 storage_add_agent() {
+	if(storage.agents->used + sizeof(Agent) > storage.agents->size){
+		LogE("agent_storage", "The max amount of agents have been allocated. Increase size of storage.agents.");
+		return -1;
+	}
+	storage.agents->used += sizeof(Agent);
+	storage.agents->cursor += sizeof(Agent);
+	return u64(storage.agents->cursor - storage.agents->start) / sizeof(Agent);
+}
+
+
+//TODO(sushi) printing stuff nicely
+// struct{
+// 	u32 indent_level;	
+// }sts = {0};
+// #define do_indent()\
+// forI(sts.indent_level){\
+// 	str8_builder_append(builder, "\t");\
+// }
+
+// void strmap_to_str(strmap* map, str8b* builder);
+
+// // void entity_to_str(Entity* e, str8b builder, b32 show_predicates = 0){
+// // 	str8_builder_append(builder, "Entity[", e->name);
+// // 	if(show_predicates){
+// // 		str8_builder_append(builder, ";\n");
+// // 		sts.indent_level++;
+// // 		do_indent();
+// // 		str8_builder_append(builder, "desc: \"", e->desc, "\";\n");
+// // 		strmap_to_str(&e->predicates, builder);
+// // 		sts.indent_level--;
+// // 		str8_builder_append(builder, "desc: \"", e->desc, "\";\n");
+
+// // 	}else{
+// // 		str8_builder_append(builder, "];\n");
+// // 		do_indent();
+// // 	}
+// // }
+
+// void element(smval val, str8b* builder){
+// 	switch(val.type){
+// 		case smval_entity:{
+// 			Entity* e = val.entity;
+// 			str8_builder_append(builder, "Entity[", e->name, "];\n");
+// 			do_indent();
+// 		}break;
+// 		case smval_float:{
+// 			str8_builder_append(builder, val.floating, ";\n");
+// 			do_indent();
+// 		}break;
+// 		case smval_signed_int:{
+// 			str8_builder_append(builder, val.signed_int, ";\n");
+// 			do_indent();
+// 		}break;
+// 		case smval_unsigned_int:{
+// 			str8_builder_append(builder, val.unsigned_int, ";\n");
+// 			do_indent();
+// 		}break;
+// 		case smval_string:{
+// 			str8_builder_append(builder, "\"", val.str, "\";\n");
+// 			do_indent();
+// 		}break;
+// 		case smval_array:{
+// 			forI(arrlen(val.arr)){
+// 				element(val.arr[i], builder);
+// 			}
+// 		}break;
+// 		case smval_map:{
+// 			str8_builder_append(builder, ": {\n");
+// 			sts.indent_level++;
+// 			strmap_to_str(&val.map, builder);
+// 			sts.indent_level--;
+// 			do_indent();
+// 		}break;
+// 	}	
+// }
+
+// // pretty prints a strmap to a str8_builder
+// // expects an allocated str8_builder
+// void strmap_to_str(strmap* map, str8b* builder){
+// 	forI(map->count){
+// 		smkey key = map->keys[i];
+// 		smval val = map->values[i];
+// 		str8_builder_append(builder, key.key_string, ": ");
+// 		element(val, builder);
+// 	}
+// }

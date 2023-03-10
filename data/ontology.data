@@ -1,17 +1,6 @@
 entity:{
     desc: "anything that exists, whether it be physical, abstract, tangible, intangible, etc.";
-    instance_of: entity;
     plural: "entities";
-}
-concept:{
-    desc: "an intangible entity that represents an abstract idea.";
-    subclass_of: entity;
-    plural: "concepts";
-}
-class:{
-    desc: "a collection of items with similar qualities, characteristics, or attributes.";
-    instance_of: class;
-    plural: "classes";
 }
 object:{
     desc: "anything tangible that may be acted upon.";
@@ -19,15 +8,20 @@ object:{
     has_quality: ["mass", "age", "pos"];
     plural: "objects";
 }
+agent:{
+    desc: "any object that have needs and make take actions against other objects to affect these needs.";
+    subclass_of: object;
+    plural: "agents";
+}
 container:{
     desc: "any receptacle for holding an object.";
-    instance_of: class;
+    subclass_of: entity;
     has_quality: [ "has", "volume", "closed" ];
     plural: "containers";
 }
 food:{
     desc: "any solid substance that can be consumed by living organisms in order to sustain life.";
-    instance_of: class;
+    subclass_of: object;
     has_quality: ["food_cost"];
 }
 fruit:{
@@ -42,21 +36,11 @@ apple:{
         adverts:{
             eat:{
                 action:{
-                    time:{
-                        minutes: 1;
-                    }
-                    costs:{
-                        food: 1;
-                    }
+                    time:{ minutes: 1; }
+                    costs:{ food: 1; }
                     reqs:{
-                        has:{
-                            mouth:{
-                                has: null;
-                            } 
-                        }
-                        not:{
-                            instance_of: carnivore;
-                        }
+                        has:{ mouth:{ has: null; } }
+                        not:{ instance_of: carnivore; }
                     }
                 }
             }
@@ -65,7 +49,7 @@ apple:{
 }
 organism: {
     desc: "a discrete and complete living thing.";
-    instance_of: class;
+    subclass_of: agent;
     has_quality: ["sex"];
     plural: "organisms";
 }
@@ -96,51 +80,51 @@ manipulator:{
 }
 body_part:{
     desc: "a part of an animal.";
-    instance_of: class;
+    subclass_of: object;
     plural: "body parts";
 }
 arm:{
     desc: "A limb of an animal";
-    instance_of: body_part;
+    subclass_of: body_part;
     plural: "arms";
 }
 leg:{
     desc: "a limb of an animal used for locomotion.";
-    instance_of: body_part;
+    subclass_of: body_part;
     plural: "legs";
 }
 hand:{
     desc: "the extremity of the human arm.";
-    instance_of: [body_part, manipulator, container];
+    subclass_of: [body_part, manipulator, container];
     part_of: [human, arm];
     plural: "hands";
 }
 foot:{
     desc: "a biological structure found in many animals that is used for locomotion and is found at the terminal part_of the leg.";
-    instance_of: body_part;
+    subclass_of: body_part;
     part_of: leg;
     plural: "feet";
 }
 head:{
     desc: "the part of an animal which contains the brain, mouth, and main sense organs";
-    instance_of: body_part;
+    subclass_of: body_part;
     plural: "heads";
 }
 brain:{
     desc: "body part that serves as the center of the nervous system.";
-    instance_of: body_part;
+    subclass_of: body_part;
     part_of: [head];
     plural: "brains";
 }
 eye:{
     desc: "body part that detects light.";
-    instance_of: body_part;
+    subclass_of: body_part;
     part_of: head;
     plural: "eyes";
 }
 mouth:{
     desc: "body part that processes food.";
-    instance_of: [body_part, container];
+    subclass_of: [body_part, container];
     part_of: head;
     plural: "mouths";
 }
@@ -168,7 +152,7 @@ action:{
 }
 sleeping_place:{
     desc: "place used for sleep.";
-    instance_of: class;
+    subclass_of: object;
     plural: "sleeping places";
 }
 furniture:{

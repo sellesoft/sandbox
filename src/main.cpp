@@ -36,6 +36,16 @@
 #include "types.h"
 #include "parser.cpp"
 
+Object* object_from_concept(str8 name, vec2 pos){
+	smval* get = strmap_at(&storage.concepts, name);
+	if(!get) { Log("agentmodel", "unable to create object from concept '", name, "' because it is not defined."); return 0; }
+	Entity* e = get->entity;
+	Object* obj = ((Object*)storage.objects->start) + storage_add_object();
+	CopyMemory(&obj->entity, e, sizeof(Entity));
+	obj->pos = pos;
+	return obj;
+}	
+
 int main(){
 	//init deshi
 	Stopwatch deshi_watch = start_stopwatch();
@@ -58,6 +68,14 @@ int main(){
 	storage.agents = memory_create_arena(sizeof(Agent) * 128);
 
 	parse_ontology();
+
+	forI(storage.concepts.count){
+		Log("", storage.concepts.values[i].entity->name, " ", storage.concepts.values[i].entity->type);
+	}
+
+	Object* bed = object_from_concept(STR8("bed"), {1,1});
+
+	Log("", is_subclass_of((Entity*)bed, strmap_at(&storage.concepts, STR8("entity"))->entity));
 
 	//start main loop
 	while(platform_update()){DPZoneScoped;
