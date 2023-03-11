@@ -163,6 +163,13 @@ smval parse_array(EntityBlock* block){
             return {0};
         }else advance(block);
     }
+    if(!arrlen(out.arr)){
+        warning(block, "empty array.");
+    }
+    else if(arrlen(out.arr) == 1){
+        warning(block, "array with only 1 element.");
+    }
+
     return out;
 }
 
@@ -328,6 +335,7 @@ smval parse_action(EntityBlock* block){
 smval parse_adverts(EntityBlock* block){
     advance(block); // skip {
     smval out{smval_map};
+    strmap* map = &out.map;
     while(1){
         eat_whitespace(block);
         if(*block->stream.str == '}'){
@@ -371,6 +379,7 @@ smval parse_adverts(EntityBlock* block){
                 }break;
             }
         }
+        strmap_add(map, key, advert);
     }
     return out;
 }
@@ -380,6 +389,7 @@ smval parse_adverts(EntityBlock* block){
 smval parse_template(EntityBlock* block){
     advance(block); // skip {
     smval out{smval_map};
+    strmap* map = &out.map;
     while(1){
         eat_whitespace(block);
         if(*block->stream.str == '}'){
@@ -394,6 +404,7 @@ smval parse_template(EntityBlock* block){
         switch(str8_hash64(key)){
             case str8case("adverts"):{
                 smval v = parse_adverts(block); if(!v.type) return {0};
+                strmap_add(map, key, v);
             }break;
             default:{
                 error(block, "unknown key '", key, "'.");
@@ -520,7 +531,6 @@ b32 parse_entity(EntityBlock* block){
                     str8 str = eat_string(block); if(!str.str) return 0;
                     v.str = str;
                     strmap_add(&block->entity->predicates, STR8("has_quality"), v);
-                    advance(block);
                 }else{
                     error(block, "invalid value for key 'has_quality'. valid values are strings or an array of only strings.");
                     return 0;
@@ -641,7 +651,7 @@ void parse_ontology(){
             advance(block);
             curr.count = block->stream.str - curr.str;
             smval v{smval_entity}; 
-            v.entity = ((Entity*)storage.entities->start) + storage_add_entity();
+            v.entity = storage_add_entity();
             v.entity->name = name; // TODO(sushi) maybe automatically replace underscores with spaces
             v.entity->raw = curr;
             u64 idx = strmap_add(&storage.concepts, name, v);

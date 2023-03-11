@@ -22,7 +22,7 @@ container:{
 food:{
     desc: "any solid substance that can be consumed by living organisms in order to sustain life.";
     subclass_of: object;
-    has_quality: ["food_cost"];
+    has_quality: "food_cost";
 }
 fruit:{
     desc: "sweet or fleshy part of a plant that contains seed and can be eaten.";
@@ -50,7 +50,7 @@ apple:{
 organism: {
     desc: "a discrete and complete living thing.";
     subclass_of: agent;
-    has_quality: ["sex"];
+    has_quality: "sex";
     plural: "organisms";
 }
 animal:{
@@ -76,6 +76,7 @@ herbivore:{
 manipulator:{
     desc: "natural or artificial object used to grasp and hold.";
     subclass_of: object;
+    has_quality: "has";
     plural: "manipulators";
 }
 body_part:{
@@ -113,7 +114,7 @@ head:{
 brain:{
     desc: "body part that serves as the center of the nervous system.";
     subclass_of: body_part;
-    part_of: [head];
+    part_of: head;
     plural: "brains";
 }
 eye:{
@@ -133,6 +134,9 @@ human:{
     subclass_of: omnivore;
     has_quality: ["has", "sex"];
     plural: "humans";
+    template:{
+
+    }
 }
 event:{
     desc: "an occurance in space and time. something that happens.";
@@ -142,7 +146,7 @@ event:{
 activity:{
     desc: "series of actions which results in a change";
     subclass_of: event;
-    has_parts: [action];
+    has_parts: action;
     plural: "activities";
 }
 action:{
@@ -163,4 +167,14 @@ bed:{
     desc: "a piece of furniture used to sleep or relax.";
     subclass_of: [furniture, sleeping_place];
     plural: "beds";
+    template:{
+        adverts:{
+            sleep:{
+                action:{
+                    time:{ hours: 8; }
+                    costs:{ sleep: 1; }
+                }
+            }
+        }
+    }
 }
