@@ -5,15 +5,12 @@
 
 struct Entity;
 
-
 // represents keys in strmap
 // NOTE(sushi): the key_string is NOT copied and is expected to be kept allocated by the user 
 struct smkey{
 	str8 key_string;
 	u64 key;
 };
-
-
 
 struct smval;
 struct strmap;
@@ -191,18 +188,54 @@ smpair strmap_pair_at_idx(strmap* map, s64 idx){
 	return {&map->keys[idx], &map->values[idx]};
 }
 
+enum{
+	need_hunger,
+	need_sleep,
+	need_bladder,
+	need_mood,
+	need_food,
+	need_COUNT,
+};
+
+struct Needs{
+	union{
+		f32 arr[5];
+		struct{
+			f32 hunger;
+			f32 sleep;
+			f32 bladder;
+			f32 mood;
+			f32 food;
+		};
+	};
+};
+
 // an event caused by an Agent that causes some change in the world
 struct Action{
-	u64  time;
-	f32* costs; 
+	str8 name;
+	u64 time;
+	Needs costs;
 	strmap reqs; // a list of requirements in the form of predicates needed to perform this action
 };
+
+Action idle;
 
 // an advertisement of a collection of actions that an agent may take
 struct Advert{
 	str8 name;
 	Action* actions;
 };
+
+Needs advert_costs(Advert* advert){
+	Needs out = {0};
+	forI(arrlen(advert->actions)){
+		Action* action = advert->actions + i;
+		forX(j, need_COUNT){
+			out.arr[j] += action->costs.arr[j];
+		}
+	}
+	return out;
+}
 
 enum{
 	entity_null, // indicates that an entity has not been parsed or that an error has occured
@@ -228,15 +261,20 @@ struct Object{
 	u32 age;
 	vec2 pos;
 	f32 mass;
-	Advert* adverts;
+	Advert* adverts; // stb array
+};
+
+struct ActionQueue{
+	Action** actions;
+	u64* times;
 };
 
 // an animate object that can make decisions to take actions on other objects based on 
 // a list of needs and is able to store memories about entities.
 struct Agent{
 	Object object;
-	Action* action_queue;
-	f32* needs;
+	ActionQueue action_queue;
+	Needs needs;
 	Entity* memories; // TODO(sushi)
 };
 
@@ -263,39 +301,68 @@ struct{
 	Arena* entities;
 	Arena* objects;
 	Arena* agents;
+	// Arena* adverts; // normally allocated, for now
 	strmap concepts;
 }storage;
 
+struct{
+	struct{
+		Action idle;
+	}actions;
+	struct{
+		Entity* entity;
+		Entity* object;
+		Entity* agent;
+
+	}concepts;
+}singletons;
+
 // returns -1 if no more room
-u64 storage_add_entity() {
+Entity* storage_add_entity() {
 	if(storage.entities->used + sizeof(Entity) > storage.entities->size){
 		LogE("agent_storage", "The max amount of entities have been allocated. Increase size of storage.entities.");
-		return -1;
+		return 0;
 	}
+	Entity* out = (Entity*)storage.entities->cursor;
 	storage.entities->used += sizeof(Entity);
 	storage.entities->cursor += sizeof(Entity);
-	return u64(storage.entities->cursor - storage.entities->start) / sizeof(Entity);
+	return out;
 }
 
-u64 storage_add_object() {
+Object* storage_add_object() {
 	if(storage.objects->used + sizeof(Object) > storage.objects->size){
 		LogE("agent_storage", "The max amount of objects have been allocated. Increase size of storage.objects.");
-		return -1;
+		return 0;
 	}
+	Object* out = (Object*)storage.objects->cursor;
 	storage.objects->used += sizeof(Object);
 	storage.objects->cursor += sizeof(Object);
-	return u64(storage.objects->cursor - storage.objects->start) / sizeof(Object);
+	return out;
 }
 
-u64 storage_add_agent() {
+Agent* storage_add_agent() {
 	if(storage.agents->used + sizeof(Agent) > storage.agents->size){
 		LogE("agent_storage", "The max amount of agents have been allocated. Increase size of storage.agents.");
-		return -1;
+		return 0;
 	}
+	Agent* out = (Agent*)storage.agents->cursor;
 	storage.agents->used += sizeof(Agent);
 	storage.agents->cursor += sizeof(Agent);
-	return u64(storage.agents->cursor - storage.agents->start) / sizeof(Agent);
+	return out;
 }
+
+// Advert* storage_add_advert() {
+// 	if(storage.entities->used + sizeof(Entity) > storage.entities->size){
+// 		LogE("agent_storage", "The max amount of entities have been allocated. Increase size of storage.entities.");
+// 		return -1;
+// 	}
+// 	Entity* out = (Entity*)storage.entities->cursor;
+// 	storage.entities->used += sizeof(Entity);
+// 	storage.entities->cursor += sizeof(Entity);
+// 	return out;
+// }
+
+
 
 
 //TODO(sushi) printing stuff nicely
