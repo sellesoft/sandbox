@@ -606,6 +606,45 @@ b32 parse_entity(EntityBlock* block){
     #undef check_for_semicolon
 }
 
+
+// runs through the buffer and turns all comments into whitespace
+void preprocess_ontology(){
+    str8 stream = parser.stream;
+    while(stream){
+        if(*stream.str == '/'){
+            u8* save = stream.str;
+            str8_advance(&stream);
+            if(*stream.str == '/'){
+                *save = ' ';
+                while(stream && *stream.str != '\r' && *stream.str != '\n') {
+                    *stream.str = ' ';
+                    str8_advance(&stream);
+                }
+            }else if(*stream.str == '*'){
+                *save = ' ';
+                *stream.str = ' ';
+                str8_advance(&stream);
+                while(stream){
+                    if(*stream.str == '*'){
+                        str8_advance(&stream);
+                        if(!stream || *stream.str == '/'){
+                            *(stream.str-1) = ' ';
+                            *stream.str = ' ';
+                            break;
+                        }
+                        else *stream.str = ' ';
+                    }else{
+                        *stream.str = ' ';
+                        str8_advance(&stream);
+
+                    }
+                }
+            }
+        }
+        str8_advance(&stream);
+    }
+}
+
 // parses ontology.data
 void parse_ontology(){
     File* f = file_init(STR8("data/ontology.data"), FileAccess_Read);
@@ -615,6 +654,7 @@ void parse_ontology(){
     parser.stream = parser.buffer;
     parser.line = 1;
     parser.column = 1;
+    preprocess_ontology();
 
     str8 stream = parser.buffer;
 
