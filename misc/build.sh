@@ -191,7 +191,7 @@ misc_folder="$( cd -- "$( dirname -- "${BASH_SOURCE[0]:-$0}"; )" &> /dev/null &&
 root_folder="$misc_folder/.."
 vulkan_folder="$VULKAN_SDK"
 tracy_folder="H:/src/tracy-0.7.8" #TODO(sushi) make this an env var
-graphviz_folder="H:/src/graphviz_debug"
+graphviz_folder="H:/src/graphviz"
 
 
 if [ $vulkan_override != 0 ]; then
@@ -231,6 +231,12 @@ libs=(
   opengl32
   vulkan-1
   shaderc_combined
+
+  #graphviz libs
+  cdt
+  cgraph
+  cgraph++
+  gvc
 )
 #_____________________________________________________________________________________________________
 #                                         Global Defines
